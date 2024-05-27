@@ -1,0 +1,5325 @@
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 1
+msx_asm\tur_init.ASM
+
+
+
+      1	    0000				  .model small
+      2	    0000				  .code
+      3						  .486	; .8086
+      4
+      5						  include msx_gen\init.mc
+1     6					 ; ^QW:	find current word
+1     7					 ; ^QS:	find current word without first	letter (for names that start with an
+1     8					 ;	underscore)
+1     9
+1    10					 ; - define the	symbol 'MSX' to	compile	the msx	compiler
+1    11					 ;   otherwise the PC version will be generated
+1    12
+1    13					 ; - define the	symbol 'USELIB'	to compile all library routines
+1    14					 ; - define the	symbol 'NEWEXT'	to use the new external	routine
+1    15
+1    16					 ;NEWEXT:
+1    17	    0000			 FASTREAL:
+1    18
+1    19	    0000			 MSX:
+1    20
+1    21		  =0005			 MSXDOS	 EQU 5
+1    22	    0000			 USELIB:
+1    23
+1    24						 INCLUDE STDIO.INC
+2    25		  =0004			 FIL_HDR  EQU 4			     ; length of FILE header
+2    26
+2    27						  include ..\library\fileio.inc
+3    28
+3    29					 ; FILEIO.MAC global definitions file
+3    30
+3    31						  GLOBAL DOS2Present:NEAR
+3    32						  GLOBAL InitFileIO:NEAR
+3    33						  GLOBAL GetError:NEAR
+3    34						  GLOBAL SetErrorHandler:NEAR
+3    35						  GLOBAL ResErrorHandler:NEAR
+3    36
+3    37						  GLOBAL ParseName:NEAR
+3    38						  GLOBAL SetExtension:NEAR
+3    39
+3    40						  GLOBAL CreateFile:NEAR
+3    41						  GLOBAL OpenFile:NEAR
+3    42						  GLOBAL ReadFile:NEAR
+3    43						  GLOBAL WriteFile:NEAR
+3    44						  GLOBAL CloseFile:NEAR
+3    45						  GLOBAL FileSeek:NEAR
+3    46						  GLOBAL FilePos:NEAR
+3    47						  GLOBAL FileSize:NEAR
+3    48						  GLOBAL DeleteFile:NEAR     ; or subdirectory
+3    49						  GLOBAL RenameFile:NEAR     ; or subdirectory
+3    50						  GLOBAL GetCurrentDirectory:NEAR
+3    51
+3    52						  GLOBAL FatalError:NEAR     ; 0 = no fatal error, NonZero = fatal
+3    53						  GLOBAL ErrorNumber:NEAR    ; 0 = no error, NonZero = DOS 2 error code
+3    54
+3    55		  =0024			 FCB_LEN	   EQU 36	     ; length of an FCB
+3    56
+3    57		  =0000			 FCB_DRIVE	   EQU 0	     ; Drive Number
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 2
+msx_asm\tur_init.ASM
+
+
+
+3    58		  =0001			 FCB_NAME	   EQU 1	     ; Name
+3    59		  =0009			 FCB_EXT	   EQU 9	     ; Extension
+3    60		  =000E			 FCB_RECSIZE	   EQU 0EH	     ; Record Size (word)
+3    61		  =0010			 FCB_FILESIZE	   EQU 10H	     ; File Size (long)
+3    62		  =0021			 FCB_FILEPOS	   EQU 21H	     ; File Position (long)
+3    63
+3    64
+2    65
+2    66		  =0000			 FIB_F	  EQU 0			     ; Flags byte
+2    67		  =0001			 FIB_CHR  EQU 1			     ; Character buffer
+2    68		  =0002			 FIB_PTR  EQU 2			     ; Sector buffer pointer
+2    69		  =0004			 FIB_NUM  EQU 4			     ; Number of records
+2    70		  =0006			 FIB_REC  EQU 6			     ; Record length
+2    71		  =0008			 FIB_CUR  EQU 8			     ; Current record
+2    72		  =000C			 FIB_FCB  EQU 12		     ; First byte of FCB
+2    73		  =0030			 FIB_BUF  EQU 48		     ; First byte of sector buffer
+2    74
+2    75		  =00B0			 FIB_LEN  EQU FIB_BUF+128	     ; total length of a complete FIB
+2    76
+2    77		  =0000			 DOS_FLG  EQU 0			     ; Flags byte
+2    78		  =0001			 DOS_CHR  EQU 1			     ; Character buffer
+2    79		  =0002			 DOS_PTR  EQU 2			     ; Sector buffer pointer
+2    80		  =0004			 DOS_BLEN EQU 4			     ; Sector buffer length
+2    81		  =0006			 DOS_NUM  EQU 6			     ; Number of records
+2    82		  =000A			 DOS_REC  EQU 10		     ; Record length
+2    83		  =000C			 DOS_CUR  EQU 12		     ; Current record
+2    84		  =0010			 DOS_FCB  EQU 16		     ; First byte FCB/Handle structure
+2    85		  =0051			 DOS_BUF  EQU (16 + 65)		     ; First byte of sector buffer
+2    86
+2    87		  =00D1			 DOS_LEN  EQU (DOS_BUF + 128)
+2    88
+2    89						  include ..\library\macros.inc
+3    90					 OFF_HL	  MACRO	CURRENT,NEW
+3    91						  LOCAL	DIF
+3    92					 DIF	  EQU (NEW)-(CURRENT)
+3    93
+3    94					 IFDEF MSX
+3    95						  IFE DIF-1
+3    96						   DB 23h; INC HL
+3    97						  ELSE
+3    98						   IFE DIF-2
+3    99						    DB 23h; INC	HL
+3   100						    DB 23h; INC	HL
+3   101						   ELSE
+3   102						    IFE	DIF-3
+3   103						     DB	23h; INC HL
+3   104						     DB	23h; INC HL
+3   105						     DB	23h; INC HL
+3   106						    ELSE
+3   107						     IFE DIF+1
+3   108						      DB 2bh; DEC HL
+3   109						     ELSE
+3   110						      IFE DIF+2
+3   111						       DB 2bh; DEC HL
+3   112						       DB 2bh; DEC HL
+3   113						      ELSE
+3   114						       IFE DIF+3
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 3
+msx_asm\tur_init.ASM
+
+
+
+3   115							DB 2bh;	DEC HL
+3   116							DB 2bh;	DEC HL
+3   117							DB 2bh;	DEC HL
+3   118						       ELSE
+3   119							IFE DIF
+3   120							ELSE
+3   121							 DB 0D5H ; PUSH	DE
+3   122							 DB 11H
+3   123							 DW DIF
+3   124							 DB 19H	 ; ADD HL,DE
+3   125							 DB 0D1H ; POP DE
+3   126							ENDIF
+3   127						       ENDIF
+3   128						      ENDIF
+3   129						     ENDIF
+3   130						    ENDIF
+3   131						   ENDIF
+3   132						  ENDIF
+3   133					 ELSE
+3   134						  IFE DIF-1
+3   135						   INC bx
+3   136						  ELSE
+3   137						   IFE DIF-2
+3   138						    INC	bx
+3   139						    INC	bx
+3   140						   ELSE
+3   141						    IFE	DIF-3
+3   142						     INC bx
+3   143						     INC bx
+3   144						     INC bx
+3   145						    ELSE
+3   146						     IFE DIF+1
+3   147						      DEC bx
+3   148						     ELSE
+3   149						      IFE DIF+2
+3   150						       DEC bx
+3   151						       DEC bx
+3   152						      ELSE
+3   153						       IFE DIF+3
+3   154							DEC bx
+3   155							DEC bx
+3   156							DEC bx
+3   157						       ELSE
+3   158							IFE DIF
+3   159							ELSE
+3   160							 push dx
+3   161							 mov dx,DIF
+3   162							 ADD bx,dx
+3   163							 pop dx
+3   164							ENDIF
+3   165						       ENDIF
+3   166						      ENDIF
+3   167						     ENDIF
+3   168						    ENDIF
+3   169						   ENDIF
+3   170						  ENDIF
+3   171					 ENDIF
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 4
+msx_asm\tur_init.ASM
+
+
+
+3   172
+3   173						  ENDM
+3   174
+3   175					 dc	 macro string
+3   176
+3   177						 strsize sizestr <string>
+3   178						 pos = 0
+3   179
+3   180						 irpc parameter,string
+3   181							 pos = pos + 1
+3   182
+3   183							 if pos	EQ strsize - 1
+3   184							 db '&parameter' + 80h
+3   185							 endif
+3   186
+3   187							 if pos	GT 1
+3   188								 if pos	LT strsize -1
+3   189									 db '&parameter'
+3   190								 endif
+3   191							 endif
+3   192
+3   193						 endm
+3   194
+3   195						 endm
+3   196
+3   197
+2   198
+1   199
+1   200						  INCLUDE LIBDEFS.INC
+2   201
+2   202
+2   203					 GLOBAL2  MACRO	NAME
+2   204						  GLOBAL NAME :	NEAR
+2   205
+2   206						  IFDEF	MSX
+2   207						  IFDEF	RUNTIME
+2   208						  GLOBAL _&NAME	: NEAR
+2   209					 _&NAME:
+2   210						  ELSE
+2   211							   _&NAME EQU NAME
+2   212						  ENDIF
+2   213						  ELSE
+2   214							   _&NAME EQU NAME
+2   215						  ENDIF
+2   216
+2   217						  ENDM
+2   218
+2   219					 GLOBALS MACRO NAMES
+2   220
+2   221						  IRP NAME,<NAMES>
+2   222							   GLOBAL2 <NAME>
+2   223						  ENDM
+2   224
+2   225						  ENDM
+2   226
+2   227						  GLOBAL L0004:NEAR	     ; def. init.mac
+2   228						  GLOBAL L0006:NEAR	     ; def. init.mac
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 5
+msx_asm\tur_init.ASM
+
+
+
+2   229						  GLOBAL L005C:NEAR	     ; def. init.mac
+2   230						  GLOBAL L005D:NEAR	     ; def. init.mac
+2   231						  GLOBAL L0065:NEAR	     ; def. init.mac
+2   232						  GLOBAL L0066:NEAR	     ; def. init.mac
+2   233						  GLOBAL L006C:NEAR	     ; def. init.mac
+2   234						  GLOBAL L0080:NEAR	     ; def. init.mac
+*Warning* LIBDEFS.INC(38) Global type doesn't match symbol type: L0080
+2   235						  GLOBAL L00CE:NEAR	     ; def. init.mac
+2   236						  GLOBAL L00E0:NEAR	     ; def. init.mac
+2   237						  GLOBAL L0100:NEAR	     ; def. init.mac
+2   238						  GLOBAL L0101:NEAR	     ; def. init.mac
+2   239						  GLOBAL L0168:NEAR	     ; def. init.mac
+2   240						  GLOBAL L0169:NEAR	     ; def. init.mac
+2   241						  GLOBAL L01AE:NEAR	     ; def. init.mac
+2   242						  GLOBAL L01B4:NEAR	     ; def. init.mac
+2   243						  GLOBAL L01BC:NEAR	     ; def. init.mac
+2   244						  GLOBAL L01D0:NEAR	     ; def. init.mac
+2   245						  GLOBAL L01E1:NEAR	     ; def. init.mac
+2   246						  GLOBAL L01E8:NEAR	     ; def. init.mac
+2   247						  GLOBAL L01FA:NEAR	     ; def. init.mac
+2   248						  GLOBAL L0200:NEAR	     ; def. init.mac
+2   249						  GLOBAL L023E:NEAR	     ; def. init.mac
+2   250						  GLOBAL L0259:NEAR	     ; def. init.mac
+2   251						  GLOBAL L0262:NEAR	     ; def. init.mac
+2   252						  GLOBAL L026B:NEAR	     ; def. init.mac
+2   253						  GLOBAL L0284:NEAR	     ; def. init.mac
+2   254						  GLOBAL L0299:NEAR	     ; def. init.mac
+2   255						  GLOBAL L02A2:NEAR	     ; def. init.mac
+2   256						  GLOBAL L030A:NEAR	     ; def. init.mac
+2   257						  GLOBAL L0310:NEAR	     ; def. init.mac
+2   258						  GLOBAL L0364:NEAR	     ; def. init.mac
+2   259						  GLOBAL L03C9:NEAR	     ; def. init.mac
+2   260						  GLOBAL L03E1:NEAR	     ; def. init.mac
+2   261						  GLOBAL L03EE:NEAR	     ; def. init.mac
+2   262						  GLOBAL L0406:NEAR	     ; def. init.mac
+2   263						  GLOBAL L04A6:NEAR	     ; def. init.mac
+2   264						  GLOBAL L04B4:NEAR	     ; def. init.mac
+2   265						  GLOBAL L04D2:NEAR	     ; def. init.mac
+2   266						  GLOBAL L04AF:NEAR	     ; def. init.mac
+2   267						  GLOBAL L0581:NEAR	     ; def. init.mac
+2   268						  GLOBAL L0591:NEAR	     ; def. init.mac
+2   269						  GLOBAL L059B:NEAR	     ; def. init.mac
+2   270						  GLOBAL L0612:NEAR	     ; def. init.mac
+2   271						  GLOBAL L0783:NEAR	     ; def. init.mac
+2   272						  GLOBAL L07F7:NEAR	     ; def. init.mac
+2   273						  GLOBAL L1008:NEAR	     ; def. init.mac
+2   274						  GLOBAL L11A3:NEAR	     ; def. init.mac
+2   275						  GLOBAL L149B:NEAR	     ; def. init.mac
+2   276						  GLOBAL L14E8:NEAR	     ; def. init.mac
+2   277						  GLOBAL L1726:NEAR	     ; def. init.mac
+2   278						  GLOBAL L20E2:NEAR	     ; def. init.mac
+2   279
+2   280						  GLOBAL CON1OUTPTR:NEAR     ; def. init.mac
+2   281						  GLOBAL CONSTPTR:NEAR	     ; def. init.mac
+2   282						  GLOBAL A2L:NEAR	     ; def. init.mac
+2   283						  GLOBAL L_NEG:NEAR	     ; def. init.mac
+2   284						  GLOBAL L_R:NEAR	     ; def. init.mac
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 6
+msx_asm\tur_init.ASM
+
+
+
+2   285						  GLOBAL PREFIX:NEAR	     ; def. init.mac
+2   286
+2   287						  GLOBAL DEF_TYPE:NEAR	     ; def. compiler.mac
+2   288						  GLOBAL L72E1:NEAR	     ; def. compiler.mac, no conditon error
+2   289						  GLOBAL L7B5C:NEAR	     ; def. compiler.mac
+2   290						  GLOBAL L7B62:NEAR	     ; def. compiler.mac
+2   291
+2   292						  GLOBAL L7BF5:NEAR	     ; def. end.mac
+2   293
+2   294						  GLOBAL O_BYTE:NEAR,O_CALHL:NEAR,O_CODE:NEAR,O_HL:NEAR
+2   295						  GLOBAL O_JPHL:NEAR,O_LDDE:NEAR,O_LDHL:NEAR,O_PSHHL:NEAR
+2   296
+2   297						  GLOBAL ParseByteVar:NEAR   ; def. glib.mac
+2   298						  GLOBAL ParseIntVar:NEAR    ; def. glib.mac
+2   299						  GLOBAL ParseIntError:NEAR  ; def. glib.mac
+2   300						  GLOBAL ParseStrVAR64:NEAR  ; def. glib.mac
+2   301						  GLOBAL ParseVAR64:NEAR     ; def. glib.mac
+2   302
+2   303						  GLOBAL TableIndex2:NEAR    ; def. compiler.mac
+2   304
+2   305						  ; GIOS Procedures
+2   306						  GLOBAL P_DELETEFILE:NEAR   ; def. glib.mac
+2   307						  GLOBAL P_DEFINEPICTURE:NEAR; def. glib.mac
+2   308						  GLOBAL P_PFILLSHAPE:NEAR   ; def. glib.mac
+2   309						  GLOBAL P_PPAINT:NEAR	     ; def. glib.mac
+2   310						  GLOBAL P_MEMEXPAND:NEAR    ; def. glib.mac
+2   311						  GLOBAL P_MEMTOVRAM:NEAR    ; def. glib.mac
+2   312						  GLOBAL P_MEMLOADPICTURE:NEAR;	def. glib.mac
+2   313						  GLOBAL P_MEMUNCRUNCH:NEAR  ; def. glib.mac
+2   314						  GLOBAL P_MEMSAVEPICTURE:NEAR;	def. glib.mac
+2   315						  GLOBAL P_SETCLIPPING:NEAR  ; def. glib.mac
+2   316						  GLOBAL P_SETVIEWPORT:NEAR  ; def. glib.mac
+2   317						  GLOBAL P_GETVIEWPORT:NEAR  ; def. glib.mac
+2   318						  GLOBAL P_MEMCOPY:NEAR	     ; def. glib.mac
+2   319						  GLOBAL P_BLOAD:NEAR	     ; def. glib.mac
+2   320						  GLOBAL P_BSAVE:NEAR	     ; def. glib.mac
+2   321						  GLOBAL P_CHANGECOLOR:NEAR  ; def. glib.mac
+2   322						  GLOBAL P_CHANGESCREEN:NEAR ; def. glib.mac
+2   323						  GLOBAL P_CIRCLE:NEAR	     ; def. glib.mac
+2   324						  GLOBAL P_CLEARMEM:NEAR     ; def. glib.mac
+2   325						  GLOBAL P_DATE:NEAR	     ; def. glib.mac
+2   326						  GLOBAL P_DISPLAYPAGE:NEAR  ; def. glib.mac
+2   327						  GLOBAL P_ELLIPSE:NEAR	     ; def. glib.mac
+2   328						  GLOBAL P_EXPAND:NEAR	     ; def. glib.mac
+2   329						  GLOBAL P_FASTBOX:NEAR	     ; def. glib.mac
+2   330						  GLOBAL P_FASTCOPY:NEAR     ; def. glib.mac
+2   331						  GLOBAL P_FILLBOX:NEAR	     ; def. glib.mac
+2   332						  GLOBAL P_FILLSHAPE:NEAR    ; def. glib.mac
+2   333						  GLOBAL P_FILLSPRITE:NEAR   ; def. glib.mac
+2   334						  GLOBAL P_GCOPY:NEAR	     ; def. glib.mac
+2   335						  GLOBAL P_GETDOSVERSION:NEAR; def. glib.mac
+2   336						  GLOBAL P_LINE:NEAR	     ; def. glib.mac
+2   337						  GLOBAL P_LOADPICTURE:NEAR  ; def. glib.mac
+2   338						  GLOBAL P_LOADVRAM:NEAR     ; def. glib.mac
+2   339						  GLOBAL P_MEMREADFILE:NEAR  ; def. glib.mac
+2   340						  GLOBAL P_MEMWRITEFILE:NEAR ; def. glib.mac
+2   341						  GLOBAL P_MEMAPPENDFILE:NEAR; def. glib.mac
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 7
+msx_asm\tur_init.ASM
+
+
+
+2   342						  GLOBAL P_MOVEVRAM:NEAR     ; def. glib.mac
+2   343						  GLOBAL P_PAINT:NEAR	     ; def. glib.mac
+2   344						  GLOBAL P_PSET:NEAR	     ; def. glib.mac
+2   345						  GLOBAL P_PUTSPRITE:NEAR    ; def. glib.mac
+2   346						  GLOBAL P_READMEM:NEAR	     ; def. glib.mac
+2   347						  GLOBAL P_READSECTOR:NEAR   ; def. glib.mac
+2   348						  GLOBAL P_SAVEPICTURE:NEAR  ; def. glib.mac
+2   349						  GLOBAL P_SAVEVRAM:NEAR     ; def. glib.mac
+2   350						  GLOBAL P_SCREEN:NEAR	     ; def. glib.mac
+2   351						  GLOBAL P_SCREENOFF:NEAR    ; def. glib.mac
+2   352						  GLOBAL P_SCREENON:NEAR     ; def. glib.mac
+2   353						  GLOBAL P_SETCHANNEL:NEAR   ; def. glib.mac
+2   354						  GLOBAL P_SOUND:NEAR	     ; def. glib.mac
+2   355						  GLOBAL P_SPRITEATTRIBUTEADDRESS:NEAR	; def. glib.mac
+2   356						  GLOBAL P_SPRITECOLOR:NEAR  ; def. glib.mac
+2   357						  GLOBAL P_SPRITEPATTERN:NEAR; def. glib.mac
+2   358						  GLOBAL P_SPRITEPATTERNADDRESS:NEAR	; def. glib.mac
+2   359						  GLOBAL P_SPRITESIZE:NEAR   ; def. glib.mac
+2   360						  GLOBAL P_SPRITESOFF:NEAR   ; def. glib.mac
+2   361						  GLOBAL P_SPRITESON:NEAR    ; def. glib.mac
+2   362						  GLOBAL P_TIME:NEAR	     ; def. glib.mac
+2   363						  GLOBAL P_UNCRUNCH:NEAR     ; def. glib.mac
+2   364						  GLOBAL P_VPOKE:NEAR	     ; def. glib.mac
+2   365						  GLOBAL P_WAITVDP:NEAR	     ; def. glib.mac
+2   366						  GLOBAL P_WRITEMEM:NEAR     ; def. glib.mac
+2   367						  GLOBAL P_WRITESECTOR:NEAR  ; def. glib.mac
+2   368						  GLOBAL P_WRITEVDP:NEAR     ; def. glib.mac
+2   369
+2   370						  ; GIOS Functions
+2   371						  GLOBAL F_TSRPRESENT:NEAR   ; def. glib.mac
+2   372						  GLOBAL F_GETCLIPPING:NEAR  ; def. glib.mac
+2   373						  GLOBAL F_SIMULATEDDISK:NEAR; def. glib.mac
+2   374						  GLOBAL F_FINDFIRST:NEAR    ; def. glib.mac
+2   375						  GLOBAL F_FINDNEXT:NEAR     ; def. glib.mac
+2   376						  GLOBAL F_GETDRIVE:NEAR     ; def. glib.mac
+2   377						  GLOBAL F_TESTDRIVE:NEAR    ; def. glib.mac
+2   378						  GLOBAL F_GETERROR:NEAR     ; def. glib.mac
+2   379						  GLOBAL F_GETFKEY:NEAR	     ; def. glib.mac
+2   380						  GLOBAL F_GETPAD:NEAR	     ; def. glib.mac
+2   381						  GLOBAL F_GETPDL:NEAR	     ; def. glib.mac
+2   382						  GLOBAL F_GETCHANNEL:NEAR   ; def. glib.mac
+2   383						  GLOBAL F_GETPAGEID:NEAR    ; def. glib.mac
+2   384						  GLOBAL F_POINT:NEAR	     ; def. glib.mac
+2   385						  GLOBAL F_READPSG:NEAR	     ; def. glib.mac
+2   386						  GLOBAL F_READSTATUS:NEAR   ; def. glib.mac
+2   387						  GLOBAL F_READVDP:NEAR	     ; def. glib.mac
+2   388						  GLOBAL F_SEARCH:NEAR	     ; def. glib.mac
+2   389						  GLOBAL F_SETDATE:NEAR	     ; def. glib.mac
+2   390						  GLOBAL F_SETMEM:NEAR	     ; def. glib.mac
+2   391						  GLOBAL F_SETTIME:NEAR	     ; def. glib.mac
+2   392						  GLOBAL F_STICK:NEAR	     ; def. glib.mac
+2   393						  GLOBAL F_STRIG:NEAR	     ; def. glib.mac
+2   394						  GLOBAL F_VPEEK:NEAR	     ; def. glib.mac
+2   395
+2   396
+1   397
+1   398						  INCLUDE LIBCONST.INC
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 8
+msx_asm\tur_init.ASM
+
+
+
+2   399		  =OFFSET 0177		 _AUXINPTR EQU offset 00177h
+2   400		  =OFFSET 0174		 _AUXOUTPTR EQU	offset 00174h
+2   401		  =OFFSET 018C		 _BUFLEN EQU offset 0018Ch
+2   402		  =OFFSET 0190		 _CBREAK EQU offset 00190h
+2   403		  =OFFSET 016B		 _CONINPTR EQU offset 0016Bh
+2   404		  =OFFSET 016E		 _CONOUTPTR EQU	offset 0016Eh
+2   405		  =OFFSET 0168		 _CONSTPTR EQU offset 00168h
+2   406		  =OFFSET 2887		 _DOSERRORHANDLEROFF EQU offset	02887h
+2   407		  =OFFSET 2884		 _DOSERRORHANDLERON EQU	offset 02884h
+2   408		  =OFFSET 286F		 _ERROREXIT EQU	offset 0286Fh
+2   409		  =OFFSET 018D		 _ERRORPTR EQU offset 0018Dh
+2   410		  =OFFSET 2703		 _GETERROR_LIB EQU offset 02703h
+2   411		  =OFFSET 0581		 _GIOSOK EQU offset 00581h
+2   412		  =OFFSET 0582		 _GIOSVER EQU offset 00582h
+2   413		  =OFFSET 0192		 _HEAPPTR EQU offset 00192h
+2   414		  =OFFSET 0180		 _L00B8	EQU offset 00180h
+2   415		  =OFFSET 0182		 _L00BA	EQU offset 00182h
+2   416		  =OFFSET 0186		 _L00BE	EQU offset 00186h
+2   417		  =OFFSET 0188		 _L00C0	EQU offset 00188h
+2   418		  =OFFSET 02D0		 _L021D	EQU offset 002D0h
+2   419		  =OFFSET 02F1		 _L023E	EQU offset 002F1h
+2   420		  =OFFSET 030C		 _L0259	EQU offset 0030Ch
+2   421		  =OFFSET 0315		 _L0262	EQU offset 00315h
+2   422		  =OFFSET 031E		 _L026B	EQU offset 0031Eh
+2   423		  =OFFSET 0337		 _L0284	EQU offset 00337h
+2   424		  =OFFSET 034C		 _L0299	EQU offset 0034Ch
+2   425		  =OFFSET 03BD		 _L030A	EQU offset 003BDh
+2   426		  =OFFSET 03C3		 _L0310	EQU offset 003C3h
+2   427		  =OFFSET 0420		 _L0364	EQU offset 00420h
+2   428		  =OFFSET 06C3		 _L04D4	EQU offset 006C3h
+2   429		  =OFFSET 06F4		 _L0508	EQU offset 006F4h
+2   430		  =OFFSET 070E		 _L0522	EQU offset 0070Eh
+2   431		  =OFFSET 0717		 _L052C	EQU offset 00717h
+2   432		  =OFFSET 0725		 _L053A	EQU offset 00725h
+2   433		  =OFFSET 0738		 _L054D	EQU offset 00738h
+2   434		  =OFFSET 0748		 _L055D	EQU offset 00748h
+2   435		  =OFFSET 076C		 _L0581	EQU offset 0076Ch
+2   436		  =OFFSET 077C		 _L0591	EQU offset 0077Ch
+2   437		  =OFFSET 0786		 _L059B	EQU offset 00786h
+2   438		  =OFFSET 07BC		 _L05D1	EQU offset 007BCh
+2   439		  =OFFSET 07CD		 _L05E2	EQU offset 007CDh
+2   440		  =OFFSET 07EC		 _L0601	EQU offset 007ECh
+2   441		  =OFFSET 07FD		 _L0612	EQU offset 007FDh
+2   442		  =OFFSET 080E		 _L0623	EQU offset 0080Eh
+2   443		  =OFFSET 0823		 _L0638	EQU offset 00823h
+2   444		  =OFFSET 0837		 _L064C	EQU offset 00837h
+2   445		  =OFFSET 0841		 _L0656	EQU offset 00841h
+2   446		  =OFFSET 0851		 _L0666	EQU offset 00851h
+2   447		  =OFFSET 0861		 _L0676	EQU offset 00861h
+2   448		  =OFFSET 086A		 _L067F	EQU offset 0086Ah
+2   449		  =OFFSET 0889		 _L0688	EQU offset 00889h
+2   450		  =OFFSET 088F		 _L068D	EQU offset 0088Fh
+2   451		  =OFFSET 0895		 _L0692	EQU offset 00895h
+2   452		  =OFFSET 08A3		 _L069B	EQU offset 008A3h
+2   453		  =OFFSET 08A8		 _L06A0	EQU offset 008A8h
+2   454		  =OFFSET 08AD		 _L06A5	EQU offset 008ADh
+2   455		  =OFFSET 08BB		 _L06AE	EQU offset 008BBh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 9
+msx_asm\tur_init.ASM
+
+
+
+2   456		  =OFFSET 08C0		 _L06B3	EQU offset 008C0h
+2   457		  =OFFSET 08C5		 _L06B8	EQU offset 008C5h
+2   458		  =OFFSET 08D4		 _L06C2	EQU offset 008D4h
+2   459		  =OFFSET 08D9		 _L06C7	EQU offset 008D9h
+2   460		  =OFFSET 08DE		 _L06CC	EQU offset 008DEh
+2   461		  =OFFSET 08ED		 _L06D6	EQU offset 008EDh
+2   462		  =OFFSET 08F2		 _L06DB	EQU offset 008F2h
+2   463		  =OFFSET 08F7		 _L06E0	EQU offset 008F7h
+2   464		  =OFFSET 0905		 _L06E9	EQU offset 00905h
+2   465		  =OFFSET 090A		 _L06EE	EQU offset 0090Ah
+2   466		  =OFFSET 090F		 _L06F3	EQU offset 0090Fh
+2   467		  =OFFSET 0911		 _L06F5	EQU offset 00911h
+2   468		  =OFFSET 092B		 _L070F	EQU offset 0092Bh
+2   469		  =OFFSET 0999		 _L073B	EQU offset 00999h
+2   470		  =OFFSET 09A3		 _L0745	EQU offset 009A3h
+2   471		  =OFFSET 09B0		 _L074E	EQU offset 009B0h
+2   472		  =OFFSET 09B8		 _L0756	EQU offset 009B8h
+2   473		  =OFFSET 09E2		 _L0780	EQU offset 009E2h
+2   474		  =OFFSET 09E5		 _L0783	EQU offset 009E5h
+2   475		  =OFFSET 09ED		 _L078B	EQU offset 009EDh
+2   476		  =OFFSET 0D66		 _L083D	EQU offset 00D66h
+2   477		  =OFFSET 0D94		 _L086B	EQU offset 00D94h
+2   478		  =OFFSET 0DCC		 _L08A3	EQU offset 00DCCh
+2   479		  =OFFSET 0DDB		 _L08B2	EQU offset 00DDBh
+2   480		  =OFFSET 0E1C		 _L08F3	EQU offset 00E1Ch
+2   481		  =OFFSET 0E49		 _L0920	EQU offset 00E49h
+2   482		  =OFFSET 0EBF		 _L0996	EQU offset 00EBFh
+2   483		  =OFFSET 0ECB		 _L09A2	EQU offset 00ECBh
+2   484		  =OFFSET 0F12		 _L09E9	EQU offset 00F12h
+2   485		  =OFFSET 0F1B		 _L09F2	EQU offset 00F1Bh
+2   486		  =OFFSET 0F20		 _L09F7	EQU offset 00F20h
+2   487		  =OFFSET 0F23		 _L09FA	EQU offset 00F23h
+2   488		  =OFFSET 0F28		 _L09FF	EQU offset 00F28h
+2   489		  =OFFSET 1171		 _L0BFD	EQU offset 01171h
+2   490		  =OFFSET 11A8		 _L0C34	EQU offset 011A8h
+2   491		  =OFFSET 11BA		 _L0C46	EQU offset 011BAh
+2   492		  =OFFSET 11F3		 _L0C7F	EQU offset 011F3h
+2   493		  =OFFSET 11FB		 _L0C87	EQU offset 011FBh
+2   494		  =OFFSET 129F		 _L0D2B	EQU offset 0129Fh
+2   495		  =OFFSET 132A		 _L0DB6	EQU offset 0132Ah
+2   496		  =OFFSET 13BA		 _L0E46	EQU offset 013BAh
+2   497		  =OFFSET 1528		 _L0FB4	EQU offset 01528h
+2   498		  =OFFSET 1544		 _L0FD0	EQU offset 01544h
+2   499		  =OFFSET 1552		 _L0FDE	EQU offset 01552h
+2   500		  =OFFSET 1581		 _L1008	EQU offset 01581h
+2   501		  =OFFSET 18AA		 _L12DD	EQU offset 018AAh
+2   502		  =OFFSET 18AE		 _L12E1	EQU offset 018AEh
+2   503		  =OFFSET 18C9		 _L12FC	EQU offset 018C9h
+2   504		  =OFFSET 18CD		 _L1300	EQU offset 018CDh
+2   505		  =OFFSET 18E5		 _L1318	EQU offset 018E5h
+2   506		  =OFFSET 18F3		 _L1326	EQU offset 018F3h
+2   507		  =OFFSET 1900		 _L1333	EQU offset 01900h
+2   508		  =OFFSET 191C		 _L134F	EQU offset 0191Ch
+2   509		  =OFFSET 193C		 _L136F	EQU offset 0193Ch
+2   510		  =OFFSET 193D		 _L1370	EQU offset 0193Dh
+2   511		  =OFFSET 19D6		 _L13FE	EQU offset 019D6h
+2   512		  =OFFSET 19D7		 _L13FF	EQU offset 019D7h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 10
+msx_asm\tur_init.ASM
+
+
+
+2   513		  =OFFSET 1A45		 _L1469	EQU offset 01A45h
+2   514		  =OFFSET 1A77		 _L149B	EQU offset 01A77h
+2   515		  =OFFSET 1A85		 _L14A9	EQU offset 01A85h
+2   516		  =OFFSET 1A96		 _L14BA	EQU offset 01A96h
+2   517		  =OFFSET 1AA7		 _L14CB	EQU offset 01AA7h
+2   518		  =OFFSET 1AAB		 _L14CC	EQU offset 01AABh
+2   519		  =OFFSET 1C67		 _L1644	EQU offset 01C67h
+2   520		  =OFFSET 1C70		 _L164D	EQU offset 01C70h
+2   521		  =OFFSET 1C74		 _L164E	EQU offset 01C74h
+2   522		  =OFFSET 1C98		 _L1671	EQU offset 01C98h
+2   523		  =OFFSET 1CBE		 _L1672	EQU offset 01CBEh
+2   524		  =OFFSET 1CDA		 _L168E	EQU offset 01CDAh
+2   525		  =OFFSET 1CF7		 _L16AB	EQU offset 01CF7h
+2   526		  =OFFSET 1D83		 _L1722	EQU offset 01D83h
+2   527		  =OFFSET 1D87		 _L1726	EQU offset 01D87h
+2   528		  =OFFSET 1DDA		 _L1779	EQU offset 01DDAh
+2   529		  =OFFSET 1E18		 _L178B	EQU offset 01E18h
+2   530		  =OFFSET 1E37		 _L17AA	EQU offset 01E37h
+2   531		  =OFFSET 1E47		 _L17BA	EQU offset 01E47h
+2   532		  =OFFSET 1E5A		 _L17CD	EQU offset 01E5Ah
+2   533		  =OFFSET 1E64		 _L17D7	EQU offset 01E64h
+2   534		  =OFFSET 1E69		 _L17DC	EQU offset 01E69h
+2   535		  =OFFSET 1E6E		 _L17E1	EQU offset 01E6Eh
+2   536		  =OFFSET 1E73		 _L17E6	EQU offset 01E73h
+2   537		  =OFFSET 1E9D		 _L1810	EQU offset 01E9Dh
+2   538		  =OFFSET 1EA2		 _L1811	EQU offset 01EA2h
+2   539		  =OFFSET 1F40		 _L187A	EQU offset 01F40h
+2   540		  =OFFSET 1F4A		 _L18A4	EQU offset 01F4Ah
+2   541		  =OFFSET 1F5E		 _L18B6	EQU offset 01F5Eh
+2   542		  =OFFSET 1F80		 _L18DC	EQU offset 01F80h
+2   543		  =OFFSET 1F8E		 _L19A5	EQU offset 01F8Eh
+2   544		  =OFFSET 1FBA		 _L19D5	EQU offset 01FBAh
+2   545		  =OFFSET 2014		 _L1A49	EQU offset 02014h
+2   546		  =OFFSET 2028		 _L1A55	EQU offset 02028h
+2   547		  =OFFSET 203F		 _L1A5D	EQU offset 0203Fh
+2   548		  =OFFSET 2052		 _L1A6F	EQU offset 02052h
+2   549		  =OFFSET 2057		 _L1A70	EQU offset 02057h
+2   550		  =OFFSET 20B8		 _L1AB0	EQU offset 020B8h
+2   551		  =OFFSET 20C2		 _L1ABA	EQU offset 020C2h
+2   552		  =OFFSET 20C6		 _L1ABE	EQU offset 020C6h
+2   553		  =OFFSET 2192		 _L1AED	EQU offset 02192h
+2   554		  =OFFSET 2196		 _L1AF1	EQU offset 02196h
+2   555		  =OFFSET 21C4		 _L1B6F	EQU offset 021C4h
+2   556		  =OFFSET 2213		 _L1B93	EQU offset 02213h
+2   557		  =OFFSET 224F		 _L1BA5	EQU offset 0224Fh
+2   558		  =OFFSET 227A		 _L1BEA	EQU offset 0227Ah
+2   559		  =OFFSET 227E		 _L1BEB	EQU offset 0227Eh
+2   560		  =OFFSET 23C6		 _L1CDB	EQU offset 023C6h
+2   561		  =OFFSET 23D0		 _L1CE5	EQU offset 023D0h
+2   562		  =OFFSET 2465		 _L1D7A	EQU offset 02465h
+2   563		  =OFFSET 2528		 _L1E3D	EQU offset 02528h
+2   564		  =OFFSET 252F		 _L1E44	EQU offset 0252Fh
+2   565		  =OFFSET 258E		 _L1EA3	EQU offset 0258Eh
+2   566		  =OFFSET 2596		 _L1EAB	EQU offset 02596h
+2   567		  =OFFSET 25A8		 _L1EBC	EQU offset 025A8h
+2   568		  =OFFSET 25AC		 _L1EBD	EQU offset 025ACh
+2   569		  =OFFSET 25B0		 _L1EBE	EQU offset 025B0h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 11
+msx_asm\tur_init.ASM
+
+
+
+2   570		  =OFFSET 25EC		 _L1EF2	EQU offset 025ECh
+2   571		  =OFFSET 25F0		 _L1EF3	EQU offset 025F0h
+2   572		  =OFFSET 25F4		 _L1EF4	EQU offset 025F4h
+2   573		  =OFFSET 2650		 _L1F48	EQU offset 02650h
+2   574		  =OFFSET 2656		 _L1F4E	EQU offset 02656h
+2   575		  =OFFSET 266C		 _L1F64	EQU offset 0266Ch
+2   576		  =OFFSET 2685		 _L1F7D	EQU offset 02685h
+2   577		  =OFFSET 26A3		 _L1F9B	EQU offset 026A3h
+2   578		  =OFFSET 26E3		 _L1FDB	EQU offset 026E3h
+2   579		  =OFFSET 26EC		 _L1FE4	EQU offset 026ECh
+2   580		  =OFFSET 26F2		 _L1FEA	EQU offset 026F2h
+2   581		  =OFFSET 26F9		 _L1FF1	EQU offset 026F9h
+2   582		  =OFFSET 272A		 _L201B	EQU offset 0272Ah
+2   583		  =OFFSET 27FD		 _L20D4	EQU offset 027FDh
+2   584		  =OFFSET 2E9B		 _L20E2	EQU offset 02E9Bh
+2   585		  =OFFSET 2339		 _LOADRUNOVERLAY EQU offset 02339h
+2   586		  =OFFSET 232C		 _LOADRUNOVERLAYREC EQU	offset 0232Ch
+2   587		  =OFFSET 0184		 _LST EQU offset 00184h
+2   588		  =OFFSET 0171		 _LSTOUTPTR EQU	offset 00171h
+2   589		  =OFFSET 0A61		 _L_ABS	EQU offset 00A61h
+2   590		  =OFFSET 0A74		 _L_ADD	EQU offset 00A74h
+2   591		  =OFFSET 0A1E		 _L_AND	EQU offset 00A1Eh
+2   592		  =OFFSET 0B16		 _L_DIV	EQU offset 00B16h
+2   593		  =OFFSET 0883		 _L_EQ EQU offset 00883h
+2   594		  =OFFSET 0851		 _L_FOR_DOWNTO EQU offset 00851h
+2   595		  =OFFSET 0851		 _L_FOR_TO EQU offset 00851h
+2   596		  =OFFSET 08E8		 _L_GT EQU offset 008E8h
+2   597		  =OFFSET 08B6		 _L_GTE	EQU offset 008B6h
+2   598		  =OFFSET 0900		 _L_LS EQU offset 00900h
+2   599		  =OFFSET 08CF		 _L_LSE	EQU offset 008CFh
+2   600		  =OFFSET 0B2C		 _L_MOD	EQU offset 00B2Ch
+2   601		  =OFFSET 0A9A		 _L_MUL	EQU offset 00A9Ah
+2   602		  =OFFSET 0A64		 _L_NEG	EQU offset 00A64h
+2   603		  =OFFSET 089E		 _L_NEQ	EQU offset 0089Eh
+2   604		  =OFFSET 0A54		 _L_NOT	EQU offset 00A54h
+2   605		  =OFFSET 0A30		 _L_OR EQU offset 00A30h
+2   606		  =OFFSET 0873		 _L_PRED EQU offset 00873h
+2   607		  =OFFSET 15A0		 _L_R EQU offset 015A0h
+2   608		  =OFFSET 0BD5		 _L_SHL	EQU offset 00BD5h
+2   609		  =OFFSET 0BF1		 _L_SHR	EQU offset 00BF1h
+2   610		  =OFFSET 0A94		 _L_SQR	EQU offset 00A94h
+2   611		  =OFFSET 0A7F		 _L_SUB	EQU offset 00A7Fh
+2   612		  =OFFSET 087C		 _L_SUCC EQU offset 0087Ch
+2   613		  =OFFSET 0A42		 _L_XOR	EQU offset 00A42h
+2   614		  =OFFSET 057E		 _MEMMAN EQU offset 0057Eh
+2   615		  =OFFSET 057F		 _MEMMNVER EQU offset 0057Fh
+2   616		  =OFFSET 018A		 _OUTPUT EQU offset 0018Ah
+2   617		  =OFFSET 238E		 _OVERLAYLOADPTR EQU offset 0238Eh
+2   618		  =OFFSET 2301		 _OVERLAYREC1 EQU offset 02301h
+2   619		  =OFFSET 1DEC		 _PRT_LONG EQU offset 01DECh
+2   620		  =OFFSET 0194		 _RECURPTR EQU offset 00194h
+2   621		  =OFFSET 2225		 _RENAMEFILE_LIB EQU offset 02225h
+2   622		  =OFFSET 057B		 _RUNGIOS EQU offset 0057Bh
+2   623		  =OFFSET 15C4		 _R_L EQU offset 015C4h
+2   624		  =OFFSET 052E		 _TSRPRESENT EQU offset	0052Eh
+2   625		  =OFFSET 017D		 _USRINPTR EQU offset 0017Dh
+2   626		  =OFFSET 017A		 _USROUTPTR EQU	offset 0017Ah
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 12
+msx_asm\tur_init.ASM
+
+
+
+2   627		  =OFFSET 0168		 _CONSTPTR EQU offset 00168h
+2   628		  =OFFSET 016B		 _CONINPTR EQU offset 0016Bh
+2   629		  =OFFSET 016E		 _CONOUTPTR EQU	offset 0016Eh
+2   630		  =OFFSET 0171		 _LSTOUTPTR EQU	offset 00171h
+2   631		  =OFFSET 0174		 _AUXOUTPTR EQU	offset 00174h
+2   632		  =OFFSET 0177		 _AUXINPTR EQU offset 00177h
+2   633		  =OFFSET 017A		 _USROUTPTR EQU	offset 0017Ah
+2   634		  =OFFSET 017D		 _USRINPTR EQU offset 0017Dh
+2   635		  =OFFSET 0180		 _L00B8	EQU offset 00180h
+2   636		  =OFFSET 0182		 _L00BA	EQU offset 00182h
+2   637		  =OFFSET 0184		 _LST EQU offset 00184h
+2   638		  =OFFSET 0186		 _L00BE	EQU offset 00186h
+2   639		  =OFFSET 0188		 _L00C0	EQU offset 00188h
+2   640		  =OFFSET 018A		 _OUTPUT EQU offset 0018Ah
+2   641		  =OFFSET 018C		 _BUFLEN EQU offset 0018Ch
+2   642		  =OFFSET 018D		 _ERRORPTR EQU offset 0018Dh
+2   643		  =OFFSET 0190		 _CBREAK EQU offset 00190h
+2   644		  =OFFSET 0192		 _HEAPPTR EQU offset 00192h
+2   645		  =OFFSET 0194		 _RECURPTR EQU offset 00194h
+2   646		  =OFFSET 02D0		 _L021D	EQU offset 002D0h
+2   647		  =OFFSET 02F1		 _L023E	EQU offset 002F1h
+2   648		  =OFFSET 030C		 _L0259	EQU offset 0030Ch
+2   649		  =OFFSET 0315		 _L0262	EQU offset 00315h
+2   650		  =OFFSET 031E		 _L026B	EQU offset 0031Eh
+2   651		  =OFFSET 0337		 _L0284	EQU offset 00337h
+2   652		  =OFFSET 034C		 _L0299	EQU offset 0034Ch
+2   653		  =OFFSET 03BD		 _L030A	EQU offset 003BDh
+2   654		  =OFFSET 03C3		 _L0310	EQU offset 003C3h
+2   655		  =OFFSET 0420		 _L0364	EQU offset 00420h
+2   656		  =OFFSET 052E		 _TSRPRESENT EQU offset	0052Eh
+2   657		  =OFFSET 057B		 _RUNGIOS EQU offset 0057Bh
+2   658		  =OFFSET 057E		 _MEMMAN EQU offset 0057Eh
+2   659		  =OFFSET 057F		 _MEMMNVER EQU offset 0057Fh
+2   660		  =OFFSET 0581		 _GIOSOK EQU offset 00581h
+2   661		  =OFFSET 0582		 _GIOSVER EQU offset 00582h
+2   662		  =OFFSET 06C3		 _L04D4	EQU offset 006C3h
+2   663		  =OFFSET 06F4		 _L0508	EQU offset 006F4h
+2   664		  =OFFSET 070E		 _L0522	EQU offset 0070Eh
+2   665		  =OFFSET 0717		 _L052C	EQU offset 00717h
+2   666		  =OFFSET 0725		 _L053A	EQU offset 00725h
+2   667		  =OFFSET 0738		 _L054D	EQU offset 00738h
+2   668		  =OFFSET 0748		 _L055D	EQU offset 00748h
+2   669		  =OFFSET 076C		 _L0581	EQU offset 0076Ch
+2   670		  =OFFSET 077C		 _L0591	EQU offset 0077Ch
+2   671		  =OFFSET 0786		 _L059B	EQU offset 00786h
+2   672		  =OFFSET 07BC		 _L05D1	EQU offset 007BCh
+2   673		  =OFFSET 07CD		 _L05E2	EQU offset 007CDh
+2   674		  =OFFSET 07EC		 _L0601	EQU offset 007ECh
+2   675		  =OFFSET 07FD		 _L0612	EQU offset 007FDh
+2   676		  =OFFSET 080E		 _L0623	EQU offset 0080Eh
+2   677		  =OFFSET 0823		 _L0638	EQU offset 00823h
+2   678		  =OFFSET 0837		 _L064C	EQU offset 00837h
+2   679		  =OFFSET 0841		 _L0656	EQU offset 00841h
+2   680		  =OFFSET 0851		 _L_FOR_TO EQU offset 00851h
+2   681		  =OFFSET 0851		 _L0666	EQU offset 00851h
+2   682		  =OFFSET 0851		 _L_FOR_DOWNTO EQU offset 00851h
+2   683		  =OFFSET 0861		 _L0676	EQU offset 00861h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 13
+msx_asm\tur_init.ASM
+
+
+
+2   684		  =OFFSET 086A		 _L067F	EQU offset 0086Ah
+2   685		  =OFFSET 0873		 _L_PRED EQU offset 00873h
+2   686		  =OFFSET 087C		 _L_SUCC EQU offset 0087Ch
+2   687		  =OFFSET 0883		 _L_EQ EQU offset 00883h
+2   688		  =OFFSET 0889		 _L0688	EQU offset 00889h
+2   689		  =OFFSET 088F		 _L068D	EQU offset 0088Fh
+2   690		  =OFFSET 0895		 _L0692	EQU offset 00895h
+2   691		  =OFFSET 089E		 _L_NEQ	EQU offset 0089Eh
+2   692		  =OFFSET 08A3		 _L069B	EQU offset 008A3h
+2   693		  =OFFSET 08A8		 _L06A0	EQU offset 008A8h
+2   694		  =OFFSET 08AD		 _L06A5	EQU offset 008ADh
+2   695		  =OFFSET 08B6		 _L_GTE	EQU offset 008B6h
+2   696		  =OFFSET 08BB		 _L06AE	EQU offset 008BBh
+2   697		  =OFFSET 08C0		 _L06B3	EQU offset 008C0h
+2   698		  =OFFSET 08C5		 _L06B8	EQU offset 008C5h
+2   699		  =OFFSET 08CF		 _L_LSE	EQU offset 008CFh
+2   700		  =OFFSET 08D4		 _L06C2	EQU offset 008D4h
+2   701		  =OFFSET 08D9		 _L06C7	EQU offset 008D9h
+2   702		  =OFFSET 08DE		 _L06CC	EQU offset 008DEh
+2   703		  =OFFSET 08E8		 _L_GT EQU offset 008E8h
+2   704		  =OFFSET 08ED		 _L06D6	EQU offset 008EDh
+2   705		  =OFFSET 08F2		 _L06DB	EQU offset 008F2h
+2   706		  =OFFSET 08F7		 _L06E0	EQU offset 008F7h
+2   707		  =OFFSET 0900		 _L_LS EQU offset 00900h
+2   708		  =OFFSET 0905		 _L06E9	EQU offset 00905h
+2   709		  =OFFSET 090A		 _L06EE	EQU offset 0090Ah
+2   710		  =OFFSET 090F		 _L06F3	EQU offset 0090Fh
+2   711		  =OFFSET 0911		 _L06F5	EQU offset 00911h
+2   712		  =OFFSET 092B		 _L070F	EQU offset 0092Bh
+2   713		  =OFFSET 0999		 _L073B	EQU offset 00999h
+2   714		  =OFFSET 09A3		 _L0745	EQU offset 009A3h
+2   715		  =OFFSET 09B0		 _L074E	EQU offset 009B0h
+2   716		  =OFFSET 09B8		 _L0756	EQU offset 009B8h
+2   717		  =OFFSET 09E2		 _L0780	EQU offset 009E2h
+2   718		  =OFFSET 09E5		 _L0783	EQU offset 009E5h
+2   719		  =OFFSET 09ED		 _L078B	EQU offset 009EDh
+2   720		  =OFFSET 0A1E		 _L_AND	EQU offset 00A1Eh
+2   721		  =OFFSET 0A30		 _L_OR EQU offset 00A30h
+2   722		  =OFFSET 0A42		 _L_XOR	EQU offset 00A42h
+2   723		  =OFFSET 0A54		 _L_NOT	EQU offset 00A54h
+2   724		  =OFFSET 0A61		 _L_ABS	EQU offset 00A61h
+2   725		  =OFFSET 0A64		 _L_NEG	EQU offset 00A64h
+2   726		  =OFFSET 0A74		 _L_ADD	EQU offset 00A74h
+2   727		  =OFFSET 0A7F		 _L_SUB	EQU offset 00A7Fh
+2   728		  =OFFSET 0A94		 _L_SQR	EQU offset 00A94h
+2   729		  =OFFSET 0A9A		 _L_MUL	EQU offset 00A9Ah
+2   730		  =OFFSET 0B16		 _L_DIV	EQU offset 00B16h
+2   731		  =OFFSET 0B2C		 _L_MOD	EQU offset 00B2Ch
+2   732		  =OFFSET 0BD5		 _L_SHL	EQU offset 00BD5h
+2   733		  =OFFSET 0BF1		 _L_SHR	EQU offset 00BF1h
+2   734		  =OFFSET 0D66		 _L083D	EQU offset 00D66h
+2   735		  =OFFSET 0D94		 _L086B	EQU offset 00D94h
+2   736		  =OFFSET 0DCC		 _L08A3	EQU offset 00DCCh
+2   737		  =OFFSET 0DDB		 _L08B2	EQU offset 00DDBh
+2   738		  =OFFSET 0E1C		 _L08F3	EQU offset 00E1Ch
+2   739		  =OFFSET 0E49		 _L0920	EQU offset 00E49h
+2   740		  =OFFSET 0EBF		 _L0996	EQU offset 00EBFh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 14
+msx_asm\tur_init.ASM
+
+
+
+2   741		  =OFFSET 0ECB		 _L09A2	EQU offset 00ECBh
+2   742		  =OFFSET 0F12		 _L09E9	EQU offset 00F12h
+2   743		  =OFFSET 0F1B		 _L09F2	EQU offset 00F1Bh
+2   744		  =OFFSET 0F20		 _L09F7	EQU offset 00F20h
+2   745		  =OFFSET 0F23		 _L09FA	EQU offset 00F23h
+2   746		  =OFFSET 0F28		 _L09FF	EQU offset 00F28h
+2   747		  =OFFSET 1171		 _L0BFD	EQU offset 01171h
+2   748		  =OFFSET 11A8		 _L0C34	EQU offset 011A8h
+2   749		  =OFFSET 11BA		 _L0C46	EQU offset 011BAh
+2   750		  =OFFSET 11F3		 _L0C7F	EQU offset 011F3h
+2   751		  =OFFSET 11FB		 _L0C87	EQU offset 011FBh
+2   752		  =OFFSET 129F		 _L0D2B	EQU offset 0129Fh
+2   753		  =OFFSET 132A		 _L0DB6	EQU offset 0132Ah
+2   754		  =OFFSET 13BA		 _L0E46	EQU offset 013BAh
+2   755		  =OFFSET 1528		 _L0FB4	EQU offset 01528h
+2   756		  =OFFSET 1544		 _L0FD0	EQU offset 01544h
+2   757		  =OFFSET 1552		 _L0FDE	EQU offset 01552h
+2   758		  =OFFSET 1581		 _L1008	EQU offset 01581h
+2   759		  =OFFSET 15A0		 _L_R EQU offset 015A0h
+2   760		  =OFFSET 15C4		 _R_L EQU offset 015C4h
+2   761		  =OFFSET 18AA		 _L12DD	EQU offset 018AAh
+2   762		  =OFFSET 18AE		 _L12E1	EQU offset 018AEh
+2   763		  =OFFSET 18C9		 _L12FC	EQU offset 018C9h
+2   764		  =OFFSET 18CD		 _L1300	EQU offset 018CDh
+2   765		  =OFFSET 18E5		 _L1318	EQU offset 018E5h
+2   766		  =OFFSET 18F3		 _L1326	EQU offset 018F3h
+2   767		  =OFFSET 1900		 _L1333	EQU offset 01900h
+2   768		  =OFFSET 191C		 _L134F	EQU offset 0191Ch
+2   769		  =OFFSET 193C		 _L136F	EQU offset 0193Ch
+2   770		  =OFFSET 193D		 _L1370	EQU offset 0193Dh
+2   771		  =OFFSET 19D6		 _L13FE	EQU offset 019D6h
+2   772		  =OFFSET 19D7		 _L13FF	EQU offset 019D7h
+2   773		  =OFFSET 1A45		 _L1469	EQU offset 01A45h
+2   774		  =OFFSET 1A77		 _L149B	EQU offset 01A77h
+2   775		  =OFFSET 1A85		 _L14A9	EQU offset 01A85h
+2   776		  =OFFSET 1A96		 _L14BA	EQU offset 01A96h
+2   777		  =OFFSET 1AA7		 _L14CB	EQU offset 01AA7h
+2   778		  =OFFSET 1AAB		 _L14CC	EQU offset 01AABh
+2   779		  =OFFSET 1C67		 _L1644	EQU offset 01C67h
+2   780		  =OFFSET 1C70		 _L164D	EQU offset 01C70h
+2   781		  =OFFSET 1C74		 _L164E	EQU offset 01C74h
+2   782		  =OFFSET 1C98		 _L1671	EQU offset 01C98h
+2   783		  =OFFSET 1CBE		 _L1672	EQU offset 01CBEh
+2   784		  =OFFSET 1CDA		 _L168E	EQU offset 01CDAh
+2   785		  =OFFSET 1CF7		 _L16AB	EQU offset 01CF7h
+2   786		  =OFFSET 1D83		 _L1722	EQU offset 01D83h
+2   787		  =OFFSET 1D87		 _L1726	EQU offset 01D87h
+2   788		  =OFFSET 1DDA		 _L1779	EQU offset 01DDAh
+2   789		  =OFFSET 1DEC		 _PRT_LONG EQU offset 01DECh
+2   790		  =OFFSET 1E18		 _L178B	EQU offset 01E18h
+2   791		  =OFFSET 1E37		 _L17AA	EQU offset 01E37h
+2   792		  =OFFSET 1E47		 _L17BA	EQU offset 01E47h
+2   793		  =OFFSET 1E5A		 _L17CD	EQU offset 01E5Ah
+2   794		  =OFFSET 1E64		 _L17D7	EQU offset 01E64h
+2   795		  =OFFSET 1E69		 _L17DC	EQU offset 01E69h
+2   796		  =OFFSET 1E6E		 _L17E1	EQU offset 01E6Eh
+2   797		  =OFFSET 1E73		 _L17E6	EQU offset 01E73h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 15
+msx_asm\tur_init.ASM
+
+
+
+2   798		  =OFFSET 1E9D		 _L1810	EQU offset 01E9Dh
+2   799		  =OFFSET 1EA2		 _L1811	EQU offset 01EA2h
+2   800		  =OFFSET 1F40		 _L187A	EQU offset 01F40h
+2   801		  =OFFSET 1F4A		 _L18A4	EQU offset 01F4Ah
+2   802		  =OFFSET 1F5E		 _L18B6	EQU offset 01F5Eh
+2   803		  =OFFSET 1F80		 _L18DC	EQU offset 01F80h
+2   804		  =OFFSET 1F8E		 _L19A5	EQU offset 01F8Eh
+2   805		  =OFFSET 1FBA		 _L19D5	EQU offset 01FBAh
+2   806		  =OFFSET 2014		 _L1A49	EQU offset 02014h
+2   807		  =OFFSET 2028		 _L1A55	EQU offset 02028h
+2   808		  =OFFSET 203F		 _L1A5D	EQU offset 0203Fh
+2   809		  =OFFSET 2052		 _L1A6F	EQU offset 02052h
+2   810		  =OFFSET 2057		 _L1A70	EQU offset 02057h
+2   811		  =OFFSET 20B8		 _L1AB0	EQU offset 020B8h
+2   812		  =OFFSET 20C2		 _L1ABA	EQU offset 020C2h
+2   813		  =OFFSET 20C6		 _L1ABE	EQU offset 020C6h
+2   814		  =OFFSET 2192		 _L1AED	EQU offset 02192h
+2   815		  =OFFSET 2196		 _L1AF1	EQU offset 02196h
+2   816		  =OFFSET 21C4		 _L1B6F	EQU offset 021C4h
+2   817		  =OFFSET 2213		 _L1B93	EQU offset 02213h
+2   818		  =OFFSET 2225		 _RENAMEFILE_LIB EQU offset 02225h
+2   819		  =OFFSET 224F		 _L1BA5	EQU offset 0224Fh
+2   820		  =OFFSET 227A		 _L1BEA	EQU offset 0227Ah
+2   821		  =OFFSET 227E		 _L1BEB	EQU offset 0227Eh
+2   822		  =OFFSET 2301		 _OVERLAYREC1 EQU offset 02301h
+2   823		  =OFFSET 232C		 _LOADRUNOVERLAYREC EQU	offset 0232Ch
+2   824		  =OFFSET 2339		 _LOADRUNOVERLAY EQU offset 02339h
+2   825		  =OFFSET 238E		 _OVERLAYLOADPTR EQU offset 0238Eh
+2   826		  =OFFSET 23C6		 _L1CDB	EQU offset 023C6h
+2   827		  =OFFSET 23D0		 _L1CE5	EQU offset 023D0h
+2   828		  =OFFSET 2465		 _L1D7A	EQU offset 02465h
+2   829		  =OFFSET 2528		 _L1E3D	EQU offset 02528h
+2   830		  =OFFSET 252F		 _L1E44	EQU offset 0252Fh
+2   831		  =OFFSET 258E		 _L1EA3	EQU offset 0258Eh
+2   832		  =OFFSET 2596		 _L1EAB	EQU offset 02596h
+2   833		  =OFFSET 25A8		 _L1EBC	EQU offset 025A8h
+2   834		  =OFFSET 25AC		 _L1EBD	EQU offset 025ACh
+2   835		  =OFFSET 25B0		 _L1EBE	EQU offset 025B0h
+2   836		  =OFFSET 25EC		 _L1EF2	EQU offset 025ECh
+2   837		  =OFFSET 25F0		 _L1EF3	EQU offset 025F0h
+2   838		  =OFFSET 25F4		 _L1EF4	EQU offset 025F4h
+2   839		  =OFFSET 2650		 _L1F48	EQU offset 02650h
+2   840		  =OFFSET 2656		 _L1F4E	EQU offset 02656h
+2   841		  =OFFSET 266C		 _L1F64	EQU offset 0266Ch
+2   842		  =OFFSET 2685		 _L1F7D	EQU offset 02685h
+2   843		  =OFFSET 26A3		 _L1F9B	EQU offset 026A3h
+2   844		  =OFFSET 26E3		 _L1FDB	EQU offset 026E3h
+2   845		  =OFFSET 26EC		 _L1FE4	EQU offset 026ECh
+2   846		  =OFFSET 26F2		 _L1FEA	EQU offset 026F2h
+2   847		  =OFFSET 26F9		 _L1FF1	EQU offset 026F9h
+2   848		  =OFFSET 2703		 _GETERROR_LIB EQU offset 02703h
+2   849		  =OFFSET 272A		 _L201B	EQU offset 0272Ah
+2   850		  =OFFSET 27FD		 _L20D4	EQU offset 027FDh
+2   851		  =OFFSET 286F		 _ERROREXIT EQU	offset 0286Fh
+2   852		  =OFFSET 2884		 _DOSERRORHANDLERON EQU	offset 02884h
+2   853		  =OFFSET 2887		 _DOSERRORHANDLEROFF EQU offset	02887h
+2   854		  =OFFSET 2E9B		 _L20E2	EQU offset 02E9Bh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 16
+msx_asm\tur_init.ASM
+
+
+
+2   855
+1   856
+1   857						  ORG 100H
+1   858
+1   859	    0100			 L0100:
+1   860
+1   861
+1   862	    0100  C3				  DB 0C3H
+1   863
+1   864
+1   865	    0101  0000e			 L0101:	  DW L20E2
+1   866
+1   867	    0103			 MAGICNUMBER:			     ; must be at 103H
+1   868	    0103  12 34	56 78			  DB 12H,34H,56H,78H
+1   869	    0107			 TURBOPASCALVERSION:
+1   870	    0107  03 03	61 04			  DB 03H,03H,'a',04H	     ; must be at 107H
+1   871
+1   872	    010B  01F2r				  DW L016B		     ; must be at 10BH
+1   873	    010D  0000				  DW 0			     ; reserved	10DH
+1   874	    010F  0000				  DW 0			     ; reserved	10FH
+1   875	    0111  0000				  DW 0			     ; reserved	111H
+1   876	    0113  0000				  DW 0
+1   877	    0115  0000				  DW 0
+1   878	    0117  0000				  DW 0
+1   879	    0119  0000				  DW 0
+1   880	    011B  0000				  DW 0
+1   881	    011D  0000				  DW 0
+1   882	    011F  0000				  DW 0
+1   883	    0121  0000				  DW 0
+1   884	    0123  0000				  DW 0
+1   885
+1   886					 ;PREFIX:  DB 'TURBO '		      ;	for 'TURBO.MSG'	or 'TURBO.OVR'
+1   887
+1   888					 ;L0000:   DB 0
+1   889					 ;L0001:   DW 0
+1   890
+1   891					 ;L0004:   DB 0			       ; current drive ?
+1   892
+1   893					 ;L0005:   DB 0
+1   894
+1   895
+1   896					 ;L0038:   DB 0
+1   897					 ;L0039:   DW 0
+1   898
+1   899	    0125  00			 L005C:	 DB 0			 ; start of FCB
+1   900
+1   901	    0126  08*(00)		 L005D:	 db 8 dup (0)			 ; name
+1   902
+1   903	    012E  00			 L0065:	 DB 0			 ; FCB extension, first	letter
+1   904	    012F  02*(00)		 L0066:	 db 2 dup (0)			 ; second and third letter
+1   905
+1   906	    0131  00			 L0068:	 DB 0			 ; 0CH
+1   907	    0132  00				 DB 0			 ; 0DH
+1   908	    0133  00				 DB 0			 ; 0EH
+1   909	    0134  00				 DB 0			 ; 0FH
+1   910	    0135  04*(00)		 L006C:	 db 4 dup (0)			 ; 10H-13H
+1   911	    0139  04*(00)		 L0070:	 db 4 dup (0)			 ; 14H-17H
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 17
+msx_asm\tur_init.ASM
+
+
+
+1   912	    013D  08*(00)		 L0074:	 db 8 dup (0)			 ; 18H-1FH
+1   913	    0145  00			 L007C:	 DB 0			 ; 20H
+1   914	    0146  0000			 L007D:	 DW 0			 ; 21H-22H
+1   915	    0148  0000				 DW 0			 ; 23H-24H
+1   916
+1   917		  =0080			 L0080	  EQU 0080H
+1   918
+1   919	    014A			 CONSTPTR:; FUNCTION KeyPressed: BOOLEAN;
+1   920	    014A  C3				 DB 0C3H
+1   921	    014B  03A0r			 CONSTPTR_1:DW L0316
+1   922
+1   923	    014D			 CONINPTR:			 ; console input routine
+1   924	    014D  C3				 DB 0C3H
+1   925	    014E  03AEr			 CONINPTR_1:DW L0320
+1   926
+1   927	    0150			 CONOUTPTR:			     ; console output routine
+1   928	    0150  C3				 DB 0C3H
+1   929	    0151  03D5r			 CON1OUTPTR:DW L0339
+1   930
+1   931	    0153			 LSTOUTPTR:
+1   932	    0153  C3				 DB 0c3h
+1   933	    0154  03CBr				 DW  L032F
+1   934						 ;DS 3			 ; jump	opcode at 00A9H
+1   935									 ; LSTOUTPTR at	absolute 00AAH
+1   936	    0156			 AUXOUTPTR:
+1   937	    0156  C3				 DB 0c3h
+1   938	    0157  03D0r				 DW  L0334
+1   939						 ;DS 3			 ; jump	opcode at 00ACH
+1   940									 ; AUXOUTPTR at	absolute 00ADH
+1   941	    0159			 AUXINPTR:
+1   942	    0159  C3				 DB 0c3h
+1   943	    015A  03C6r				 DW  L032A
+1   944						 ;DS 3			 ; jump	opcode at 00AFH
+1   945									 ; AUXINPTR  at	absolute 00B0H
+1   946	    015C			 USROUTPTR:
+1   947	    015C  C3				 DB 0c3h
+1   948	    015D  03D5r				 DW  L0339
+1   949						 ;DS 3			 ; jump	opcode at 00B2H
+1   950									 ; USROUTPTR at	absolute 00B3H
+1   951	    015F			 USRINPTR:
+1   952	    015F  C3				 DB 0c3h
+1   953	    0160  03AEr				 DW  L0320
+1   954						 ;DS 3			 ; jump	opcode at 00B5H
+1   955									 ; USRINPTR  at	absolute 00B6H
+1   956
+1   957	    0162  0000			 L00B8:	 DW 0			 ; CON,	TRM, 00B8
+1   958	    0164  0000			 L00BA:	 DW 0			 ; KBD,	    00BA
+1   959	    0166  0000			 LST:	 DW 0			 ; LST,	    00BC, absolute 00BCH
+1   960	    0168  0000			 L00BE:	 DW 0			 ; AUX,	    00BE
+1   961	    016A  0000			 L00C0:	 DW 0			 ; USR,	    00C0
+1   962	    016C  0000			 OUTPUT: DW 0			 ; OUTPUT,   00C2, absolute 00C2H
+1   963
+1   964	    016E  00			 BUFLEN: DB 0;			 ; BUFLEN    at	absolute 00D1H
+1   965
+1   966	    016F			 ERRORPTR:
+1   967	    016F  C3				 DB 0C3H
+1   968	    0170  0000			 ERRORPTR_1:DW 0
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 18
+msx_asm\tur_init.ASM
+
+
+
+1   969
+1   970	    0172  0000			 CBREAK:DW 0			 ; CBREAK    at	absolute 00DDH
+1   971	    0174  0000			 HEAPPTR:DW 0			 ; HEAPPTR   at	absolute 00C4H
+1   972	    0176  0000			 RECURPTR:DW 0			 ; RECURPTR  at	absolute 00C6H
+1   973
+1   974	    0178  0000			 L00C8:	 DW 0			 ; 32 bit Seed number
+1   975	    017A  00				  DB 0
+1   976
+1   977	    017B  00			 L00CB:	 DB 0			 ; waarde van R	register
+1   978
+1   979	    017C  0000			 L00CC:	 DW 0
+1   980	    017E  0000			 L00CE:	 DW 0
+1   981
+1   982	    0180  00			 L00D0:	 DB 0			  ; IORESULT value
+1   983	    0181  0000			 L00D2:	 DW 0
+1   984	    0183  0000			 L00D4:	 DW 0
+1   985	    0185  0000			 L00D6:	 DW 0
+1   986	    0187  00			 L00D8:	 DB 0
+1   987	    0188  00			 L00DC:	 DB 0
+1   988	    0189  0000			 L00DE:	 DW 0
+1   989	    018B  00			 L00E0:	 DB 0
+1   990
+1   991	    018C  0000			 L00E2:	 DW 0			 ; current device pointer
+1   992
+1   993	    018E  0000			 L00E4:	 DW 0
+1   994	    0190  0000			 L00E6:	 DW 0
+1   995	    0192  0000			 L00E8:	 DW 0
+1   996		  =_TEXT:0193		 L00E9	 EQU L00E8+1
+1   997	    0194  0000			 L00EA:	 DW 0
+1   998	    0196  00			 L00EC:	 DB 0
+1   999	    0197  0000			 L00ED:	 DW 0			 ; old device pointer
+1  1000
+1  1001						 ; tabel van 16	bytes, soort buffer
+1  1002	    0199  0000			 L00F0:	 DW 0
+1  1003	    019B  0000			 L00F2:	 DW 0
+1  1004	    019D  0000			 L00F4:	 DW 0			 ; MemAvail
+1  1005	    019F  0000			 L00F6:	 DW 0			 ; MaxAvail
+1  1006	    01A1  0000			 L00F8:	 DW 0
+1  1007	    01A3  08*(00)			 db 8 dup (0)
+1  1008
+1  1009					 ;	  DW 0ABCDH		  ; Magic
+1  1010					 ;	  DB 0CDH,0ABH
+1  1011					 ;	  DB 'Copyright	(C) 1994 MSX Computer Club Enschede',0
+1  1012
+1  1013	    01AB  0004			 L0124:	 DW 4			 ; Operating frequency of CPU (1-12 MHz)
+1  1014
+1  1015	    01AD  A1 42	00		 L0126:	 DB 0A1H,'B',0
+1  1016
+1  1017	    01B0  2A*(00)			 db 42 dup (0)			 ; patch area of 42 bytes
+1  1018
+1  1019	    01DA			 L0153:	 ; TermTypStr
+1  1020	    01DA  03 6D	73 78			 DB 3,'msx'		    ; STRING
+1  1021	    01DE  11*(00)			 db L0153+21-$ dup (0)
+1  1022
+1  1023	    01EF  50			 L0168:	 DB 80			 ; ScreenWidth
+1  1024	    01F0  18			 L0169:	 DB 24			 ; ScreenHeight
+1  1025
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 19
+msx_asm\tur_init.ASM
+
+
+
+1  1026	    01F1  00				 DB 0			 ; Why ?
+1  1027
+1  1028	    01F2			 L016B:	 ; InitialStr, 16 bytes
+1  1029	    01F2  03 1B	78 35 1D		 DB 3,1BH,'x5',1DH
+1  1030	    01F7  0B*(00)			 db L016B+16-$ dup (0)		 ; fill	rest
+1  1031
+1  1032	    0202			 L017B:	 ; ResetStr, 16	bytes
+1  1033	    0202  10*(00)			 db L017B+16-$ dup (0)		 ; fill	rest
+1  1034
+1  1035	    0212			 L018B:	 ; CursorStr, 16 bytes
+1  1036	    0212  04 1B	59 00 00		 DB 4,1BH,'Y',0,0
+1  1037	    0217  0B*(00)			 db L018B+16-$ dup (0)		 ; fill	rest
+1  1038
+1  1039	    0222  01			 L019B:	 DB 1			 ; 0 = ASCII, 1	= Binary Address
+1  1040	    0223  20			 L019C:	 DB 32			 ; ColumnOffset
+1  1041	    0224  20			 L019D:	 DB 32			 ; LineOffset
+1  1042	    0225  04			 L019E:	 DB 4			 ; XPosition in	CursorStr
+1  1043	    0226  03			 L019F:	 DB 3			 ; YPosition in	CursorStr
+1  1044	    0227  0000			 L01A0:	 DW 0			 ; Delay after cursor address (0 - 255 ms)
+1  1045
+1  1046	    0229			 L01A2:	 ; ClearScrStr,	6 bytes
+1  1047	    0229  01 0C				 DB 1,0CH		 ; length = 1
+1  1048	    022B  04*(00)			 db L01A2+6-$ dup (0)		 ; fill	rest
+1  1049
+1  1050	    022F			 L01A8:	 ; HomeStr, 6 bytes
+1  1051	    022F  00				 DB 0			 ; length = 0
+1  1052	    0230  05*(00)			 db L01A8+6-$ dup (0)
+1  1053
+1  1054	    0235			 L01AE:	 ; InsLineStr, 6 bytes
+1  1055	    0235  02 1B	4C			 DB 2,1BH,'L'
+1  1056	    0238  03*(00)			 db L01AE+6-$ dup (0)
+1  1057
+1  1058	    023B			 L01B4:	 ; DelLineStr, 6 bytes
+1  1059	    023B  02 1B	4D			 DB 2,1BH,'M'
+1  1060	    023E  03*(00)			 db L01B4+6-$ dup (0)
+1  1061
+1  1062	    0241  0000			 L01BA:	 DW 0			 ; DelayLine
+1  1063
+1  1064	    0243			 L01BC:	 ; EraToEolStr
+1  1065	    0243  02 1B	4B			 DB 2,1BH,'K'
+1  1066	    0246  03*(00)			 db L01BC+6-$ dup (0)
+1  1067
+1  1068	    0249			 L01C2:	 ; HLStartStr		 ; Start of highlighting
+1  1069	    0249  00				 DB 0
+1  1070	    024A  05*(00)			 db L01C2+6-$ dup (0)
+1  1071
+1  1072	    024F			 L01C8:	 ; HLEndStr		 ; End of highlighting
+1  1073	    024F  00				 DB 0
+1  1074	    0250  05*(00)			 db L01C8+6-$ dup (0)
+1  1075
+1  1076	    0255  0000			 L01CE:	 DW 0			 ; DelayHL, delay after
+1  1077									 ; EraToEol and	HighLight
+1  1078
+1  1079	    0257  7E			 L01D0:	  DB 7eh
+1  1080	    0258  B7				 DB 0b7h
+1  1081	    0259  37				 DB 37h
+1  1082	    025A  C8				 DB 0c8h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 20
+msx_asm\tur_init.ASM
+
+
+
+1  1083	    025B  23			 L01D4:	 DB 23h
+1  1084	    025C  F5				 DB 0f5h
+1  1085	    025D  E5				 DB 0e5h
+1  1086	    025E  7E				 DB 7eh
+1  1087	    025F  CD				 DB 0cdh
+1  1088	    0260  026Fr				 DW  L01E8
+1  1089	    0262  E1				 DB 0e1h
+1  1090	    0263  F1				 DB 0f1h
+1  1091	    0264  3D				 DB 3dh
+1  1092	    0265  C8				 DB 0c8h
+1  1093	    0266  18 F3				 DB 18h,( L01D4)-$-1
+1  1094
+1  1095	    0268  CD			 L01E1:	 DB 0cdh
+1  1096	    0269  0287r				 DW  L0200		 ; print CR,LF
+1  1097	    026B  0D 0A	00			 DB 0DH,0AH,0
+1  1098	    026E  C9				 DB 0c9h
+1  1099
+1  1100	    026F  6F			 L01E8:	  DB 6fh
+1  1101	    0270  E5				 DB 0e5h
+1  1102	    0271  CD				 DB 0cdh
+1  1103	    0272  0150r				 DW  CONOUTPTR
+1  1104	    0274  C9				 DB 0c9h
+1  1105
+1  1106	    0275			 L01EE:	 ; print character A with/without highlighting
+1  1107	    0275  FE 80				 DB 0feh, 080H
+1  1108	    0277  DC				 DB 0dch
+1  1109	    0278  02F5r				 DW L026B		 ; LowVideo
+1  1110	    027A  D4				 DB 0d4h
+1  1111	    027B  030Er				 DW L0284		 ; HighVideo
+1  1112	    027D  E6 7F				 DB 0e6h, 07FH
+1  1113	    027F  18 EE				 DB 18h,( L01E8)-$-1
+1  1114
+1  1115	    0281			 L01FA:	 ; print ASCIIZ-string with highlighting
+1  1116	    0281  E5				 DB 0e5h
+1  1117	    0282  21				 DB 21h
+1  1118	    0283  0275r				 DW L01EE
+1  1119	    0285  18 04				 DB 18h,( L0204)-$-1
+1  1120
+1  1121	    0287			 L0200:	  ; print ASCIIZ-string	without	highlighting
+1  1122	    0287  E5				 DB 0e5h
+1  1123	    0288  21				 DB 21h
+1  1124	    0289  026Fr				 DW L01E8
+1  1125	    028B  22			 L0204:	  DB 22h
+1  1126	    028C  02A5r				 DW L0213
+1  1127	    028E  E1				 DB 0e1h
+1  1128	    028F  E3				 DB 0e3h
+1  1129	    0290  F5			 L0209:	 DB 0f5h
+1  1130	    0291  C5				 DB 0c5h
+1  1131	    0292  D5			 L020B:	 DB 0d5h
+1  1132
+1  1133	    0293  7E			 L020C:	  DB 7eh
+1  1134	    0294  23				 DB 23h
+1  1135	    0295  B7				 DB 0b7h
+1  1136	    0296  28 07				 DB 28h,(L0218)-$-1
+1  1137	    0298  E5				 DB 0e5h
+1  1138	    0299  CD			 L0212:	 DB 0cdh
+1  1139	    029A  02A4r				 DW  J0213		 ; call	address, address is change able
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 21
+msx_asm\tur_init.ASM
+
+
+
+1  1140	    029C  E1				 DB 0e1h
+1  1141	    029D  18 F4				 DB 18h,( L020C)-$-1
+1  1142
+1  1143	    029F  D1			 L0218:	 DB 0d1h
+1  1144	    02A0  C1				 DB 0c1h
+1  1145	    02A1  F1				 DB 0f1h
+1  1146	    02A2  E3				 DB 0e3h	 ; continue after string data
+1  1147	    02A3  C9				 DB 0c9h
+1  1148
+1  1149	    02A4			 J0213:
+1  1150	    02A4  C3				 DB 0C3H
+1  1151	    02A5  056Dr			 L0213:	 DW L04D2
+1  1152
+1  1153	    02A7			 L021D:	 ; in:	 HL = time to wait
+1  1154	    02A7  7D				 DB 7dh			 ; delay
+1  1155	    02A8  B4				 DB 0b4h
+1  1156	    02A9  C8				 DB 0c8h
+1  1157	    02AA  3A				 DB 3ah
+1  1158	    02AB  01ABr				 DW L0124		 ; A = frequency
+1  1159	    02AD  87				 DB 087h
+1  1160	    02AE  87				 DB 087h
+1  1161	    02AF  87				 DB 087h
+1  1162	    02B0  E3			 L0226:	 DB 0e3h
+1  1163	    02B1  E3				 DB 0e3h
+1  1164	    02B2  E3				 DB 0e3h
+1  1165	    02B3  E3				 DB 0e3h
+1  1166	    02B4  C5				 DB 0c5h
+1  1167	    02B5  01				 DB 01h
+1  1168	    02B6  04D2				 DW 1234
+1  1169	    02B8  C1				 DB 0c1h
+1  1170	    02B9  3D				 DB 3dh
+1  1171	    02BA  20 F4				 DB 20h,(L0226)-$-1
+1  1172	    02BC  2B				 DB 2bh
+1  1173	    02BD  18 E8				 DB 18h,( L021D)-$-1		 ; Delay
+1  1174
+1  1175	    02BF  CD			 L0235:	 DB 0cdh
+1  1176	    02C0  0257r				 DW  L01D0
+1  1177	    02C2  D8				 DB 0d8h
+1  1178	    02C3  2A				 DB 02ah
+1  1179	    02C4  0255r				 DW L01CE		 ; HL =	DelayHL, delay highlighting
+1  1180	    02C6  18 DF				 DB 18h,( L021D)-$-1		 ; Delay
+1  1181
+1  1182	    02C8			 L023E:	 ; PROCEDURE ClrSCr;
+1  1183	    02C8  F5				 DB 0f5h
+1  1184	    02C9  C5				 DB 0c5h
+1  1185	    02CA  D5				 DB 0d5h
+1  1186	    02CB  E5				 DB 0e5h
+1  1187
+1  1188	    02CC  21				 DB 21h
+1  1189	    02CD  022Fr				 DW L01A8		 ; HL =	HomeStr
+1  1190	    02CF  CD				 DB 0cdh
+1  1191	    02D0  02BFr				 DW  L0235
+1  1192	    02D2  21				 DB 21h
+1  1193	    02D3  0229r				 DW L01A2		 ; HL =	ClearScrStr
+1  1194
+1  1195	    02D5  CD			 L024B:	 DB 0cdh
+1  1196	    02D6  0257r				 DW  L01D0
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 22
+msx_asm\tur_init.ASM
+
+
+
+1  1197	    02D8  2A				 DB 02ah
+1  1198	    02D9  0241r				 DW L01BA		 ; HL =	DelayLine
+1  1199	    02DB  D4				 DB 0d4h
+1  1200	    02DC  02A7r				 DW L021D		 ; Delay
+1  1201
+1  1202	    02DE  E1				 DB 0e1h
+1  1203	    02DF  D1				 DB 0d1h
+1  1204	    02E0  C1				 DB 0c1h
+1  1205	    02E1  F1				 DB 0f1h
+1  1206	    02E2  C9				 DB 0c9h
+1  1207
+1  1208	    02E3			 L0259:	 ; PROCEDURE DelLine
+1  1209	    02E3  F5				 DB 0f5h
+1  1210	    02E4  C5				 DB 0c5h
+1  1211	    02E5  D5				 DB 0d5h
+1  1212	    02E6  E5				 DB 0e5h
+1  1213	    02E7  21				 DB 21h
+1  1214	    02E8  023Br				 DW L01B4		 ; DelLineStr
+1  1215	    02EA  18 E9				 DB 18h,( L024B)-$-1
+1  1216
+1  1217	    02EC			 L0262:	 ; PROCEDURE InsLine;
+1  1218	    02EC  F5				 DB 0f5h
+1  1219	    02ED  C5				 DB 0c5h
+1  1220	    02EE  D5				 DB 0d5h
+1  1221	    02EF  E5				 DB 0e5h
+1  1222	    02F0  21				 DB 21h
+1  1223	    02F1  0235r				 DW L01AE		 ; InsLineStr
+1  1224	    02F3  18 E0				 DB 18h,( L024B)-$-1
+1  1225
+1  1226	    02F5			 L026B:	 ; PROCEDURE LowVideo;
+1  1227	    02F5  F5				 DB 0f5h
+1  1228	    02F6  3A				 DB 3ah
+1  1229	    02F7  018Br				 DW L00E0
+1  1230	    02F9  B7				 DB 0b7h
+1  1231	    02FA  28 10				 DB 28h,(L0282)-$-1
+1  1232
+1  1233	    02FC  C5				 DB 0c5h
+1  1234	    02FD  D5				 DB 0d5h
+1  1235	    02FE  E5				 DB 0e5h
+1  1236	    02FF  AF				 DB 0afh
+1  1237	    0300  32				 DB 32h
+1  1238	    0301  018Br				 DW L00E0
+1  1239	    0303  21				 DB 21h
+1  1240	    0304  024Fr				 DW L01C8		 ; HLEndStr
+1  1241
+1  1242	    0306  CD			 L027C:	 DB 0cdh
+1  1243	    0307  02BFr				 DW  L0235
+1  1244
+1  1245	    0309  E1				 DB 0e1h
+1  1246	    030A  D1				 DB 0d1h
+1  1247	    030B  C1				 DB 0c1h
+1  1248	    030C  F1			 L0282:	 DB 0f1h
+1  1249	    030D  C9				 DB 0c9h
+1  1250
+1  1251	    030E			 L0284:	 ; PROCEDURE NormVideo;
+1  1252	    030E  F5				 DB 0f5h
+1  1253	    030F  3A				 DB 3ah
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 23
+msx_asm\tur_init.ASM
+
+
+
+1  1254	    0310  018Br				 DW L00E0
+1  1255	    0312  FE FF				 DB 0feh, 0FFH
+1  1256	    0314  28 F6				 DB 28h,(L0282)-$-1
+1  1257
+1  1258	    0316  C5				 DB 0c5h
+1  1259	    0317  D5				 DB 0d5h
+1  1260	    0318  E5				 DB 0e5h
+1  1261	    0319  3E FF				 DB 3eh,0FFH
+1  1262	    031B  32				 DB 32h
+1  1263	    031C  018Br				 DW L00E0
+1  1264	    031E  21				 DB 21h
+1  1265	    031F  0249r				 DW L01C2		 ; HLStartStr
+1  1266	    0321  18 E3				 DB 18h,( L027C)-$-1
+1  1267
+1  1268	    0323			 L0299:	 ; PROCEDURE ClrEol;
+1  1269	    0323  F5				 DB 0f5h
+1  1270	    0324  C5				 DB 0c5h
+1  1271	    0325  D5				 DB 0d5h
+1  1272	    0326  E5				 DB 0e5h
+1  1273	    0327  21				 DB 21h
+1  1274	    0328  0243r				 DW L01BC		 ; EraToEolStr
+1  1275	    032A  18 DA				 DB 18h,( L027C)-$-1
+1  1276
+1  1277	    032C			 L02A2:	 ; in:	 L = X,	0..79
+1  1278						 ;	 H = Y,	0..23
+1  1279	    032C  F5				 DB 0f5h
+1  1280	    032D  C5				 DB 0c5h
+1  1281	    032E  D5				 DB 0d5h
+1  1282	    032F  E5				 DB 0e5h
+1  1283	    0330  E5				 DB 0e5h
+1  1284	    0331  21				 DB 21h
+1  1285	    0332  0212r				 DW L018B
+1  1286	    0334  11				 DB 11h
+1  1287	    0335  0199r				 DW L00F0
+1  1288	    0337  01				 DB 01h
+1  1289	    0338  0010				 DW 0010H
+1  1290	    033A  ED B0				 DB 0edh,0b0h
+1  1291	    033C  D1				 DB 0d1h
+1  1292	    033D  3A				 DB 3ah
+1  1293	    033E  0225r				 DW L019E
+1  1294	    0340  4F				 DB 4fh
+1  1295	    0341  3A				 DB 3ah
+1  1296	    0342  0223r				 DW L019C
+1  1297	    0344  82				 DB 082h
+1  1298	    0345  D5				 DB 0d5h
+1  1299	    0346  CD				 DB 0cdh
+1  1300	    0347  0366r				 DW  L02DC
+1  1301	    0349  D1				 DB 0d1h
+1  1302	    034A  3A				 DB 3ah
+1  1303	    034B  0226r				 DW L019F
+1  1304	    034D  4F				 DB 4fh
+1  1305	    034E  3A				 DB 3ah
+1  1306	    034F  0224r				 DW L019D
+1  1307	    0351  83				 DB 083h
+1  1308	    0352  CD				 DB 0cdh
+1  1309	    0353  0366r				 DW  L02DC
+1  1310	    0355  21				 DB 21h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 24
+msx_asm\tur_init.ASM
+
+
+
+1  1311	    0356  0199r				 DW L00F0
+1  1312	    0358  CD				 DB 0cdh
+1  1313	    0359  0257r				 DW  L01D0
+1  1314
+1  1315	    035B  2A				 DB 02ah
+1  1316	    035C  0227r				 DW L01A0		 ; DelayCursor
+1  1317	    035E  CD				 DB 0cdh
+1  1318	    035F  02A7r				 DW  L021D		 ; Delay
+1  1319	    0361  E1				 DB 0e1h
+1  1320	    0362  D1				 DB 0d1h
+1  1321	    0363  C1				 DB 0c1h
+1  1322	    0364  F1				 DB 0f1h
+1  1323	    0365  C9				 DB 0c9h
+1  1324
+1  1325	    0366  21			 L02DC:	 DB 21h
+1  1326	    0367  0199r				 DW L00F0
+1  1327	    0369  06 00				 DB 06h,0
+1  1328	    036B  09				 DB 09h
+1  1329	    036C  EB				 DB 0ebh
+1  1330	    036D  21				 DB 21h
+1  1331	    036E  0222r				 DW L019B
+1  1332	    0370  34				 DB 034h
+1  1333	    0371  35				 DB 035h
+1  1334	    0372  28 02				 DB 28h,(L02EC)-$-1
+1  1335	    0374  12				 DB 12h
+1  1336	    0375  C9				 DB 0c9h
+1  1337
+1  1338	    0376  1B			 L02EC:	 DB 1bh
+1  1339	    0377  1B				 DB 1bh
+1  1340	    0378  21				 DB 21h
+1  1341	    0379  0394r				 DW TAB110100+3
+1  1342	    037B  06 03				 DB 06h,3
+1  1343
+1  1344	    037D  2B			 L02F3:	 DB 2bh
+1  1345
+1  1346	    037E  0E 2F				 DB 0eh,'0'-1
+1  1347	    0380  0C			 L02F6:	 DB 0ch
+1  1348	    0381  96				 DB 096h
+1  1349	    0382  30 FC				 DB 30h,(L02F6)-$-1
+1  1350
+1  1351	    0384  86				 DB 086h
+1  1352	    0385  F5				 DB 0f5h
+1  1353	    0386  79				 DB 79h
+1  1354	    0387  FE 30				 DB 0feh, '0'
+1  1355	    0389  28 01			 L02FF:	 DB 28h,(L0302)-$-1
+1  1356	    038B  12				 DB 12h
+1  1357	    038C  13			 L0302:	 DB 13h
+1  1358	    038D  F1				 DB 0f1h
+1  1359	    038E  10 ED				 DB 10h,( L02F3)-$-1
+1  1360	    0390  C9				 DB 0c9h
+1  1361
+1  1362	    0391			 TAB110100:
+1  1363	    0391  01 0A	64			 DB 1,10,100
+1  1364
+1  1365	    0394			 L030A:	 ; PROCEDURE CrtInit;
+1  1366	    0394  21				 DB 21h
+1  1367	    0395  01F2r				 DW L016B		 ; InitialStr
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 25
+msx_asm\tur_init.ASM
+
+
+
+1  1368	    0397  C3				 DB 0c3h
+1  1369	    0398  02BFr				 DW  L0235
+1  1370
+1  1371	    039A			 L0310:	 ; PROCEDURE CrtExit;
+1  1372	    039A  21				 DB 21h
+1  1373	    039B  0202r				 DW L017B		 ; ResetStr
+1  1374	    039D  C3				 DB 0c3h
+1  1375	    039E  02BFr				 DW  L0235
+1  1376
+1  1377	    03A0			 L0316:	  ; tests if there is a	character in the input buffer
+1  1378						 ; and places it in a temporary	buffer to read it the next time
+1  1379						 ; in:	 -
+1  1380						 ; out:	 HL = false = 0, if no character present
+1  1381						 ;	 HL = true = 1,	if a character was present
+1  1382						  ; MSX	version, FAST
+1  1383	    03A0  2A				  DB 02ah
+1  1384	    03A1  F3FA				 DW 0F3FAH
+1  1385	    03A3  3A				  DB 3ah
+1  1386	    03A4  F3F8				 DW 0F3F8H
+1  1387	    03A6  95				  DB 095h
+1  1388	    03A7  3E 01				  DB 3eh,1		       ; assume	there are characters present
+1  1389	    03A9  20 01				  DB 20h,(L0316_OK)-$-1		    ; jump if characters present
+1  1390
+1  1391	    03AB  3D				  DB 3dh		      ;	FALSE if not
+1  1392	    03AC			 L0316_OK:
+1  1393
+1  1394	    03AC  18 14				 DB 18h,( L0326)-$-1
+1  1395
+1  1396	    03AE			 L0320:	  ; in:	   -
+1  1397						 ; out:	 HL = character	read from keyboard
+1  1398						 ;	 H = always zero
+1  1399						  ; FAST character input
+1  1400	    03AE  DD E5				  DB 0ddh,0e5h
+1  1401	    03B0  FD E5				  DB 0fdh,0e5h
+1  1402	    03B2  79				  DB 79h
+1  1403	    03B3  80F7				  DW 80F7H
+1  1404	    03B5  009F				  DW 009FH
+1  1405	    03B7  FD E1				  DB 0fdh,0e1h
+1  1406	    03B9  DD E1				  DB 0ddh,0e1h
+1  1407	    03BB  6F				  DB 6fh
+1  1408	    03BC  26 00				  DB 26h,0
+1  1409	    03BE  C9				  DB 0c9h
+1  1410
+1  1411	    03BF  CD			 L0323:	  DB 0cdh
+1  1412	    03C0  0406r				 DW  L035F
+1  1413
+1  1414	    03C2  6F			 L0326:	  DB 6fh
+1  1415	    03C3  26 00				 DB 26h,0
+1  1416	    03C5  C9				 DB 0c9h
+1  1417
+1  1418	    03C6  11			 L032A:	 DB 11h
+1  1419	    03C7  0012				 DW 6*3		 ; Reader Input
+1  1420	    03C9  18 F4				 DB 18h,( L0323)-$-1
+1  1421
+1  1422	    03CB  11			 L032F:	 DB 11h
+1  1423	    03CC  000C				 DW 4*3		 ; List	Output
+1  1424	    03CE  18 05				 DB 18h,( L033C)-$-1
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 26
+msx_asm\tur_init.ASM
+
+
+
+1  1425
+1  1426	    03D0  11			 L0334:	 DB 11h
+1  1427	    03D1  000F				 DW 5*3		 ; Puncher Output
+1  1428	    03D3  18 00				 DB 18h,( L033C)-$-1
+1  1429
+1  1430	    03D5			 L0339:
+1  1431
+1  1432	    03D5  E1			 L033C:	 DB 0e1h		 ; pop return address
+1  1433	    03D6  C1				 DB 0c1h		 ; C = character to print
+1  1434	    03D7  E5				 DB 0e5h		 ; push	return address
+1  1435
+1  1436	    03D8  3A				  DB 3ah
+1  1437	    03D9  0172r				 DW CBREAK
+1  1438	    03DB  B7				 DB 0b7h
+1  1439	    03DC  28 1A				  DB 28h,(L035D_1)-$-1		     ; jump if no break	allowed
+1  1440
+1  1441	    03DE  D5				  DB 0d5h
+1  1442	    03DF  C5				 DB 0c5h
+1  1443	    03E0  CD				 DB 0cdh
+1  1444	    03E1  014Ar				 DW  CONSTPTR
+1  1445	    03E3  7C				 DB 7ch
+1  1446	    03E4  B5				 DB 0b5h
+1  1447	    03E5  28 0F				 DB 28h,(L035D)-$-1		 ; jump	if no character	present
+1  1448
+1  1449	    03E7  CD				  DB 0cdh
+1  1450	    03E8  047Br				 DW  L03E1		   ; A = character from	console
+1  1451	    03EA  FE 13				 DB 0feh, 013H
+1  1452	    03EC  20 08				 DB 20h,(L035D)-$-1
+1  1453
+1  1454	    03EE  CD				  DB 0cdh
+1  1455	    03EF  047Br				 DW  L03E1		   ; A = character from	console
+1  1456	    03F1  FE 03				 DB 0feh, 3
+1  1457	    03F3  CA				  DB 0cah
+1  1458	    03F4  0FF5r				 DW L20D4		  ; jump to Program Abort if ^C	pressed
+1  1459
+1  1460	    03F6  C1			 L035D:	 DB 0c1h
+1  1461	    03F7  D1				 DB 0d1h
+1  1462
+1  1463	    03F8			 L035D_1:
+1  1464						  ; FAST character output
+1  1465	    03F8  DD E5				  DB 0ddh,0e5h
+1  1466	    03FA  FD E5				  DB 0fdh,0e5h
+1  1467	    03FC  79				  DB 79h
+1  1468	    03FD  80F7				  DW 80F7H
+1  1469	    03FF  00A2				  DW 00A2H
+1  1470	    0401  FD E1				  DB 0fdh,0e1h
+1  1471	    0403  DD E1				  DB 0ddh,0e1h
+1  1472	    0405  C9				  DB 0c9h
+1  1473
+1  1474	    0406			 L035F:
+1  1475	    0406  2A				 DB 02ah
+1  1476	    0407  0001				 DW 0001H
+1  1477	    0409  19				 DB 019h
+1  1478	    040A  E9				 DB 0e9h
+1  1479
+1  1480	    040B			 L0364:	  ; InitCharIO
+1  1481	    040B  22				 DB 22h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 27
+msx_asm\tur_init.ASM
+
+
+
+1  1482	    040C  0181r				 DW L00D2		 ; LIB
+1  1483	    040E  78				 DB 78h
+1  1484	    040F  32				 DB 32h
+1  1485	    0410  0172r				 DW CBREAK
+1  1486					 ;	  LD A,C
+1  1487					 ;	  OR A
+1  1488					 ;	  JR Z,L037A
+1  1489
+1  1490	    0412			 L037A:
+1  1491	    0412  21				 DB 21h
+1  1492	    0413  043Fr				 DW L03A5
+1  1493	    0415  11				 DB 11h
+1  1494	    0416  014Ar				 DW CONSTPTR
+1  1495	    0418  01				 DB 01h
+1  1496	    0419  0018				 DW L03A5_L
+1  1497	    041B  ED B0				 DB 0edh,0b0h
+1  1498
+1  1499	    041D  21				 DB 21h
+1  1500	    041E  0457r				 DW L03BD
+1  1501	    0420  11				 DB 11h
+1  1502	    0421  0162r				 DW L00B8
+1  1503	    0423  01				 DB 01h
+1  1504	    0424  000C				 DW 000CH
+1  1505	    0426  ED B0				 DB 0edh,0b0h			 ; flag	bits of	I/O routines
+1  1506
+1  1507	    0428  AF				 DB 0afh
+1  1508	    0429  6F				 DB 6fh
+1  1509	    042A  67				 DB 67h
+1  1510	    042B  32				 DB 32h
+1  1511	    042C  0180r				 DW L00D0		 ; reset IORESULT value
+1  1512	    042E  22				 DB 22h
+1  1513	    042F  0183r				 DW L00D4
+1  1514	    0431  22				 DB 22h
+1  1515	    0432  0185r				 DW L00D6
+1  1516	    0434  3E 7E				 DB 3eh,07EH
+1  1517	    0436  32				 DB 32h
+1  1518	    0437  016Er				 DW BUFLEN
+1  1519	    0439  32				 DB 32h
+1  1520	    043A  018Br				 DW L00E0
+1  1521
+1  1522	    043C  C3				  DB 0c3h
+1  1523	    043D  0000e				 DW  INITFILEIO		     ; Set DOS2Present variable
+1  1524
+1  1525	    043F  C3			 L03A5:	  DB 0c3h
+1  1526	    0440  03A0r				 DW  L0316		     ; keypressed
+1  1527	    0442  C3				  DB 0c3h
+1  1528	    0443  03AEr				 DW  L0320		     ; read character from console
+1  1529	    0445  C3				  DB 0c3h
+1  1530	    0446  03D5r				 DW  L0339		     ; write character to console
+1  1531	    0448  C3				 DB 0c3h
+1  1532	    0449  03CBr				 DW  L032F
+1  1533	    044B  C3				 DB 0c3h
+1  1534	    044C  03D0r				 DW  L0334
+1  1535	    044E  C3				 DB 0c3h
+1  1536	    044F  03C6r				 DW  L032A
+1  1537	    0451  C3				  DB 0c3h
+1  1538	    0452  03D5r				 DW  L0339		     ; write character to console
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 28
+msx_asm\tur_init.ASM
+
+
+
+1  1539	    0454  C3				  DB 0c3h
+1  1540	    0455  03AEr				 DW  L0320		     ; read character from console
+1  1541		  =0018			 L03A5_L EQU $ - L03A5
+1  1542
+1  1543	    0457  00C1			 L03BD:	  DW 0C1H		     ; Con / Trm       , read and write
+1  1544	    0459  0082				  DW 82H		     ; Kbd	       , read
+1  1545	    045B  0043				  DW 43H		     ; Lst	       , write
+1  1546	    045D  00C4				  DW 0C4H		     ; Aux	       , read and write
+1  1547	    045F  00C5				  DW 0C5H		     ; Usr	       , read and write
+1  1548	    0461  00C1				  DW 0C1H		     ; Input / Output  , read and write
+1  1549
+1  1550	    0463			 L03C9:	 ; in:	 A = character to print
+1  1551						 ; out:	 -
+1  1552						 ; changes: -
+1  1553	    0463  C5				 DB 0c5h
+1  1554	    0464  D5				 DB 0d5h
+1  1555	    0465  E5				 DB 0e5h
+1  1556	    0466  DD E5				 DB 0ddh,0e5h
+1  1557	    0468  FD E5				 DB 0fdh,0e5h
+1  1558	    046A  F5				 DB 0f5h
+1  1559	    046B  6F				 DB 6fh
+1  1560	    046C  26 00				 DB 26h,0
+1  1561	    046E  E5				 DB 0e5h
+1  1562	    046F  CD				 DB 0cdh
+1  1563	    0470  0150r				 DW  CONOUTPTR
+1  1564	    0472  F1				 DB 0f1h
+1  1565
+1  1566	    0473  FD E1			 L03D9:	  DB 0fdh,0e1h
+1  1567	    0475  DD E1				 DB 0ddh,0e1h
+1  1568	    0477  E1				 DB 0e1h
+1  1569	    0478  D1				 DB 0d1h
+1  1570	    0479  C1				 DB 0c1h
+1  1571	    047A  C9				 DB 0c9h
+1  1572
+1  1573	    047B			 L03E1:	 ; in:	 -
+1  1574						 ; out:	 A = character read from console
+1  1575						 ; changes: F
+1  1576	    047B  C5				 DB 0c5h
+1  1577	    047C  D5				 DB 0d5h
+1  1578	    047D  E5				 DB 0e5h
+1  1579	    047E  DD E5				 DB 0ddh,0e5h
+1  1580	    0480  FD E5				 DB 0fdh,0e5h
+1  1581	    0482  CD			 L03E8:	 DB 0cdh
+1  1582	    0483  014Dr				 DW  CONINPTR
+1  1583	    0485  7D				 DB 7dh
+1  1584	    0486  18 EB				 DB 18h,( L03D9)-$-1		 ; same	end as 'print character'
+1  1585
+1  1586						 ; -----------------------------------------------------------
+1  1587
+1  1588	    0488			 L03EE:	 ; parses a filename at	DE with	wildcards to FCB at L005C
+1  1589	    0488  0E FF				 DB 0eh,0FFH		 ; with	wildcards
+1  1590	    048A  18 0C				 DB 18h,( L03FE)-$-1
+1  1591
+1  1592	    048C			 L03F2:	 ; parses a string whose address is in L00D2 to	FCB at L005C
+1  1593						 ; with	no wildcards, skips leading spaces in string
+1  1594	    048C  0E 00				 DB 0eh,0			 ; don't allow wildcards
+1  1595	    048E  ED 5B				 DB 0edh,5bh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 29
+msx_asm\tur_init.ASM
+
+
+
+1  1596	    0490  0181r				 DW L00D2
+1  1597	    0492  13			 L03F8:	 DB 13h
+1  1598	    0493  1A				 DB 1ah
+1  1599	    0494  FE 20				 DB 0feh, ' '
+1  1600	    0496  28 FA				 DB 28h,(L03F8)-$-1		 ; skip	leading	spaces
+1  1601
+1  1602	    0498  21			 L03FE:	 DB 21h
+1  1603	    0499  012Er				 DW L0065		 ; HL =	start address for extension
+1  1604	    049B  06 03				 DB 06h,3			 ; 3 characters
+1  1605	    049D  CD				 DB 0cdh
+1  1606	    049E  0515r				 DW  L047B
+1  1607
+1  1608	    04A0			 L0406:	 ; parses a complete filename at address in DE to FCB at L005C
+1  1609						 ; in:	 DE = source address for filename
+1  1610						 ;	  C = 0, no wildcards
+1  1611	    04A0  1A				 DB 1ah
+1  1612	    04A1  CD				 DB 0cdh
+1  1613	    04A2  0540r				 DW  L04A6		 ; upcase
+1  1614	    04A4  FE 41				 DB 0feh, 'A'
+1  1615	    04A6  38 12				 DB 38h,(L0420)-$-1		 ; jump	if < 'A'
+1  1616	    04A8  FE 51				 DB 0feh, 'Q'
+1  1617	    04AA  30 0E				 DB 30h,(L0420)-$-1		 ; jump	if >= 'Q'
+1  1618	    04AC  47				 DB 47h			 ; save	first character	in B
+1  1619	    04AD  13				 DB 13h
+1  1620	    04AE  1A				 DB 1ah
+1  1621	    04AF  FE 3A				 DB 0feh, ':'			  ; next character is ':' ?
+1  1622	    04B1  20 06				 DB 20h,(L041F)-$-1		 ; no, don't start with	a drive	specification
+1  1623	    04B3  78				 DB 78h			 ; A = drive letter
+1  1624	    04B4  D6 40				 DB 0d6h, 040H		 ; 1 = 'A:', 2 = 'B:' etc..
+1  1625	    04B6  13				 DB 13h			 ; to character	after ':'
+1  1626	    04B7  18 02				 DB 18h,( L0421)-$-1
+1  1627
+1  1628	    04B9  1B			 L041F:	 DB 1bh			 ; back	to first character
+1  1629
+1  1630	    04BA  AF			 L0420:	 DB 0afh		 ; default drive
+1  1631	    04BB  21			 L0421:	 DB 21h
+1  1632	    04BC  0125r				 DW L005C
+1  1633	    04BE  77				 DB 77h		 ; set drive specification
+1  1634	    04BF  23				 DB 23h
+1  1635
+1  1636	    04C0  0C				 DB 0ch			 ; C = 0 if no wildcards are allowed
+1  1637	    04C1  0D				 DB 0dh
+1  1638	    04C2  28 19				 DB 28h,(L0443)-$-1		 ; jump	to skip	wildcards
+1  1639
+1  1640	    04C4  1A				 DB 1ah
+1  1641	    04C5  CD				 DB 0cdh
+1  1642	    04C6  051Cr				 DW  L0482
+1  1643	    04C8  20 13				 DB 20h,(L0443)-$-1
+1  1644	    04CA  FE 3F				 DB 0feh, '?'
+1  1645	    04CC  28 0F				 DB 28h,(L0443)-$-1
+1  1646	    04CE  FE 2A				 DB 0feh, '*'
+1  1647	    04D0  28 0B				 DB 28h,(L0443)-$-1
+1  1648	    04D2  FE 2E				 DB 0feh, '.'
+1  1649	    04D4  28 07				 DB 28h,(L0443)-$-1
+1  1650	    04D6  06 0B				 DB 06h,11
+1  1651	    04D8  CD				 DB 0cdh
+1  1652	    04D9  0511r				 DW  L0477
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 30
+msx_asm\tur_init.ASM
+
+
+
+1  1653	    04DB  18 10				 DB 18h,( L0453)-$-1
+1  1654
+1  1655	    04DD  06 08			 L0443:	 DB 06h,8
+1  1656	    04DF  CD				 DB 0cdh
+1  1657	    04E0  04F8r				 DW  L045E
+1  1658	    04E2  1A				 DB 1ah
+1  1659	    04E3  FE 2E				 DB 0feh, '.'			  ; followed by	an extension ?
+1  1660	    04E5  20 06				 DB 20h,(L0453)-$-1		 ; no, skip parsing of an extension
+1  1661
+1  1662	    04E7  13				 DB 13h			 ; to first character of extension
+1  1663	    04E8  06 03				 DB 06h,3
+1  1664	    04EA  CD				 DB 0cdh
+1  1665	    04EB  04F8r				 DW  L045E		 ; parse extension
+1  1666
+1  1667	    04ED  21			 L0453:	 DB 21h
+1  1668	    04EE  0131r				 DW L005C+12		 ; clear rest of the FCB
+1  1669	    04F0  06 19				  DB 06h,FCB_LEN -11	       ; 33e -12
+1  1670	    04F2  36 00			 L0458:	 DB 36h,0
+1  1671	    04F4  23				 DB 23h
+1  1672	    04F5  10 FB				 DB 10h,( L0458)-$-1
+1  1673	    04F7  C9				 DB 0c9h
+1  1674
+1  1675	    04F8  1A			 L045E:	 DB 1ah
+1  1676	    04F9  0C				 DB 0ch			 ; skip	wildcard check if not allowed
+1  1677	    04FA  0D				 DB 0dh
+1  1678	    04FB  28 08				 DB 28h,(L046B)-$-1
+1  1679
+1  1680	    04FD  FE 3F				 DB 0feh, '?'
+1  1681	    04FF  28 09				 DB 28h,(L0470)-$-1		 ; fill	as if normal letter
+1  1682	    0501  FE 2A				 DB 0feh, '*'
+1  1683	    0503  28 0B				 DB 28h,(L0476)-$-1		 ; fill	rest with '?'-wildcards
+1  1684
+1  1685	    0505  CD			 L046B:	 DB 0cdh
+1  1686	    0506  051Cr				 DW  L0482
+1  1687	    0508  28 0B				 DB 28h,(L047B)-$-1		 ; jump	if abnormal character found, end of
+1  1688									 ; string found, fill rest with	spaces
+1  1689
+1  1690	    050A  77			 L0470:	 DB 77h
+1  1691	    050B  23				 DB 23h
+1  1692	    050C  13				 DB 13h
+1  1693	    050D  10 E9				 DB 10h,( L045E)-$-1
+1  1694	    050F  C9				 DB 0c9h
+1  1695
+1  1696	    0510  13			 L0476:	 DB 13h
+1  1697
+1  1698	    0511			 L0477:	 ; fill	rest with '?'-wildcards
+1  1699	    0511  3E 3F				 DB 3eh,'?'
+1  1700	    0513  18 02				 DB 18h,( L047D)-$-1
+1  1701
+1  1702	    0515			 L047B:	 ; fill	rest with spaces
+1  1703	    0515  3E 20				 DB 3eh,' '
+1  1704
+1  1705	    0517  77			 L047D:	 DB 77h
+1  1706	    0518  23				 DB 23h
+1  1707	    0519  10 FC				 DB 10h,( L047D)-$-1
+1  1708	    051B  C9				 DB 0c9h
+1  1709
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 31
+msx_asm\tur_init.ASM
+
+
+
+1  1710	    051C  CD			 L0482:	 DB 0cdh
+1  1711	    051D  0540r				 DW  L04A6		 ; upcase A
+1  1712	    051F  FE 20				 DB 0feh, ' '			  ; < '	' ?
+1  1713	    0521  38 0D				 DB 38h,(L0496)-$-1
+1  1714
+1  1715	    0523  E5				 DB 0e5h
+1  1716	    0524  C5				 DB 0c5h
+1  1717	    0525  21				 DB 21h
+1  1718	    0526  0532r				 DW L0498		 ; HL =	address	of data	to scan
+1  1719	    0528  01				 DB 01h
+1  1720	    0529  000E				 DW L04911		 ; BC =	length of data to scan
+1  1721	    052B  ED B1				 DB 0edh,0b1h
+1  1722	    052D  C1				 DB 0c1h
+1  1723	    052E  E1				 DB 0e1h
+1  1724	    052F  C9				 DB 0c9h		 ; return Z-flag = '1' if A found in data
+1  1725
+1  1726	    0530  BF			 L0496:	 DB 0bfh		 ; return with Z-flag corresponding to A
+1  1727	    0531  C9				 DB 0c9h
+1  1728
+1  1729	    0532			 L0498:	 ; SepTable
+1  1730	    0532  20 2E	2C 3B 3A 3D 3F+		 DB ' .,;:=?*[]<>{}'
+   1731		  2A 5B	5D 3C 3E 7B 7D
+1  1732		  =000E			 L04911	 EQU $-L0498
+1  1733
+1  1734						 ; -----------------------------------------------------------
+1  1735
+1  1736	    0540			 L04A6:	 ; in:	 A = character
+1  1737						 ; out:	 A = upcased, if A >= 'a' and A	<= 'z'
+1  1738	    0540  FE 61				 DB 0feh, 'a'
+1  1739	    0542  D8				 DB 0d8h
+1  1740	    0543  FE 7B				 DB 0feh, 'z'+1
+1  1741	    0545  D0				 DB 0d0h
+1  1742	    0546  D6 20				 DB 0d6h, 'a'-'A'
+1  1743	    0548  C9				 DB 0c9h
+1  1744
+1  1745	    0549  7C			 L04AF:	 DB 7ch
+1  1746	    054A  CD				 DB 0cdh
+1  1747	    054B  054Er				 DW  L04B4
+1  1748	    054D  7D				 DB 7dh
+1  1749
+1  1750	    054E  F5			 L04B4:	 DB 0f5h
+1  1751	    054F  1F				 DB 1fh
+1  1752	    0550  1F				 DB 1fh
+1  1753	    0551  1F				 DB 1fh
+1  1754	    0552  1F				 DB 1fh
+1  1755	    0553  CD				 DB 0cdh
+1  1756	    0554  0557r				 DW  L04BD
+1  1757	    0556  F1				 DB 0f1h
+1  1758	    0557  E6 0F			 L04BD:	 DB 0e6h, 00FH
+1  1759	    0559  FE 0A				 DB 0feh, 10
+1  1760	    055B  38 02				 DB 38h,(L04BE)-$-1
+1  1761	    055D  C6 07				 DB 0c6h,7
+1  1762	    055F  C6 30			 L04BE:	 DB 0c6h,'0'
+1  1763	    0561  C3				 DB 0c3h
+1  1764	    0562  0463r				 DW  L03C9		 ; print digit
+1  1765
+1  1766	    0564			 L04C8:	  ; converts integer HL	to an unsigned byte A
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 32
+msx_asm\tur_init.ASM
+
+
+
+1  1767						 ; in:	 HL
+1  1768						 ; out:	 A = 0 and carry set, if HL < 0
+1  1769						 ;	 A = L and carry reset,	if HL <	256
+1  1770						 ;	 otherwise A = 255
+1  1771	    0564  AF				 DB 0afh
+1  1772	    0565  37				 DB 37h			 ; assume HL is	negative
+1  1773	    0566  CB 7C				 DB 0cbh,07ch
+1  1774	    0568  C0				 DB 0c0h		 ; return with carry set if negative
+1  1775
+1  1776	    0569  7C				  DB 7ch
+1  1777	    056A  B7				 DB 0b7h
+1  1778	    056B  7D				 DB 7dh
+1  1779	    056C  C8				  DB 0c8h		       ; return	if HL <	256
+1  1780
+1  1781	    056D  3A			 L04D2:	  DB 3ah
+1  1782	    056E  0571r				 DW L04D2_D		; code area
+1  1783	    0570  C9				 DB 0c9h
+1  1784
+1  1785	    0571  00			 L04D2_D: DB 0			     ; data area
+1  1786
+1  1787
+1  1788	    0572			 L0581:	  ; LIB
+1  1789						 ; push	new empty SET on stack
+1  1790						 ; in:	 -
+1  1791						 ; out:	 a new SET pushed on to	the stack
+1  1792	    0572  DD E1				 DB 0ddh,0e1h			 ; LIB
+1  1793	    0574  21				 DB 21h
+1  1794	    0575  FFE0				 DW -32
+1  1795	    0577  39				 DB 039h
+1  1796	    0578  F9				 DB 0f9h		 ; reserve 32 bytes
+1  1797
+1  1798						 ; clear the SET with zeroes
+1  1799	    0579  06 20				 DB 06h,020H
+1  1800	    057B  AF				 DB 0afh
+1  1801	    057C  77			 L058B:	 DB 77h
+1  1802	    057D  23				 DB 23h
+1  1803	    057E  10 FC				 DB 10h,( L058B)-$-1
+1  1804
+1  1805	    0580  DD E9				 DB 0ddh,0e9h
+1  1806
+1  1807	    0582			 L0591:	 ; add element HL to SET at stack
+1  1808						 ;
+1  1809	    0582  DD E1				 DB 0ddh,0e1h
+1  1810	    0584  45				 DB 45h			 ; B = element to add
+1  1811	    0585  CD				 DB 0cdh
+1  1812	    0586  05ABr				 DW  L05BA
+1  1813
+1  1814	    0588  B6			 L0597:	 DB 0b6h
+1  1815	    0589  77				 DB 77h
+1  1816
+1  1817	    058A  DD E9			 L0599:	 DB 0ddh,0e9h
+1  1818
+1  1819	    058C  DD E1			 L059B:	  DB 0ddh,0e1h			   ; LIB
+1  1820	    058E  D1				 DB 0d1h
+1  1821	    058F  7D				 DB 7dh
+1  1822	    0590  93				 DB 093h
+1  1823	    0591  38 F7				 DB 38h,(L0599)-$-1
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 33
+msx_asm\tur_init.ASM
+
+
+
+1  1824	    0593  3C				 DB 3ch
+1  1825	    0594  4F				 DB 4fh
+1  1826	    0595  43				 DB 43h
+1  1827	    0596  CD				 DB 0cdh
+1  1828	    0597  05ABr				 DW  L05BA
+1  1829	    0599  5F				 DB 5fh
+1  1830	    059A  41				 DB 41h
+1  1831	    059B  AF				 DB 0afh
+1  1832	    059C  B3			 L05AB:	 DB 0b3h
+1  1833	    059D  CB 23				 DB 0cbh,23h
+1  1834	    059F  30 06				 DB 30h,(L05B6)-$-1
+1  1835	    05A1  B6				 DB 0b6h
+1  1836	    05A2  77				 DB 77h
+1  1837	    05A3  23				 DB 23h
+1  1838	    05A4  AF				 DB 0afh
+1  1839	    05A5  1E 01				 DB 1eh,1
+1  1840	    05A7  10 F3			 L05B6:	 DB 10h,( L05AB)-$-1
+1  1841	    05A9  18 DD				 DB 18h,( L0597)-$-1
+1  1842
+1  1843	    05AB  78			 L05BA:	 DB 78h
+1  1844	    05AC  E6 F8				 DB 0e6h, 0F8H		 ; calculate byte offset
+1  1845	    05AE  0F				 DB 0fh
+1  1846	    05AF  0F				 DB 0fh
+1  1847	    05B0  0F				 DB 0fh
+1  1848	    05B1  C6 02				 DB 0c6h,2			 ; add 2 for return address
+1  1849	    05B3  6F				 DB 6fh
+1  1850	    05B4  26 00				 DB 26h,0
+1  1851	    05B6  39				 DB 039h
+1  1852	    05B7  78				 DB 78h
+1  1853	    05B8  E6 07				 DB 0e6h, 7
+1  1854	    05BA  3C				 DB 3ch
+1  1855	    05BB  47				 DB 47h
+1  1856	    05BC  AF				 DB 0afh
+1  1857	    05BD  37				 DB 37h
+1  1858	    05BE  17			 L05CD:	 DB 17h
+1  1859	    05BF  10 FD				 DB 10h,( L05CD)-$-1
+1  1860	    05C1  C9				 DB 0c9h
+1  1861
+1  1862
+1  1863	    05C2			 L0612:	 ; pop pushed set to the address in HL
+1  1864						 ; in:	 HL = destination address of SET
+1  1865						 ;	 C = bytes to copy from	SET
+1  1866						 ;	 B = offset within SET
+1  1867	    05C2  DD E1				 DB 0ddh,0e1h			 ; LIB
+1  1868	    05C4  EB				 DB 0ebh
+1  1869	    05C5  68				 DB 68h			 ; HL =	offset within SET
+1  1870	    05C6  26 00				 DB 26h,0
+1  1871	    05C8  44				 DB 44h			 ; BC =	length
+1  1872	    05C9  39				 DB 039h
+1  1873	    05CA  ED B0				 DB 0edh,0b0h			 ; copy	set to given address
+1  1874
+1  1875	    05CC  21				 DB 21h
+1  1876	    05CD  0020				 DW 0020H
+1  1877
+1  1878	    05CF  39			 L061F:	  DB 039h
+1  1879	    05D0  F9				 DB 0f9h
+1  1880	    05D1  DD E9				 DB 0ddh,0e9h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 34
+msx_asm\tur_init.ASM
+
+
+
+1  1881
+1  1882	    05D3			 L06F5:	 ; X * Y : INTEGER
+1  1883						 ; in:	 DE = X
+1  1884						 ;	 HL = Y
+1  1885						 ; out:	 HL = X	* Y
+1  1886	    05D3  4B				 DB 4bh			 ; BC =	X
+1  1887	    05D4  42				 DB 42h
+1  1888	    05D5  EB				 DB 0ebh
+1  1889	    05D6  21				 DB 21h
+1  1890	    05D7  0000				 DW 0
+1  1891	    05D9  7A				 DB 7ah			 ; D non zero?
+1  1892	    05DA  B7				 DB 0b7h
+1  1893	    05DB  3E 10				 DB 3eh,16			 ; assume 16 bits
+1  1894	    05DD  20 03				 DB 20h,(L0704)-$-1		 ; yes,	continue
+1  1895	    05DF  53				 DB 53h			 ; no, shift E to D
+1  1896	    05E0  3E 08				 DB 3eh,8			 ; shift rest over 8 bits
+1  1897	    05E2  29			 L0704:	 DB 029h
+1  1898	    05E3  EB				 DB 0ebh
+1  1899	    05E4  29				 DB 029h
+1  1900	    05E5  EB				 DB 0ebh
+1  1901	    05E6  30 01				 DB 30h,(L070B)-$-1
+1  1902	    05E8  09				 DB 09h
+1  1903	    05E9  3D			 L070B:	 DB 3dh
+1  1904	    05EA  20 F6				 DB 20h,(L0704)-$-1
+1  1905	    05EC  C9				 DB 0c9h
+1  1906
+1  1907	    05ED			 L0780:	  ; Abs	X : INTEGER
+1  1908						 ; in:	 HL = X
+1  1909						 ; out:	 HL = -X, if X < 0
+1  1910						 ;	 HL = X, if X >= 0
+1  1911	    05ED  CB 7C				 DB 0cbh,07ch			 ; LIB,	HL = negative ?
+1  1912	    05EF  C8				 DB 0c8h		 ; return if positive
+1  1913
+1  1914	    05F0			 L0783:	 ; X = -X : INTEGER
+1  1915						 ; in:	 HL = X
+1  1916						 ; out:	 HL = -X
+1  1917	    05F0  7C				 DB 7ch			 ; negate HL
+1  1918	    05F1  2F				 DB 2fh
+1  1919	    05F2  67				 DB 67h
+1  1920	    05F3  7D				 DB 7dh
+1  1921	    05F4  2F				 DB 2fh
+1  1922	    05F5  6F				 DB 6fh
+1  1923	    05F6  23				 DB 23h
+1  1924	    05F7  C9				 DB 0c9h
+1  1925
+1  1926	    05F8			 L07C6:	  ; unsigned Integer to	ASCII
+1  1927						 ; in:	 HL = unsigned INTEGER
+1  1928						 ;	 IX = destination address of ASCII result
+1  1929						 ; out:	 IX = address after ASCII result
+1  1930	    05F8  06 00				 DB 06h,0			 ; Flag	= 0, no	leading	zero
+1  1931	    05FA  11				 DB 11h
+1  1932	    05FB  2710				 DW 10000
+1  1933	    05FD  CD				 DB 0cdh
+1  1934	    05FE  0614r				 DW  L07E2
+1  1935	    0600  11				 DB 11h
+1  1936	    0601  03E8				 DW 1000
+1  1937	    0603  CD				 DB 0cdh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 35
+msx_asm\tur_init.ASM
+
+
+
+1  1938	    0604  0614r				 DW  L07E2
+1  1939	    0606  11				 DB 11h
+1  1940	    0607  0064				 DW 100
+1  1941	    0609  CD				 DB 0cdh
+1  1942	    060A  0614r				 DW  L07E2
+1  1943	    060C  1E 0A				 DB 1eh,10
+1  1944	    060E  CD				 DB 0cdh
+1  1945	    060F  0614r				 DW  L07E2
+1  1946	    0611  7D				 DB 7dh
+1  1947	    0612  18 0D				 DB 18h,( L07EF)-$-1
+1  1948
+1  1949	    0614  AF			 L07E2:	 DB 0afh
+1  1950	    0615  3C			 L07E3:	 DB 3ch
+1  1951	    0616  ED 52				 DB 0EDH,052h
+1  1952	    0618  30 FB				 DB 30h,(L07E3)-$-1
+1  1953	    061A  19				 DB 019h
+1  1954	    061B  04				 DB 04h			 ; increase, assume NonZero
+1  1955	    061C  3D				 DB 3dh
+1  1956	    061D  20 02				 DB 20h,(L07EF)-$-1		 ; jump	if digit > 0
+1  1957
+1  1958	    061F  05				 DB 05h			 ; Flag	= 0 ?, suppress	leading	zero's
+1  1959	    0620  C8				 DB 0c8h
+1  1960
+1  1961	    0621  C6 30			 L07EF:	 DB 0c6h,'0'
+1  1962	    0623  DD 77	00			 DB 0ddh,77h,+0
+1  1963	    0626  DD 23				 DB 0ddh,23h
+1  1964	    0628  C9				 DB 0c9h
+1  1965
+1  1966	    0629			 L07F7:	  ; ASCII hexadecimal or decimal to Integer
+1  1967						 ; converts ascii hexadecimal or decimal number	at IX to
+1  1968						 ; a value in HL
+1  1969						 ; in:	 IX = address of ascii digit sequence
+1  1970						 ; out:	 carry set if value out	of range
+1  1971						 ;	 carry reset, HL = value
+1  1972	    0629  DD 7E	00			 DB 0ddh,7eh,+0
+1  1973	    062C  D6 24				 DB 0d6h, '$'
+1  1974	    062E  4F				 DB 4fh
+1  1975	    062F  21				 DB 21h
+1  1976	    0630  0000				 DW 0
+1  1977	    0632  20 02				 DB 20h,(L0804)-$-1		 ; NonZero, do not skip	'$' character
+1  1978	    0634  DD 23			 L0802:	 DB 0ddh,23h
+1  1979
+1  1980	    0636  DD 7E	00		 L0804:	 DB 0ddh,7eh,+0
+1  1981	    0639  CD				 DB 0cdh
+1  1982	    063A  0540r				 DW  L04A6		 ; upcase
+1  1983	    063C  D6 30				 DB 0d6h, '0'			 ; < '0' ?
+1  1984	    063E  38 29				 DB 38h,(L0837)-$-1		 ; yes,	quit
+1  1985	    0640  FE 0A				 DB 0feh, 10			 ; < 10	?
+1  1986	    0642  38 0E				 DB 38h,(L0820)-$-1		 ; yes,	continue
+1  1987
+1  1988						 ; A..F	?
+1  1989	    0644  0C				 DB 0ch			 ; started with	'$' ?
+1  1990	    0645  0D				 DB 0dh
+1  1991	    0646  20 21				 DB 20h,(L0837)-$-1		 ; no, quit
+1  1992	    0648  D6 07				 DB 0d6h, 7			 ; 'A' --> 10, 'B' --> 11
+1  1993	    064A  FE 0A				 DB 0feh, 10			 ; < 10	?
+1  1994	    064C  38 1B				 DB 38h,(L0837)-$-1		 ; yes,	quit
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 36
+msx_asm\tur_init.ASM
+
+
+
+1  1995	    064E  FE 10				 DB 0feh, 16			 ; >= 16 ?
+1  1996	    0650  30 17				 DB 30h,(L0837)-$-1		 ; yes,	quit
+1  1997	    0652  54			 L0820:	 DB 54h			 ; save	old HL
+1  1998	    0653  5D				 DB 5dh
+1  1999	    0654  29				 DB 029h	 ; * 2
+1  2000	    0655  D8				 DB 0d8h		 ; quit	if carry, overflow
+1  2001	    0656  29				 DB 029h	 ; * 4
+1  2002	    0657  D8				 DB 0d8h		 ; quit	if error
+1  2003	    0658  0C				 DB 0ch			 ; hexadecimal ?
+1  2004	    0659  0D				 DB 0dh
+1  2005	    065A  20 02				 DB 20h,(L082C)-$-1
+1  2006	    065C  54				 DB 54h			 ; yes,	hexadecimal (perform * 16)
+1  2007	    065D  5D				 DB 5dh
+1  2008	    065E  19			 L082C:	 DB 019h	 ; * 5 if decimal
+1  2009									 ; * 8 if hexadecimal
+1  2010	    065F  D8				 DB 0d8h		 ; quit	if error
+1  2011	    0660  29				 DB 029h	 ; * 10	if decimal
+1  2012									 ; * 16	if hexadecimal
+1  2013	    0661  D8				 DB 0d8h		 ; quit	if error
+1  2014	    0662  5F				 DB 5fh
+1  2015	    0663  16 00				 DB 16h,0
+1  2016	    0665  19				 DB 019h	 ; * 10	+ digit	if decimal
+1  2017									 ; * 16	+ digit	if hexadecimal
+1  2018	    0666  D8				 DB 0d8h		 ; quit	if error
+1  2019	    0667  18 CB				 DB 18h,( L0802)-$-1		 ; go for the next digit
+1  2020
+1  2021	    0669  B7			 L0837:	  DB 0b7h
+1  2022						 ;RET Z			 ; quit	if carry reset if hexadecimal
+1  2023									 ; allow hexadecimals that are negative
+1  2024									 ; decimals
+1  2025						 ;LD A,H
+1  2026						 ;ADD A,A
+1  2027	    066A  C9				 DB 0c9h		 ; quit	with carry set if HL > 32767?
+1  2028
+1  2029	    066B  00			 A2L_FLAG:DB 0			     ; hexadecimal flag
+1  2030									 ; 0 = convert as hexadecimal
+1  2031									 ; NonZero = convert as	decimal
+1  2032	    066C			 A2L:	  ; ASCII hexadecimal or decimal to LONGINT
+1  2033						 ; converts ascii hexadecimal or decimal number	at IX to
+1  2034						 ; an unsigned value in	DE:HL
+1  2035						 ; in:	 IX = address of ascii digit sequence
+1  2036						 ; out:	 carry set if value out	of range
+1  2037						 ;	 carry reset, DE:HL = unsigned value
+1  2038						  ;	   A = 0, if hexadecimal constant parsed
+1  2039	    066C  DD 7E	00			 DB 0ddh,7eh,+0
+1  2040	    066F  D6 24				 DB 0d6h, '$'
+1  2041	    0671  32				 DB 32h
+1  2042	    0672  066Br				 DW A2L_FLAG
+1  2043	    0674  21				 DB 21h
+1  2044	    0675  0000				 DW 0			 ; DE:HL = 0
+1  2045	    0677  11				 DB 11h
+1  2046	    0678  0000				 DW 0
+1  2047	    067A  20 02				 DB 20h,(A2L04)-$-1		 ; NonZero, do not skip	'$' character
+1  2048
+1  2049	    067C  DD 23			 A2L02:	 DB 0ddh,23h
+1  2050
+1  2051	    067E  3A			 A2L04:	  DB 3ah
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 37
+msx_asm\tur_init.ASM
+
+
+
+1  2052	    067F  066Br				 DW A2L_FLAG
+1  2053	    0681  4F				  DB 4fh
+1  2054	    0682  DD 7E	00			  DB 0ddh,7eh,+0
+1  2055	    0685  CD				 DB 0cdh
+1  2056	    0686  0540r				 DW  L04A6		 ; upcase
+1  2057	    0688  D6 30				 DB 0d6h, '0'			 ; < '0' ?
+1  2058	    068A  38 53				 DB 38h,(A2L37)-$-1		 ; yes,	quit --> error
+1  2059	    068C  FE 0A				 DB 0feh, 10			 ; < 10	?
+1  2060	    068E  38 0E				 DB 38h,(A2L20)-$-1		 ; yes,	continue
+1  2061
+1  2062						 ; A..F	?
+1  2063	    0690  0C				  DB 0ch		      ;	started	with '$' ?
+1  2064	    0691  0D				  DB 0dh
+1  2065	    0692  20 4B				  DB 20h,(A2L37)-$-1		    ; no, quit --> error
+1  2066
+1  2067						 ; hexadecimal
+1  2068	    0694  D6 07				 DB 0d6h, 7			 ; 'A' --> 10, 'B' --> 11
+1  2069	    0696  FE 0A				 DB 0feh, 10			 ; < 10	?
+1  2070	    0698  38 45				  DB 38h,(A2L37)-$-1		     ; yes, quit --> error
+1  2071	    069A  FE 10				 DB 0feh, 16			 ; >= 16 ?
+1  2072	    069C  30 41				  DB 30h,(A2L37)-$-1		    ; yes, quit	--> error
+1  2073
+1  2074	    069E  F5			 A2L20:	  DB 0f5h
+1  2075	    069F  3A				  DB 3ah
+1  2076	    06A0  066Br				 DW A2L_FLAG
+1  2077	    06A2  B7				 DB 0b7h		 ; hexadecimal or decimal ?
+1  2078	    06A3  28 1C				 DB 28h,(A2L_HEX)-$-1		 ; jump	if hexadecimal
+1  2079
+1  2080						 ; multiply DE:HL by 10	with overflow detection
+1  2081	    06A5  D5				 DB 0d5h		 ; save	old DE:HL * 1
+1  2082	    06A6  E5				 DB 0e5h
+1  2083	    06A7  CD				 DB 0cdh
+1  2084	    06A8  06E6r				 DW  L_M2		 ; DE:HL * 2
+1  2085	    06AA  38 36				 DB 38h,(A2L38)-$-1		 ; quit	if carry, overflow
+1  2086
+1  2087	    06AC  CD				 DB 0cdh
+1  2088	    06AD  06E6r				 DW  L_M2		 ; DE:HL * 4
+1  2089	    06AF  38 31				 DB 38h,(A2L38)-$-1		 ; quit	if carry, overflow
+1  2090
+1  2091	    06B1  C1				 DB 0c1h		 ; DE:HL * 4 + DE:HL * 1
+1  2092	    06B2  09				 DB 09h
+1  2093	    06B3  EB				 DB 0ebh
+1  2094	    06B4  C1				 DB 0c1h
+1  2095	    06B5  ED 4A				 DB 0EDH,04ah
+1  2096	    06B7  EB				 DB 0ebh
+1  2097	    06B8  C1				  DB 0c1h
+1  2098	    06B9  78				  DB 78h		     ; A = digit to add
+1  2099	    06BA  D8				  DB 0d8h		       ; quit if carry,	overflow
+1  2100
+1  2101	    06BB  CD				  DB 0cdh
+1  2102	    06BC  06E6r				 DW  L_M2		   ; DE:HL * 2
+1  2103	    06BE  D8				  DB 0d8h
+1  2104	    06BF  18 11				  DB 18h,( A2L36)-$-1			; add the current digit
+1  2105
+1  2106	    06C1  F1			 A2L_HEX: DB 0f1h
+1  2107	    06C2  CD				  DB 0cdh
+1  2108	    06C3  06E6r				 DW  L_M2		   ; DE:HL * 2
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 38
+msx_asm\tur_init.ASM
+
+
+
+1  2109	    06C5  D8				 DB 0d8h		 ; quit	if carry, overflow
+1  2110	    06C6  CD				 DB 0cdh
+1  2111	    06C7  06E6r				 DW  L_M2		 ; DE:HL * 4
+1  2112	    06C9  D8				 DB 0d8h		 ; quit	if carry, overflow
+1  2113	    06CA  CD				 DB 0cdh
+1  2114	    06CB  06E6r				 DW  L_M2		 ; DE:HL * 8
+1  2115	    06CD  D8				 DB 0d8h		 ; quit	if carry, overflow
+1  2116	    06CE  CD				 DB 0cdh
+1  2117	    06CF  06E6r				 DW  L_M2		 ; DE:HL * 16
+1  2118	    06D1  D8				 DB 0d8h		 ; quit	if carry, overflow
+1  2119
+1  2120	    06D2			 A2L36:	  ; add	the new	digit and repeat
+1  2121	    06D2  4F				  DB 4fh
+1  2122	    06D3  06 00				  DB 06h,0
+1  2123	    06D5  09				  DB 09h
+1  2124	    06D6  EB				  DB 0ebh
+1  2125	    06D7  01				  DB 01h
+1  2126	    06D8  0000				 DW 0
+1  2127	    06DA  ED 4A				  DB 0EDH,04ah
+1  2128	    06DC  EB				  DB 0ebh
+1  2129	    06DD  18 9D				  DB 18h,( A2L02)-$-1			; go for the next digit
+1  2130
+1  2131	    06DF  79			 A2L37:	  DB 79h
+1  2132	    06E0  B7				 DB 0b7h
+1  2133	    06E1  C9				 DB 0c9h
+1  2134
+1  2135	    06E2  E1			 A2L38:	  DB 0e1h
+1  2136	    06E3  E1				  DB 0e1h
+1  2137	    06E4  D1				 DB 0d1h
+1  2138	    06E5  C9				 DB 0c9h
+1  2139
+1  2140	    06E6			 L_M2:	  ; in:	   DE:HL
+1  2141						 ; out:	 DE:HL * 2
+1  2142						 ;	 Carry if overflow
+1  2143	    06E6  29				 DB 029h
+1  2144	    06E7  EB				 DB 0ebh
+1  2145	    06E8  ED 6A				 DB 0EDH,06ah
+1  2146	    06EA  EB				 DB 0ebh
+1  2147	    06EB  C9				 DB 0c9h
+1  2148
+1  2149					 ; ------------------------------------------------------
+1  2150					 ; ------------------------------------------------------
+1  2151					 ; ------------------------------------------------------
+1  2152					 ; ------------------------------------------------------
+1  2153					 ; ------------------------------------------------------
+1  2154
+1  2155
+1  2156	    06EC			 L09E9:	  ; REAL + REAL
+1  2157	    06EC  CD				  DB 0cdh
+1  2158	    06ED  06FFr				 DW  L0A0D		   ; LIB
+1  2159
+1  2160	    06EF  D0			 L09EC:	 DB 0d0h
+1  2161	    06F0  3E 01				 DB 3eh,1			 ; r.error 1: Floating point overflow
+1  2162	    06F2  C3				 DB 0c3h
+1  2163	    06F3  0F48r				 DW  L2027		 ; Run-time error
+1  2164
+1  2165
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 39
+msx_asm\tur_init.ASM
+
+
+
+1  2166	    06F5  3E 02			 L0A03:	  DB 3eh,2		       ; r.error 2: Division by	zero attempted
+1  2167	    06F7  CA				 DB 0cah
+1  2168	    06F8  0F48r				 DW L2027		 ; Run-time error
+1  2169	    06FA  CD				  DB 0cdh
+1  2170	    06FB  0800r				 DW  L0AF5
+1  2171	    06FD  18 F0				 DB 18h,( L09EC)-$-1
+1  2172
+1  2173	    06FF  D9			 L0A0D:	 DB 0d9h
+1  2174	    0700  CB 78				 DB 0cbh,078h
+1  2175	    0702  D9				 DB 0d9h
+1  2176	    0703  C2				 DB 0c2h
+1  2177	    0704  077Ar				 DW L0A88
+1  2178	    0706  D9			 L0A14:	 DB 0d9h
+1  2179	    0707  7D				 DB 7dh
+1  2180	    0708  B7				 DB 0b7h
+1  2181	    0709  D9				 DB 0d9h
+1  2182	    070A  C8				 DB 0c8h
+1  2183	    070B  D9				 DB 0d9h
+1  2184	    070C  C5				 DB 0c5h
+1  2185	    070D  D5				 DB 0d5h
+1  2186	    070E  E5				 DB 0e5h
+1  2187	    070F  D9				 DB 0d9h
+1  2188	    0710  7D				 DB 7dh
+1  2189	    0711  B7				 DB 0b7h
+1  2190	    0712  20 05				 DB 20h,(L0A27)-$-1
+1  2191	    0714  D9				 DB 0d9h
+1  2192	    0715  CB B8				 DB 0cbh,0b8h
+1  2193	    0717  18 54				 DB 18h,( L0A7B)-$-1
+1  2194	    0719  C5			 L0A27:	 DB 0c5h
+1  2195	    071A  CB F8				 DB 0cbh,0f8h
+1  2196	    071C  AF				 DB 0afh
+1  2197	    071D  08				 DB 08h
+1  2198	    071E  D9				 DB 0d9h
+1  2199	    071F  CB F8				 DB 0cbh,0f8h
+1  2200	    0721  7D				 DB 7dh
+1  2201	    0722  D9				 DB 0d9h
+1  2202	    0723  95				 DB 095h
+1  2203	    0724  28 13				 DB 28h,(L0A47)-$-1
+1  2204	    0726  30 06				 DB 30h,(L0A3C)-$-1
+1  2205	    0728  ED 44				 DB 0edh,44h
+1  2206	    072A  08				 DB 08h
+1  2207	    072B  3D				 DB 3dh
+1  2208	    072C  08				 DB 08h
+1  2209	    072D  D9				 DB 0d9h
+1  2210	    072E  CD			 L0A3C:	 DB 0cdh
+1  2211	    072F  08B7r				 DW  L0B7A
+1  2212	    0731  2C				 DB 2ch
+1  2213	    0732  3D				 DB 3dh
+1  2214	    0733  20 F9				 DB 20h,(L0A3C)-$-1
+1  2215	    0735  08				 DB 08h
+1  2216	    0736  28 01				 DB 28h,(L0A47)-$-1
+1  2217	    0738  D9				 DB 0d9h
+1  2218	    0739  F1			 L0A47:	 DB 0f1h
+1  2219	    073A  E6 80				 DB 0e6h, 80H
+1  2220	    073C  20 0F				 DB 20h,(L0A5B)-$-1
+1  2221	    073E  CD				 DB 0cdh
+1  2222	    073F  08CFr				 DW  L0B92
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 40
+msx_asm\tur_init.ASM
+
+
+
+1  2223	    0741  30 25				 DB 30h,(L0A76)-$-1
+1  2224	    0743  CD				 DB 0cdh
+1  2225	    0744  08B8r				 DW  L0B7B
+1  2226	    0746  B7				 DB 0b7h
+1  2227	    0747  2C				 DB 2ch
+1  2228	    0748  20 1E				 DB 20h,(L0A76)-$-1
+1  2229	    074A  37				 DB 37h
+1  2230	    074B  18 20				 DB 18h,( L0A7B)-$-1
+1  2231	    074D  CD			 L0A5B:	 DB 0cdh
+1  2232	    074E  0903r				 DW  L0BC6
+1  2233	    0750  3F				 DB 3fh
+1  2234	    0751  F5				 DB 0f5h
+1  2235	    0752  28 10				 DB 28h,(L0A72)-$-1
+1  2236	    0754  38 01				 DB 38h,(L0A65)-$-1
+1  2237	    0756  D9				 DB 0d9h
+1  2238	    0757  CD			 L0A65:	 DB 0cdh
+1  2239	    0758  08E9r				 DW  L0BAC
+1  2240	    075A  CB 78			 L0A68:	 DB 0cbh,078h
+1  2241	    075C  20 09				 DB 20h,(L0A75)-$-1
+1  2242	    075E  CD				 DB 0cdh
+1  2243	    075F  08C3r				 DW  L0B86
+1  2244	    0761  2D				 DB 2dh
+1  2245	    0762  20 F6				 DB 20h,(L0A68)-$-1
+1  2246
+1  2247	    0764  CD			 L0A72:	 DB 0cdh
+1  2248	    0765  08AFr				 DW  L0B72		 ; HLDEBC = 0.0
+1  2249
+1  2250	    0767  F1			 L0A75:	 DB 0f1h
+1  2251	    0768  38 02			 L0A76:	 DB 38h,(L0A7A)-$-1
+1  2252	    076A  CB B8				 DB 0cbh,0b8h
+1  2253	    076C  B7			 L0A7A:	 DB 0b7h
+1  2254	    076D  D9			 L0A7B:	 DB 0d9h
+1  2255	    076E  E1				 DB 0e1h
+1  2256	    076F  D1				 DB 0d1h
+1  2257	    0770  C1				 DB 0c1h
+1  2258	    0771  D9				 DB 0d9h
+1  2259	    0772  C9				 DB 0c9h
+1  2260	    0773  D9			 L0A81:	 DB 0d9h
+1  2261	    0774  CB 78				 DB 0cbh,078h
+1  2262	    0776  D9				 DB 0d9h
+1  2263	    0777  C2				 DB 0c2h
+1  2264	    0778  0706r				 DW L0A14
+1  2265	    077A  CD			 L0A88:	 DB 0cdh
+1  2266	    077B  0781r				 DW  L0A8F
+1  2267	    077D  CD				 DB 0cdh
+1  2268	    077E  0706r				 DW  L0A14
+1  2269	    0780  D8				 DB 0d8h
+1  2270	    0781  2C			 L0A8F:	 DB 2ch
+1  2271	    0782  2D				 DB 2dh
+1  2272	    0783  C8				 DB 0c8h
+1  2273	    0784  78				 DB 78h
+1  2274	    0785  EE 80				 DB 0eeh, 80H
+1  2275	    0787  47				 DB 47h
+1  2276	    0788  C9				 DB 0c9h
+1  2277	    0789  D9			 L0A97:	 DB 0d9h
+1  2278	    078A  7D				 DB 7dh
+1  2279	    078B  B7				 DB 0b7h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 41
+msx_asm\tur_init.ASM
+
+
+
+1  2280	    078C  D9				 DB 0d9h
+1  2281	    078D  CA				 DB 0cah
+1  2282	    078E  08AFr				 DW L0B72		 ; Zero	--> HLDEBC = 0.0
+1  2283
+1  2284	    0790  7D				 DB 7dh
+1  2285	    0791  B7				 DB 0b7h
+1  2286	    0792  C8				 DB 0c8h
+1  2287	    0793  D9				 DB 0d9h
+1  2288	    0794  85				 DB 085h
+1  2289	    0795  D9				 DB 0d9h
+1  2290	    0796  CD				 DB 0cdh
+1  2291	    0797  0889r				 DW  L0B4D
+1  2292	    0799  C5				 DB 0c5h
+1  2293	    079A  D5				 DB 0d5h
+1  2294	    079B  E5				 DB 0e5h
+1  2295	    079C  DD 39				 DB 0ddh,039h
+1  2296
+1  2297
+1  2298	    079E  D9				 DB 0d9h
+1  2299	    079F  C5				 DB 0c5h
+1  2300	    07A0  4C				 DB 4ch
+1  2301	    07A1  D9				 DB 0d9h
+1  2302	    07A2  D1				 DB 0d1h		 ; BCDEHL' --> DED'E'C'
+1  2303
+1  2304	    07A3  AF				 DB 0afh		 ; HLH'L'A = 0
+1  2305	    07A4  6F				 DB 6fh
+1  2306	    07A5  67				 DB 67h
+1  2307	    07A6  D9				 DB 0d9h
+1  2308	    07A7  6F				 DB 6fh
+1  2309	    07A8  67				 DB 67h
+1  2310	    07A9  06 05				 DB 06h,5			 ; B' =	byte count
+1  2311	    07AB  D9				 DB 0d9h
+1  2312
+1  2313	    07AC			 MULTREAL1:
+1  2314	    07AC  06 08				 DB 06h,8			 ; B = bit count
+1  2315	    07AE  DD 23				 DB 0ddh,23h
+1  2316					 ;	   LD C,(IX+0)
+1  2317	    07B0  DD 4E	00			  DB 0ddh,4eh,+0
+1  2318
+1  2319	    07B3			 MULTREAL2:
+1  2320	    07B3  CB 19				 DB 0cbh,19h
+1  2321	    07B5  30 07				 DB 30h,(MULTREAL3)-$-1
+1  2322	    07B7  D9				 DB 0d9h
+1  2323	    07B8  81				 DB 081h
+1  2324	    07B9  ED 5A				 DB 0EDH,05ah
+1  2325	    07BB  D9				 DB 0d9h
+1  2326	    07BC  ED 5A				 DB 0EDH,05ah
+1  2327
+1  2328	    07BE			 MULTREAL3:
+1  2329	    07BE  CB 1C				 DB 0cbh,1ch
+1  2330	    07C0  CB 1D				 DB 0cbh,1dh
+1  2331	    07C2  D9				 DB 0d9h
+1  2332	    07C3  CB 1C				 DB 0cbh,1ch
+1  2333	    07C5  CB 1D				 DB 0cbh,1dh
+1  2334	    07C7  D9				 DB 0d9h
+1  2335	    07C8  1F				 DB 1fh
+1  2336
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 42
+msx_asm\tur_init.ASM
+
+
+
+1  2337	    07C9  10 E8				 DB 10h,( MULTREAL2)-$-1
+1  2338
+1  2339	    07CB  D9				 DB 0d9h
+1  2340	    07CC  05				 DB 05h
+1  2341	    07CD  D9				 DB 0d9h
+1  2342	    07CE  20 DC				 DB 20h,(MULTREAL1)-$-1
+1  2343
+1  2344						 ; BCDEH = HLH'L'A
+1  2345	    07D0  44				 DB 44h
+1  2346	    07D1  4D				 DB 4dh
+1  2347	    07D2  67				 DB 67h
+1  2348	    07D3  D9				 DB 0d9h
+1  2349	    07D4  E5				 DB 0e5h
+1  2350	    07D5  D9				 DB 0d9h
+1  2351	    07D6  D1				 DB 0d1h
+1  2352
+1  2353	    07D7  08				 DB 08h			 ; save	Carry from RRA
+1  2354
+1  2355
+1  2356	    07D8  DD 6E	FB			 DB 0ddh,6eh,-5
+1  2357	    07DB  CB 78				 DB 0cbh,078h
+1  2358	    07DD  20 09				 DB 20h,(L0ADE)-$-1
+1  2359	    07DF  08				 DB 08h
+1  2360	    07E0  CD				 DB 0cdh
+1  2361	    07E1  08C4r				 DW  L0B87
+1  2362	    07E3  2C				 DB 2ch
+1  2363	    07E4  2D				 DB 2dh
+1  2364	    07E5  28 01				 DB 28h,(L0ADE)-$-1
+1  2365	    07E7  2D				 DB 2dh
+1  2366	    07E8  F1			 L0ADE:	 DB 0f1h
+1  2367	    07E9  F1				 DB 0f1h
+1  2368	    07EA  F1				 DB 0f1h
+1  2369
+1  2370	    07EB  B7			 L0AE1:	 DB 0b7h
+1  2371
+1  2372	    07EC  08			 L0AE2:	 DB 08h
+1  2373	    07ED  F1				 DB 0f1h
+1  2374	    07EE  D9				 DB 0d9h
+1  2375	    07EF  C1				 DB 0c1h
+1  2376	    07F0  D1				 DB 0d1h		 ; FastReal
+1  2377	    07F1  E1				 DB 0e1h
+1  2378	    07F2  D9				 DB 0d9h
+1  2379	    07F3  DD E1				 DB 0ddh,0e1h
+1  2380	    07F5  CB B8				 DB 0cbh,0b8h
+1  2381	    07F7  B0				 DB 0b0h
+1  2382	    07F8  47				 DB 47h
+1  2383	    07F9  2C				 DB 2ch
+1  2384	    07FA  2D				 DB 2dh
+1  2385	    07FB  CC				 DB 0cch
+1  2386	    07FC  08AFr				 DW L0B72		 ; Zero	--> HLDEBC = 0.0
+1  2387
+1  2388	    07FE  08				 DB 08h
+1  2389	    07FF  C9				 DB 0c9h
+1  2390
+1  2391	    0800  7D			 L0AF5:	 DB 7dh
+1  2392	    0801  B7				 DB 0b7h
+1  2393	    0802  C8				 DB 0c8h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 43
+msx_asm\tur_init.ASM
+
+
+
+1  2394	    0803  D9				 DB 0d9h
+1  2395	    0804  95				 DB 095h
+1  2396	    0805  D9				 DB 0d9h
+1  2397	    0806  3F				 DB 3fh
+1  2398	    0807  CD				 DB 0cdh
+1  2399	    0808  0889r				 DW  L0B4D
+1  2400	    080A  E5				 DB 0e5h
+1  2401	    080B  E5			 L0B00:	 DB 0e5h
+1  2402	    080C  E5				 DB 0e5h
+1  2403	    080D  DD 39				 DB 0ddh,039h
+1  2404
+1  2405
+1  2406	    080F  7C				 DB 7ch
+1  2407	    0810  08				 DB 08h
+1  2408	    0811  60				 DB 60h
+1  2409	    0812  69				 DB 69h
+1  2410	    0813  D5				 DB 0d5h
+1  2411	    0814  D9				 DB 0d9h
+1  2412	    0815  7C				 DB 7ch
+1  2413	    0816  E1				 DB 0e1h
+1  2414	    0817  C5				 DB 0c5h
+1  2415	    0818  4F				 DB 4fh
+1  2416	    0819  06 05				 DB 06h,5			 ; B' =	byte count
+1  2417	    081B  D9				 DB 0d9h
+1  2418	    081C  D1				 DB 0d1h
+1  2419	    081D  08				 DB 08h
+1  2420
+1  2421	    081E  06 08				 DB 06h,8			 ; B = bit count
+1  2422
+1  2423	    0820  CD			 DIVREAL1:DB 0cdh
+1  2424	    0821  086Dr				 DW  COMPMANTISSE
+1  2425	    0823  38 07				 DB 38h,(DIVREAL2)-$-1
+1  2426
+1  2427						 ; SubMantisse
+1  2428	    0825  D9				 DB 0d9h
+1  2429	    0826  91				 DB 091h
+1  2430	    0827  ED 52				 DB 0EDH,052h
+1  2431	    0829  D9				 DB 0d9h
+1  2432	    082A  ED 52				 DB 0EDH,052h
+1  2433
+1  2434	    082C  3F			 DIVREAL2:DB 3fh
+1  2435	    082D  CB 11				 DB 0cbh,11h
+1  2436
+1  2437	    082F  10 0C				 DB 10h,( DIVREAL3)-$-1
+1  2438
+1  2439					 ;	   LD (IX+5),C
+1  2440	    0831  DD 71	05			  DB 0ddh,71h,+5
+1  2441	    0834  DD 2B				 DB 0ddh,2bh
+1  2442
+1  2443	    0836  D9				 DB 0d9h
+1  2444	    0837  05				 DB 05h
+1  2445	    0838  D9				 DB 0d9h
+1  2446	    0839  28 17				 DB 28h,(DIVREAL4)-$-1
+1  2447
+1  2448	    083B  06 08				 DB 06h,8			 ; B = bit count
+1  2449
+1  2450	    083D			 DIVREAL3:; SLAMantisse
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 44
+msx_asm\tur_init.ASM
+
+
+
+1  2451	    083D  B7				 DB 0b7h
+1  2452	    083E  17				 DB 17h
+1  2453	    083F  D9				 DB 0d9h
+1  2454	    0840  ED 6A				 DB 0EDH,06ah
+1  2455	    0842  D9				 DB 0d9h
+1  2456	    0843  ED 6A				 DB 0EDH,06ah
+1  2457	    0845  30 D9				 DB 30h,(DIVREAL1)-$-1
+1  2458
+1  2459						 ; SubMantisse
+1  2460	    0847  D9				 DB 0d9h
+1  2461	    0848  91				 DB 091h
+1  2462	    0849  ED 52				 DB 0EDH,052h
+1  2463	    084B  D9				 DB 0d9h
+1  2464	    084C  ED 52				 DB 0EDH,052h
+1  2465	    084E  B7				 DB 0b7h
+1  2466	    084F  C3				 DB 0c3h
+1  2467	    0850  082Cr				 DW  DIVREAL2
+1  2468
+1  2469	    0852			 DIVREAL4:; SLAMantisse
+1  2470	    0852  B7				 DB 0b7h
+1  2471	    0853  17				 DB 17h
+1  2472	    0854  D9				 DB 0d9h
+1  2473	    0855  ED 6A				 DB 0EDH,06ah
+1  2474	    0857  D9				 DB 0d9h
+1  2475	    0858  ED 6A				 DB 0EDH,06ah
+1  2476	    085A  38 04				 DB 38h,(DIVREAL5)-$-1
+1  2477
+1  2478	    085C  CD				 DB 0cdh
+1  2479	    085D  086Dr				 DW  COMPMANTISSE
+1  2480	    085F  3F				 DB 3fh
+1  2481
+1  2482	    0860			 DIVREAL5:
+1  2483
+1  2484
+1  2485	    0860  E1			 L0B3B:	 DB 0e1h
+1  2486	    0861  D1				 DB 0d1h
+1  2487	    0862  C1				 DB 0c1h
+1  2488					 ;!	  lahf			     ; store carry in ah
+1  2489
+1  2490	    0863  CB 78				  DB 0cbh,078h
+1  2491	    0865  20 1A				  DB 20h,(L0B47)-$-1
+1  2492
+1  2493					 ;!	  sahf			     ; restore carry
+1  2494	    0867  CD				  DB 0cdh
+1  2495	    0868  08C4r				 DW  L0B87
+1  2496	    086A  C3				 DB 0c3h
+1  2497	    086B  07EBr				 DW  L0AE1
+1  2498
+1  2499	    086D			 COMPMANTISSE:
+1  2500	    086D  B7				 DB 0b7h
+1  2501	    086E  ED 52				 DB 0EDH,052h
+1  2502	    0870  F5				 DB 0f5h
+1  2503	    0871  19				 DB 019h
+1  2504	    0872  F1				 DB 0f1h
+1  2505	    0873  C0				 DB 0c0h
+1  2506
+1  2507	    0874  D9				 DB 0d9h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 45
+msx_asm\tur_init.ASM
+
+
+
+1  2508	    0875  B7				 DB 0b7h
+1  2509	    0876  ED 52				 DB 0EDH,052h
+1  2510	    0878  F5				 DB 0f5h
+1  2511	    0879  19				 DB 019h
+1  2512	    087A  F1				 DB 0f1h
+1  2513	    087B  D9				 DB 0d9h
+1  2514	    087C  C0				 DB 0c0h
+1  2515
+1  2516	    087D  D9				 DB 0d9h
+1  2517	    087E  B9				 DB 0b9h
+1  2518	    087F  D9				 DB 0d9h
+1  2519	    0880  C9				 DB 0c9h
+1  2520
+1  2521
+1  2522	    0881  2C			 L0B47:	 DB 2ch
+1  2523	    0882  C2				 DB 0c2h
+1  2524	    0883  07EBr				 DW L0AE1
+1  2525	    0885  37				 DB 37h
+1  2526	    0886  C3				 DB 0c3h
+1  2527	    0887  07ECr				 DW  L0AE2
+1  2528
+1  2529	    0889  38 06			 L0B4D:	 DB 38h,(L0B55)-$-1
+1  2530	    088B  C6 80				 DB 0c6h,80H
+1  2531	    088D  38 06				 DB 38h,(L0B59)-$-1
+1  2532	    088F  18 1C				 DB 18h,( L0B70)-$-1
+1  2533	    0891  C6 80			 L0B55:	 DB 0c6h,80H
+1  2534	    0893  38 18				 DB 38h,(L0B70)-$-1
+1  2535	    0895  6F			 L0B59:	 DB 6fh
+1  2536	    0896  DD E3				 DB 0ddh,0e3h
+1  2537	    0898  D9				 DB 0d9h
+1  2538	    0899  E5				 DB 0e5h
+1  2539	    089A  D5				 DB 0d5h
+1  2540	    089B  C5				 DB 0c5h
+1  2541	    089C  78				 DB 78h
+1  2542	    089D  CB F8				 DB 0cbh,0f8h
+1  2543	    089F  D9				 DB 0d9h
+1  2544	    08A0  A8				 DB 0a8h
+1  2545	    08A1  E6 80				 DB 0e6h, 80H
+1  2546	    08A3  F5				 DB 0f5h
+1  2547	    08A4  CB F8				 DB 0cbh,0f8h
+1  2548	    08A6  DD E5				 DB 0ddh,0e5h
+1  2549	    08A8  DD 21				 DB 0ddh,21h
+1  2550	    08AA  0000				 DW 0
+1  2551	    08AC  C9				 DB 0c9h
+1  2552	    08AD  E1			 L0B70:	 DB 0e1h
+1  2553	    08AE  D8				 DB 0d8h
+1  2554
+1  2555	    08AF			 L0B72:	 ; create a REAL HLDEBC	with 0.0 as value
+1  2556						 ; in:	 -
+1  2557						 ; out:	 REAL HLDEBC filled with zeroes
+1  2558	    08AF  AF				 DB 0afh
+1  2559	    08B0  6F				 DB 6fh
+1  2560	    08B1  47				 DB 47h
+1  2561	    08B2  4F				 DB 4fh
+1  2562	    08B3  57				 DB 57h
+1  2563	    08B4  5F				 DB 5fh
+1  2564	    08B5  67				 DB 67h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 46
+msx_asm\tur_init.ASM
+
+
+
+1  2565	    08B6  C9				 DB 0c9h
+1  2566
+1  2567	    08B7  B7			 L0B7A:	 DB 0b7h
+1  2568	    08B8  CB 18			 L0B7B:	 DB 0cbh,18h
+1  2569	    08BA  CB 19				 DB 0cbh,19h
+1  2570	    08BC  CB 1A				 DB 0cbh,1ah
+1  2571	    08BE  CB 1B				 DB 0cbh,1bh
+1  2572	    08C0  CB 1C				 DB 0cbh,1ch
+1  2573	    08C2  C9				 DB 0c9h
+1  2574
+1  2575	    08C3  B7			 L0B86:	  DB 0b7h
+1  2576
+1  2577	    08C4  CB 14			 L0B87:	  DB 0cbh,14h
+1  2578	    08C6  CB 13				 DB 0cbh,13h
+1  2579	    08C8  CB 12				 DB 0cbh,12h
+1  2580	    08CA  CB 11				 DB 0cbh,11h
+1  2581	    08CC  CB 10				 DB 0cbh,10h
+1  2582	    08CE  C9				 DB 0c9h
+1  2583
+1  2584	    08CF  7C			 L0B92:	  DB 7ch
+1  2585	    08D0  D9				 DB 0d9h
+1  2586	    08D1  84				 DB 084h
+1  2587	    08D2  D9				 DB 0d9h
+1  2588	    08D3  67				 DB 67h
+1  2589	    08D4  7B				 DB 7bh
+1  2590	    08D5  D9				 DB 0d9h
+1  2591	    08D6  8B				 DB 08bh
+1  2592	    08D7  D9				 DB 0d9h
+1  2593	    08D8  5F				 DB 5fh
+1  2594	    08D9  7A				 DB 7ah
+1  2595	    08DA  D9				 DB 0d9h
+1  2596	    08DB  8A				 DB 08ah
+1  2597	    08DC  D9				 DB 0d9h
+1  2598	    08DD  57				 DB 57h
+1  2599	    08DE  79				 DB 79h
+1  2600	    08DF  D9				 DB 0d9h
+1  2601	    08E0  89				 DB 089h
+1  2602	    08E1  D9				 DB 0d9h
+1  2603	    08E2  4F				 DB 4fh
+1  2604	    08E3  78				 DB 78h
+1  2605	    08E4  D9				 DB 0d9h
+1  2606	    08E5  88				 DB 088h
+1  2607	    08E6  D9				 DB 0d9h
+1  2608	    08E7  47				 DB 47h
+1  2609	    08E8  C9				 DB 0c9h
+1  2610	    08E9  7C			 L0BAC:	 DB 7ch
+1  2611	    08EA  D9				 DB 0d9h
+1  2612	    08EB  94				 DB 094h
+1  2613	    08EC  D9				 DB 0d9h
+1  2614	    08ED  67				 DB 67h
+1  2615	    08EE  7B				 DB 7bh
+1  2616	    08EF  D9				 DB 0d9h
+1  2617	    08F0  9B				 DB 09bh
+1  2618	    08F1  D9				 DB 0d9h
+1  2619	    08F2  5F				 DB 5fh
+1  2620	    08F3  7A				 DB 7ah
+1  2621	    08F4  D9				 DB 0d9h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 47
+msx_asm\tur_init.ASM
+
+
+
+1  2622	    08F5  9A				 DB 09ah
+1  2623	    08F6  D9				 DB 0d9h
+1  2624	    08F7  57				 DB 57h
+1  2625	    08F8  79				 DB 79h
+1  2626	    08F9  D9				 DB 0d9h
+1  2627	    08FA  99				 DB 099h
+1  2628	    08FB  D9				 DB 0d9h
+1  2629	    08FC  4F				 DB 4fh
+1  2630	    08FD  78				 DB 78h
+1  2631	    08FE  D9				 DB 0d9h
+1  2632	    08FF  98				 DB 098h
+1  2633	    0900  D9				 DB 0d9h
+1  2634	    0901  47				 DB 47h
+1  2635	    0902  C9				 DB 0c9h
+1  2636
+1  2637	    0903  78			 L0BC6:	 DB 78h
+1  2638	    0904  D9				 DB 0d9h
+1  2639	    0905  B8				 DB 0b8h
+1  2640	    0906  D9				 DB 0d9h
+1  2641	    0907  C0				 DB 0c0h
+1  2642	    0908  79				 DB 79h
+1  2643	    0909  D9				 DB 0d9h
+1  2644	    090A  B9				 DB 0b9h
+1  2645	    090B  D9				 DB 0d9h
+1  2646	    090C  C0				 DB 0c0h
+1  2647	    090D  7A				 DB 7ah
+1  2648	    090E  D9				 DB 0d9h
+1  2649	    090F  BA				 DB 0bah
+1  2650	    0910  D9				 DB 0d9h
+1  2651	    0911  C0				 DB 0c0h
+1  2652	    0912  7B				 DB 7bh
+1  2653	    0913  D9				 DB 0d9h
+1  2654	    0914  BB				 DB 0bbh
+1  2655	    0915  D9				 DB 0d9h
+1  2656	    0916  C0				 DB 0c0h
+1  2657	    0917  7C				 DB 7ch
+1  2658	    0918  D9				 DB 0d9h
+1  2659	    0919  BC				 DB 0bch
+1  2660	    091A  D9				 DB 0d9h
+1  2661	    091B  C9				 DB 0c9h
+1  2662
+1  2663	    091C			 L0BDF:	 ; Compare REALS
+1  2664	    091C  D9				 DB 0d9h
+1  2665	    091D  78				 DB 78h
+1  2666	    091E  D9				 DB 0d9h
+1  2667	    091F  A8				 DB 0a8h
+1  2668	    0920  F2				 DB 0f2h
+1  2669	    0921  0926r				 DW L0BE9
+1  2670	    0923  78				 DB 78h
+1  2671	    0924  17				 DB 17h
+1  2672	    0925  C9				 DB 0c9h
+1  2673	    0926  CB 78			 L0BE9:	 DB 0cbh,078h
+1  2674	    0928  28 06				 DB 28h,(L0BF3)-$-1
+1  2675	    092A  CD				 DB 0cdh
+1  2676	    092B  0930r				 DW  L0BF3
+1  2677	    092D  C8				 DB 0c8h
+1  2678	    092E  3F				 DB 3fh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 48
+msx_asm\tur_init.ASM
+
+
+
+1  2679	    092F  C9				 DB 0c9h
+1  2680	    0930  7D			 L0BF3:	 DB 7dh
+1  2681	    0931  D9				 DB 0d9h
+1  2682	    0932  BD				 DB 0bdh
+1  2683	    0933  D9				 DB 0d9h
+1  2684	    0934  C0				 DB 0c0h
+1  2685	    0935  B7				 DB 0b7h
+1  2686	    0936  C8				 DB 0c8h
+1  2687	    0937  C3				 DB 0c3h
+1  2688	    0938  0903r				 DW  L0BC6
+1  2689
+1  2690
+1  2691	    093A			 L0F73:	  ; in:	   IX =	address	of REAL
+1  2692						 ; out:	 HLDEBC	= REAL located at address IX
+1  2693						 ;	 IX unchanged
+1  2694	    093A  DD 6E	00			 DB 0ddh,6eh,+0
+1  2695	    093D  DD 66	01			 DB 0ddh,66h,+1
+1  2696	    0940  DD 5E	02			 DB 0ddh,5eh,+2
+1  2697	    0943  DD 56	03			 DB 0ddh,56h,+3
+1  2698	    0946  DD 4E	04			 DB 0ddh,4eh,+4
+1  2699	    0949  DD 46	05			 DB 0ddh,46h,+5
+1  2700	    094C  C9				 DB 0c9h
+1  2701
+1  2702	    094D  21			 L0F86:	  DB 21h
+1  2703	    094E  0081				 DW 81H			 ; 1.0
+1  2704	    0950  44				 DB 44h
+1  2705	    0951  4C				 DB 4ch
+1  2706	    0952  54				 DB 54h
+1  2707	    0953  5C				 DB 5ch
+1  2708	    0954  C9				 DB 0c9h
+1  2709
+1  2710	    0955  3E 93			 L10031:  DB 3eh,93H		       ; r.error 93H: Out of LONGINT range
+1  2711	    0957  C3				 DB 0c3h
+1  2712	    0958  0F48r				 DW  L2027
+1  2713
+1  2714	    095A  7C			 L1008:	  DB 7ch		     ; LIB, convert integer HL to REAL HLDEBC
+1  2715	    095B  B5				 DB 0b5h
+1  2716	    095C  CA				 DB 0cah
+1  2717	    095D  08AFr				 DW L0B72		 ; return 0.0 REAL if HL = 0
+1  2718
+1  2719	    095F  CB 7C				 DB 0cbh,07ch
+1  2720	    0961  08				 DB 08h			 ; save	NZ for negative
+1  2721
+1  2722	    0962  CD				  DB 0cdh
+1  2723	    0963  05EDr				 DW  L0780		   ; absolute HL
+1  2724
+1  2725	    0965  3E 90				 DB 3eh,90H
+1  2726
+1  2727						 ; shift, normalization
+1  2728	    0967  29			 L1015:	  DB 029h
+1  2729	    0968  3D				 DB 3dh
+1  2730	    0969  CB 7C				 DB 0cbh,07ch
+1  2731	    096B  28 FA				 DB 28h,(L1015)-$-1
+1  2732
+1  2733	    096D  44				 DB 44h			 ; BC =	integer, bit 7 of B always '1'
+1  2734	    096E  4D				 DB 4dh
+1  2735	    096F  11				 DB 11h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 49
+msx_asm\tur_init.ASM
+
+
+
+1  2736	    0970  0000				 DW 0			 ; D = E = 0
+1  2737	    0972  62				 DB 62h			 ; H = 0
+1  2738	    0973  6F				 DB 6fh
+1  2739
+1  2740	    0974  08				 DB 08h
+1  2741	    0975  C0				 DB 0c0h		 ; keep	bit 7 of B '1' if negative
+1  2742
+1  2743	    0976  CB B8				 DB 0cbh,0b8h			 ; no, make if positive
+1  2744	    0978  C9				 DB 0c9h
+1  2745
+1  2746	    0979			 L_NEG:	  ; X =	-X : LONG
+1  2747						 ; in:	 X in DEHL
+1  2748						 ; out:	 DEHL
+1  2749						  ; changes: BC, A = 0
+1  2750	    0979  4D				 DB 4dh			 ; BC =	low-word
+1  2751	    097A  44				 DB 44h
+1  2752	    097B  AF				 DB 0afh		 ; Carry = 0
+1  2753	    097C  6F				 DB 6fh
+1  2754	    097D  67				 DB 67h
+1  2755	    097E  ED 42				 DB 0EDH,042h		 ; 0 - low-word
+1  2756	    0980  EB				 DB 0ebh
+1  2757	    0981  4D				 DB 4dh			 ; BC =	high-word
+1  2758	    0982  44				 DB 44h
+1  2759	    0983  6F				 DB 6fh
+1  2760	    0984  67				 DB 67h
+1  2761	    0985  ED 42				 DB 0EDH,042h		 ; 0 - high-word - carry
+1  2762	    0987  EB				 DB 0ebh
+1  2763	    0988  C9				 DB 0c9h
+1  2764
+1  2765	    0989			 L_R:	  ; convert LONGINT DEHL to REAL HLDEBC
+1  2766						 ; in:	 DEHL =	signed LONGINT
+1  2767						 ; out:	 HLDEBC	= REAL
+1  2768	    0989  7C				 DB 7ch
+1  2769	    098A  B5				 DB 0b5h
+1  2770	    098B  B2				 DB 0b2h
+1  2771	    098C  B3				 DB 0b3h
+1  2772	    098D  CA				 DB 0cah
+1  2773	    098E  08AFr				 DW L0B72		 ; jump	if long	is zero
+1  2774
+1  2775	    0990  CB 7A				 DB 0cbh,07ah			 ; is this long	negative ?
+1  2776	    0992  F5				 DB 0f5h		 ; rember this
+1  2777	    0993  C4				 DB 0c4h
+1  2778	    0994  0979r				 DW L_NEG		 ; make	positive if long is negative
+1  2779	    0996  3E A0				 DB 3eh,0A0H
+1  2780
+1  2781						 ; perform normlization
+1  2782	    0998  29			 L_R_SH: DB 029h
+1  2783	    0999  EB				 DB 0ebh
+1  2784	    099A  ED 6A				 DB 0EDH,06ah
+1  2785	    099C  EB				 DB 0ebh
+1  2786	    099D  3D				 DB 3dh
+1  2787	    099E  CB 7A				 DB 0cbh,07ah
+1  2788	    09A0  28 F6				 DB 28h,(L_R_SH)-$-1		 ; shift until bit 31 =	'1'
+1  2789
+1  2790	    09A2  EB				 DB 0ebh		 ; HL:DE = normalized mantissa
+1  2791	    09A3  44				 DB 44h
+1  2792	    09A4  4D				 DB 4dh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 50
+msx_asm\tur_init.ASM
+
+
+
+1  2793	    09A5  26 00				 DB 26h,0
+1  2794	    09A7  6F				 DB 6fh			 ; exponent + 81H in A
+1  2795	    09A8  F1				 DB 0f1h		 ; ZeroFlag = 0	if long	was negative
+1  2796	    09A9  C0				 DB 0c0h		 ; if negative then leave bit 7	of B '1'
+1  2797
+1  2798	    09AA  CB B8				 DB 0cbh,0b8h
+1  2799	    09AC  C9				 DB 0c9h
+1  2800
+1  2801	    09AD			 R_L:	  ; convert REAL HLDEBC	to LONGINT DEHL
+1  2802						 ; in:	 HLDEBC	= REAL
+1  2803						 ; out:	 DEHL =	signed LONGINT
+1  2804	    09AD  CB 7D				 DB 0cbh,07dh			 ; exponent < 80H then float = 0.0
+1  2805									 ; in other words float	< 1.0
+1  2806	    09AF  CA				 DB 0cah
+1  2807	    09B0  08AFr				 DW L0B72		 ; return DEHL = 0 if REAL < 1.0
+1  2808
+1  2809	    09B2  CB 78				 DB 0cbh,078h			 ; ZeroFlag = 0	if REAL	is negative
+1  2810	    09B4  F5				 DB 0f5h		 ; save	sign of	REAL
+1  2811
+1  2812	    09B5  CB F8				 DB 0cbh,0f8h			 ; restore hidden bit
+1  2813
+1  2814	    09B7  3E 9F			 R_L_SH: DB 3eh,9FH
+1  2815	    09B9  BD				 DB 0bdh		 ; more	than 31	bits before the	comma
+1  2816	    09BA  38 99				 DB 38h,(L10031)-$-1		 ; r.error 93H:	Out of LONGINT range
+1  2817
+1  2818	    09BC  28 0D				 DB 28h,(R_L_READY)-$-1		 ; jump	if no more shifts
+1  2819	    09BE  CB 38				 DB 0cbh,38h
+1  2820	    09C0  CB 19				 DB 0cbh,19h
+1  2821	    09C2  CB 1A				 DB 0cbh,1ah
+1  2822	    09C4  CB 1B				 DB 0cbh,1bh
+1  2823	    09C6  CB 1C				 DB 0cbh,1ch
+1  2824	    09C8  2C				 DB 2ch
+1  2825	    09C9  18 EC				 DB 18h,( R_L_SH)-$-1		 ; go for next possible	shift
+1  2826
+1  2827	    09CB			 R_L_READY:
+1  2828	    09CB  CB 38				 DB 0cbh,38h
+1  2829	    09CD  CB 19				 DB 0cbh,19h
+1  2830	    09CF  CB 1A				 DB 0cbh,1ah
+1  2831	    09D1  CB 1B				 DB 0cbh,1bh
+1  2832	    09D3  CB 1C				 DB 0cbh,1ch
+1  2833	    09D5  F1				 DB 0f1h		 ; restore sign	of REAL
+1  2834	    09D6  60				 DB 60h
+1  2835	    09D7  69				 DB 69h			 ; long	HLDE complete, if positive
+1  2836	    09D8  EB				 DB 0ebh		 ; deliver in format DE:HL
+1  2837
+1  2838	    09D9  C8				 DB 0c8h		 ; return if float was positive
+1  2839
+1  2840	    09DA  C3				 DB 0c3h
+1  2841	    09DB  0979r				 DW  L_NEG		 ; make	long negative if REAL was negative
+1  2842
+1  2843	    09DD			 L1027:	  ; in:	   BCDEHL' = REAL to convert to	ASCII
+1  2844						  ;	   HL =	number of digits after decimal point
+1  2845	    09DD  CD				  DB 0cdh
+1  2846	    09DE  0564r				 DW  L04C8		   ; int to byte
+1  2847	    09E0  EB				 DB 0ebh
+1  2848	    09E1  1E 00				 DB 1eh,0
+1  2849	    09E3  38 04				 DB 38h,(L1033)-$-1
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 51
+msx_asm\tur_init.ASM
+
+
+
+1  2850	    09E5  FE 19				 DB 0feh, 19H
+1  2851	    09E7  38 18				 DB 38h,(L104B)-$-1
+1  2852
+1  2853	    09E9  1D			 L1033:	 DB 1dh
+1  2854	    09EA  CD				 DB 0cdh
+1  2855	    09EB  0564r				 DW  L04C8		 ; int to byte
+1  2856	    09ED  D9				 DB 0d9h
+1  2857	    09EE  CB 78				 DB 0cbh,078h			 ; NonZero if REAL HLDEBC is negative
+1  2858	    09F0  D9				 DB 0d9h
+1  2859	    09F1  16 07				 DB 16h,7			 ; 7 digits if positive
+1  2860	    09F3  28 01				 DB 28h,(L1040)-$-1
+1  2861
+1  2862	    09F5  14				 DB 14h			 ; no, 8 digits, sign included
+1  2863
+1  2864	    09F6  92			 L1040:	 DB 092h		 ; subtract from total bytes of	space
+1  2865	    09F7  30 01				 DB 30h,(L1044)-$-1		 ; jump	if enough room
+1  2866	    09F9  AF				 DB 0afh
+1  2867	    09FA  FE 09			 L1044:	 DB 0feh, 9			 ; less	than 9 digits of space left ?
+1  2868	    09FC  38 02				 DB 38h,(L104A)-$-1		 ; yes,	jump
+1  2869
+1  2870	    09FE  3E 09				 DB 3eh,9			 ; no, make it 9 digits	at the most
+1  2871
+1  2872	    0A00  3C			 L104A:	 DB 3ch
+1  2873
+1  2874	    0A01  57			 L104B:	 DB 57h
+1  2875	    0A02  D5				 DB 0d5h
+1  2876	    0A03  D9				 DB 0d9h
+1  2877	    0A04  FD 21				 DB 0fdh,21h
+1  2878	    0A06  0126r				 DW L005D		 ; destination for ascii-float
+1  2879	    0A08  DD E5				 DB 0ddh,0e5h
+1  2880	    0A0A  CD				 DB 0cdh
+1  2881	    0A0B  0AA1r				 DW  L10EB		 ; convert HLDEBC to ascii at IY
+1  2882	    0A0D  DD E1				 DB 0ddh,0e1h
+1  2883	    0A0F  D1				 DB 0d1h
+1  2884	    0A10  4F				 DB 4fh
+1  2885	    0A11  7A				 DB 7ah
+1  2886	    0A12  3C				 DB 3ch
+1  2887	    0A13  CB 7B				 DB 0cbh,07bh
+1  2888	    0A15  20 10				 DB 20h,(L1071)-$-1
+1  2889	    0A17  81				 DB 081h
+1  2890	    0A18  F2				 DB 0f2h
+1  2891	    0A19  0A21r				 DW L106B
+1  2892
+1  2893	    0A1B  FD 36	00 00			 DB 0fdh,36h,+0,0
+1  2894	    0A1F  18 0B				 DB 18h,( L1076)-$-1
+1  2895
+1  2896	    0A21  FE 0C			 L106B:	 DB 0feh, 0CH
+1  2897	    0A23  38 02				 DB 38h,(L1071)-$-1
+1  2898
+1  2899	    0A25  3E 0B				 DB 3eh,0BH
+1  2900
+1  2901	    0A27  D5			 L1071:	 DB 0d5h
+1  2902	    0A28  CD				 DB 0cdh
+1  2903	    0A29  0B36r				 DW  L1180
+1  2904	    0A2B  D1				 DB 0d1h
+1  2905	    0A2C  CB 78			 L1076:	 DB 0cbh,078h
+1  2906	    0A2E  28 05				 DB 28h,(L107F)-$-1
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 52
+msx_asm\tur_init.ASM
+
+
+
+1  2907
+1  2908	    0A30  3E 2D				 DB 3eh,'-'
+1  2909	    0A32  CD				 DB 0cdh
+1  2910	    0A33  0A9Br				 DW  L10E5		 ; add '-' at (IX+0)
+1  2911
+1  2912	    0A35  CB 7B			 L107F:	 DB 0cbh,07bh
+1  2913	    0A37  28 03				 DB 28h,(L1086)-$-1
+1  2914	    0A39  61				 DB 61h
+1  2915	    0A3A  0E 00				 DB 0eh,0
+1  2916	    0A3C  CB 79			 L1086:	 DB 0cbh,079h
+1  2917	    0A3E  28 05				 DB 28h,(L108F)-$-1
+1  2918
+1  2919	    0A40  CD				 DB 0cdh
+1  2920	    0A41  0A99r				 DW  L10E3		 ; add '0' at (IX+0)
+1  2921	    0A43  18 07				 DB 18h,( L1096)-$-1
+1  2922
+1  2923	    0A45  CD			 L108F:	 DB 0cdh
+1  2924	    0A46  0A8Fr				 DW  L10D9
+1  2925	    0A48  0D				 DB 0dh
+1  2926	    0A49  F2				 DB 0f2h
+1  2927	    0A4A  0A45r				 DW L108F
+1  2928
+1  2929	    0A4C  7A			 L1096:	 DB 7ah
+1  2930	    0A4D  B7				 DB 0b7h
+1  2931	    0A4E  28 17				 DB 28h,(L10B1)-$-1
+1  2932
+1  2933	    0A50  3E 2E				 DB 3eh,'.'
+1  2934	    0A52  CD				 DB 0cdh
+1  2935	    0A53  0A9Br				 DW  L10E5		 ; add '.' at (IX+0)
+1  2936
+1  2937	    0A55  0C			 L109F:	 DB 0ch
+1  2938	    0A56  28 06				 DB 28h,(L10A8)-$-1
+1  2939
+1  2940	    0A58  CD				 DB 0cdh
+1  2941	    0A59  0A99r				 DW  L10E3		 ; add '0' at (IX+0)
+1  2942	    0A5B  15				 DB 15h
+1  2943	    0A5C  20 F7				 DB 20h,(L109F)-$-1
+1  2944	    0A5E  15			 L10A8:	 DB 15h
+1  2945	    0A5F  FA				 DB 0fah
+1  2946	    0A60  0A67r				 DW L10B1
+1  2947	    0A62  CD				 DB 0cdh
+1  2948	    0A63  0A8Fr				 DW  L10D9
+1  2949	    0A65  18 F7				 DB 18h,( L10A8)-$-1
+1  2950
+1  2951	    0A67  CB 7B			 L10B1:	 DB 0cbh,07bh
+1  2952	    0A69  C8				 DB 0c8h
+1  2953
+1  2954	    0A6A  3E 45				 DB 3eh,'E'
+1  2955	    0A6C  CD				 DB 0cdh
+1  2956	    0A6D  0A9Br				 DW  L10E5		 ; add 'E' at (IX+0)
+1  2957
+1  2958	    0A6F  3E 2B				 DB 3eh,'+'		      ;	add '+'
+1  2959	    0A71  CB 7C				 DB 0cbh,07ch
+1  2960	    0A73  28 06				 DB 28h,(L10C5)-$-1
+1  2961	    0A75  7C				 DB 7ch
+1  2962	    0A76  ED 44				 DB 0edh,44h
+1  2963	    0A78  67				 DB 67h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 53
+msx_asm\tur_init.ASM
+
+
+
+1  2964
+1  2965	    0A79  3E 2D				 DB 3eh,'-'
+1  2966	    0A7B  CD			 L10C5:	 DB 0cdh
+1  2967	    0A7C  0A9Br				 DW  L10E5		 ; add '+' or '-' at (IX+0)
+1  2968	    0A7E  7C				 DB 7ch
+1  2969	    0A7F  06 2F				 DB 06h,'0'-1
+1  2970
+1  2971	    0A81  04			 L10CB:	 DB 04h
+1  2972	    0A82  D6 0A				 DB 0d6h, 10
+1  2973	    0A84  30 FB				 DB 30h,(L10CB)-$-1
+1  2974
+1  2975	    0A86  C6 3A				 DB 0c6h,'0'+10
+1  2976	    0A88  DD 70	00			 DB 0ddh,70h,+0
+1  2977	    0A8B  DD 23				 DB 0ddh,23h
+1  2978	    0A8D  18 0C				 DB 18h,( L10E5)-$-1
+1  2979
+1  2980	    0A8F  FD 7E	00		 L10D9:	 DB 0fdh,7eh,+0
+1  2981	    0A92  FD 23				 DB 0fdh,23h
+1  2982	    0A94  B7				 DB 0b7h
+1  2983	    0A95  20 04				 DB 20h,(L10E5)-$-1
+1  2984
+1  2985	    0A97  FD 2B				 DB 0fdh,2bh
+1  2986
+1  2987	    0A99  3E 30			 L10E3:	 DB 3eh,'0'
+1  2988	    0A9B  DD 77	00		 L10E5:	 DB 0ddh,77h,+0
+1  2989	    0A9E  DD 23				 DB 0ddh,23h
+1  2990	    0AA0  C9				 DB 0c9h
+1  2991
+1  2992	    0AA1			 L10EB:	 ; in:	 IY = destination address for REAL in ASCII format
+1  2993						 ;	 HLDEBC	= REAL
+1  2994	    0AA1  FD E5				 DB 0fdh,0e5h
+1  2995	    0AA3  2C				 DB 2ch			 ; REAL	represents zero?
+1  2996	    0AA4  2D				 DB 2dh
+1  2997	    0AA5  20 0E				 DB 20h,(L10FF)-$-1		 ; no, continue
+1  2998
+1  2999						 ; fill	destination address at IY with 12 '0' characters
+1  3000	    0AA7  06 0C				 DB 06h,12
+1  3001	    0AA9  FD 36	00 30		 L10F3:	 DB 0fdh,36h,+0,'0'
+1  3002	    0AAD  FD 23				 DB 0fdh,23h
+1  3003	    0AAF  10 F8				 DB 10h,( L10F3)-$-1
+1  3004	    0AB1  AF				 DB 0afh
+1  3005	    0AB2  C3				 DB 0c3h
+1  3006	    0AB3  0B33r				 DW  L117D		 ; jump	POP IY and RET
+1  3007
+1  3008	    0AB5  C5			 L10FF:	 DB 0c5h
+1  3009	    0AB6  CB B8				 DB 0cbh,0b8h
+1  3010	    0AB8  7D				 DB 7dh
+1  3011	    0AB9  D9				 DB 0d9h
+1  3012	    0ABA  D6 80				 DB 0d6h, 80H
+1  3013	    0ABC  6F				 DB 6fh
+1  3014	    0ABD  9F				 DB 09fh		 ; A = 255, if L was < 80H, otherwise A	= 0
+1  3015	    0ABE  67				 DB 67h			 ; HL =	signed L - 80H = exponend
+1  3016	    0ABF  11				 DB 11h
+1  3017	    0AC0  004D				 DW 4DH
+1  3018	    0AC2  CD				 DB 0cdh
+1  3019	    0AC3  05D3r				 DW  L06F5		 ; LIB
+1  3020	    0AC5  11				 DB 11h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 54
+msx_asm\tur_init.ASM
+
+
+
+1  3021	    0AC6  0005				 DW 5
+1  3022	    0AC8  19				 DB 019h
+1  3023	    0AC9  7C				 DB 7ch
+1  3024	    0ACA  FE D9				 DB 0feh, 0D9H
+1  3025	    0ACC  20 01				 DB 20h,(L1119)-$-1
+1  3026	    0ACE  3C				 DB 3ch
+1  3027	    0ACF  FD 77	00		 L1119:	 DB 0fdh,77h,+0
+1  3028	    0AD2  ED 44				 DB 0edh,44h
+1  3029	    0AD4  CD				 DB 0cdh
+1  3030	    0AD5  0BF6r				 DW  L1240
+1  3031	    0AD7  7D				 DB 7dh
+1  3032	    0AD8  FE 81				 DB 0feh, 81H
+1  3033	    0ADA  30 06				 DB 30h,(L112C)-$-1
+1  3034	    0ADC  CD				 DB 0cdh
+1  3035	    0ADD  0C69r				 DW  L12B3
+1  3036	    0ADF  FD 35	00			 DB 0fdh,035h,+0
+1  3037	    0AE2  CB F8			 L112C:	 DB 0cbh,0f8h
+1  3038	    0AE4  3E 84				 DB 3eh,84H
+1  3039	    0AE6  95				 DB 095h
+1  3040	    0AE7  2E 00				 DB 2eh,0
+1  3041	    0AE9  28 08				 DB 28h,(L113D)-$-1
+1  3042	    0AEB  CD			 L1135:	 DB 0cdh
+1  3043	    0AEC  08B7r				 DW  L0B7A
+1  3044	    0AEE  CB 1D				 DB 0cbh,1dh
+1  3045	    0AF0  3D				 DB 3dh
+1  3046	    0AF1  20 F8				 DB 20h,(L1135)-$-1
+1  3047	    0AF3  FD 7E	00		 L113D:	 DB 0fdh,7eh,+0
+1  3048	    0AF6  F5				 DB 0f5h
+1  3049	    0AF7  3E 0C				 DB 3eh,0CH
+1  3050	    0AF9  08			 L1143:	 DB 08h
+1  3051	    0AFA  78				 DB 78h
+1  3052	    0AFB  1F				 DB 1fh
+1  3053	    0AFC  1F				 DB 1fh
+1  3054	    0AFD  1F				 DB 1fh
+1  3055	    0AFE  1F				 DB 1fh
+1  3056	    0AFF  E6 0F				 DB 0e6h, 0FH
+1  3057	    0B01  C6 30				 DB 0c6h,30H
+1  3058	    0B03  FD 77	00			 DB 0fdh,77h,+0
+1  3059	    0B06  FD 23				 DB 0fdh,23h
+1  3060	    0B08  78				 DB 78h
+1  3061	    0B09  E6 0F				 DB 0e6h, 0FH
+1  3062	    0B0B  47				 DB 47h
+1  3063	    0B0C  C5				 DB 0c5h
+1  3064	    0B0D  D5				 DB 0d5h
+1  3065	    0B0E  E5				 DB 0e5h
+1  3066	    0B0F  CB 25				 DB 0cbh,25h
+1  3067	    0B11  CD				 DB 0cdh
+1  3068	    0B12  08C4r				 DW  L0B87
+1  3069	    0B14  CB 25				 DB 0cbh,25h
+1  3070	    0B16  CD				 DB 0cdh
+1  3071	    0B17  08C4r				 DW  L0B87
+1  3072	    0B19  EB				 DB 0ebh
+1  3073	    0B1A  E3				 DB 0e3h
+1  3074	    0B1B  19				 DB 019h
+1  3075	    0B1C  D1				 DB 0d1h
+1  3076	    0B1D  E3				 DB 0e3h
+1  3077	    0B1E  ED 5A				 DB 0EDH,05ah
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 55
+msx_asm\tur_init.ASM
+
+
+
+1  3078	    0B20  EB				 DB 0ebh
+1  3079	    0B21  E1				 DB 0e1h
+1  3080	    0B22  E3				 DB 0e3h
+1  3081	    0B23  ED 4A				 DB 0EDH,04ah
+1  3082	    0B25  44				 DB 44h
+1  3083	    0B26  4D				 DB 4dh
+1  3084	    0B27  E1				 DB 0e1h
+1  3085	    0B28  CB 25				 DB 0cbh,25h
+1  3086	    0B2A  CD				 DB 0cdh
+1  3087	    0B2B  08C4r				 DW  L0B87
+1  3088	    0B2D  08				 DB 08h
+1  3089	    0B2E  3D				 DB 3dh
+1  3090	    0B2F  20 C8				 DB 20h,(L1143)-$-1		 ; repeat until	ready with conversion
+1  3091	    0B31  F1				 DB 0f1h
+1  3092	    0B32  C1				 DB 0c1h
+1  3093	    0B33  FD E1			 L117D:	 DB 0fdh,0e1h
+1  3094	    0B35  C9				 DB 0c9h
+1  3095
+1  3096
+1  3097						 ; ----------
+1  3098						 ; subroutine
+1  3099						 ; ----------
+1  3100	    0B36  FD E5			 L1180:	 DB 0fdh,0e5h
+1  3101	    0B38  E1				 DB 0e1h
+1  3102	    0B39  5F				 DB 5fh
+1  3103	    0B3A  16 00				 DB 16h,0
+1  3104	    0B3C  19				 DB 019h
+1  3105	    0B3D  7E				 DB 7eh
+1  3106	    0B3E  36 00				 DB 36h,0
+1  3107	    0B40  FE 35				 DB 0feh, 35H
+1  3108	    0B42  D8				 DB 0d8h
+1  3109
+1  3110	    0B43  1D			 L118D:	 DB 1dh
+1  3111	    0B44  FA				 DB 0fah
+1  3112	    0B45  0B52r				 DW L119C
+1  3113	    0B47  2B				 DB 2bh
+1  3114	    0B48  7E				 DB 7eh
+1  3115	    0B49  3C				 DB 3ch
+1  3116	    0B4A  77				 DB 77h
+1  3117	    0B4B  FE 3A				 DB 0feh, 3AH
+1  3118	    0B4D  D8				 DB 0d8h
+1  3119	    0B4E  36 00				 DB 36h,0
+1  3120	    0B50  18 F1				 DB 18h,( L118D)-$-1
+1  3121
+1  3122	    0B52  36 31			 L119C:	 DB 36h,31H
+1  3123	    0B54  23				 DB 23h
+1  3124	    0B55  36 00				 DB 36h,0
+1  3125	    0B57  0C				 DB 0ch
+1  3126	    0B58  C9				 DB 0c9h
+1  3127						 ; ----------
+1  3128
+1  3129	    0B59			 L11A3:	 ; converts ascii REAL at IX to	binary REAL in HLDEBC
+1  3130						 ; in:	 IX = address of ascii REAL
+1  3131						 ; out:	 carry set if conversion did not succeed
+1  3132	    0B59  D9				 DB 0d9h
+1  3133	    0B5A  01				 DB 01h
+1  3134	    0B5B  0000				 DW 0
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 56
+msx_asm\tur_init.ASM
+
+
+
+1  3135	    0B5D  D9				 DB 0d9h
+1  3136	    0B5E  CD				 DB 0cdh
+1  3137	    0B5F  08AFr				 DW  L0B72		 ; HLDEBC = 0.0
+1  3138
+1  3139	    0B61  DD 7E	00		 L11AB:	 DB 0ddh,7eh,+0
+1  3140	    0B64  CD				 DB 0cdh
+1  3141	    0B65  0540r				 DW  L04A6		 ; upcase
+1  3142	    0B67  FE 2E				 DB 0feh, '.'
+1  3143	    0B69  20 0C				 DB 20h,(L11C1)-$-1
+1  3144
+1  3145	    0B6B  D9				 DB 0d9h
+1  3146	    0B6C  CB 70				 DB 0cbh,070h
+1  3147	    0B6E  37				 DB 37h
+1  3148	    0B6F  C0				 DB 0c0h
+1  3149
+1  3150	    0B70  CB F0				 DB 0cbh,0f0h
+1  3151	    0B72  D9				 DB 0d9h
+1  3152	    0B73  DD 23			 L11BD:	 DB 0ddh,23h
+1  3153	    0B75  18 EA				 DB 18h,( L11AB)-$-1
+1  3154
+1  3155	    0B77  FE 45			 L11C1:	 DB 0feh, 'E'
+1  3156	    0B79  28 21				 DB 28h,(L11E6)-$-1
+1  3157	    0B7B  CD				 DB 0cdh
+1  3158	    0B7C  0BEFr				 DW  L1239
+1  3159	    0B7E  30 54				 DB 30h,(L121E)-$-1
+1  3160	    0B80  08				 DB 08h
+1  3161	    0B81  CD				 DB 0cdh
+1  3162	    0B82  0C69r				 DW  L12B3
+1  3163	    0B84  D8				 DB 0d8h
+1  3164	    0B85  08				 DB 08h
+1  3165	    0B86  D9				 DB 0d9h
+1  3166	    0B87  C5				 DB 0c5h
+1  3167	    0B88  6F				 DB 6fh
+1  3168	    0B89  26 00				 DB 26h,0
+1  3169	    0B8B  CD				 DB 0cdh
+1  3170	    0B8C  095Ar				 DW  L1008		 ; convert integer HL to REAL HLDEBC
+1  3171	    0B8E  CD				 DB 0cdh
+1  3172	    0B8F  06ECr				 DW  L09E9
+1  3173	    0B91  D9				 DB 0d9h
+1  3174	    0B92  C1				 DB 0c1h
+1  3175	    0B93  D8				 DB 0d8h
+1  3176	    0B94  CB 70				 DB 0cbh,070h
+1  3177	    0B96  28 01				 DB 28h,(L11E3)-$-1
+1  3178	    0B98  0D				 DB 0dh
+1  3179	    0B99  D9			 L11E3:	 DB 0d9h
+1  3180	    0B9A  18 D7				 DB 18h,( L11BD)-$-1
+1  3181
+1  3182	    0B9C  CD			 L11E6:	 DB 0cdh
+1  3183	    0B9D  0BD4r				 DW  L121E
+1  3184	    0B9F  D8				 DB 0d8h
+1  3185
+1  3186	    0BA0  D9				 DB 0d9h
+1  3187	    0BA1  CB E0				 DB 0cbh,0e0h
+1  3188	    0BA3  DD 23				 DB 0ddh,23h
+1  3189
+1  3190	    0BA5  DD 7E	00			 DB 0ddh,7eh,+0
+1  3191
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 57
+msx_asm\tur_init.ASM
+
+
+
+1  3192	    0BA8  FE 2B				 DB 0feh, '+'
+1  3193	    0BAA  28 06				 DB 28h,(L11FC)-$-1		 ; jump	if '+',	ignore it
+1  3194
+1  3195	    0BAC  FE 2D				 DB 0feh, '-'
+1  3196	    0BAE  20 04				 DB 20h,(L11FE)-$-1
+1  3197
+1  3198	    0BB0  CB E8				 DB 0cbh,0e8h			 ; set bit 5 for negative
+1  3199
+1  3200	    0BB2  DD 23			 L11FC:	 DB 0ddh,23h
+1  3201	    0BB4  CD			 L11FE:	 DB 0cdh
+1  3202	    0BB5  0BECr				 DW  L1236		 ; check digit at (IX+0)
+1  3203	    0BB7  3F				 DB 3fh
+1  3204	    0BB8  D8				 DB 0d8h
+1  3205	    0BB9  4F				 DB 4fh
+1  3206	    0BBA  DD 23				 DB 0ddh,23h
+1  3207	    0BBC  CD				 DB 0cdh
+1  3208	    0BBD  0BECr				 DW  L1236		 ; check digit at (IX+0)
+1  3209	    0BBF  30 0A				 DB 30h,(L1215)-$-1
+1  3210	    0BC1  DD 23				 DB 0ddh,23h
+1  3211	    0BC3  57				 DB 57h
+1  3212	    0BC4  79				 DB 79h
+1  3213	    0BC5  87				 DB 087h
+1  3214	    0BC6  87				 DB 087h
+1  3215	    0BC7  81				 DB 081h
+1  3216	    0BC8  87				 DB 087h
+1  3217	    0BC9  82				 DB 082h
+1  3218	    0BCA  4F				 DB 4fh
+1  3219	    0BCB  CB 68			 L1215:	 DB 0cbh,068h
+1  3220	    0BCD  28 04				 DB 28h,(L121D)-$-1
+1  3221	    0BCF  79				 DB 79h
+1  3222	    0BD0  ED 44				 DB 0edh,44h
+1  3223	    0BD2  4F				 DB 4fh
+1  3224	    0BD3  D9			 L121D:	 DB 0d9h
+1  3225
+1  3226	    0BD4  D9			 L121E:	 DB 0d9h
+1  3227	    0BD5  79				 DB 79h
+1  3228	    0BD6  C6 80				 DB 0c6h,80H
+1  3229	    0BD8  FE 5A				 DB 0feh, 5AH
+1  3230	    0BDA  D8				 DB 0d8h
+1  3231	    0BDB  FE A6				 DB 0feh, 0A6H
+1  3232	    0BDD  3F				 DB 3fh
+1  3233	    0BDE  D8				 DB 0d8h
+1  3234	    0BDF  C5				 DB 0c5h
+1  3235	    0BE0  DD E5				 DB 0ddh,0e5h
+1  3236	    0BE2  79				 DB 79h
+1  3237	    0BE3  CD				 DB 0cdh
+1  3238	    0BE4  0BF6r				 DW  L1240
+1  3239	    0BE6  DD E1				 DB 0ddh,0e1h
+1  3240	    0BE8  D9				 DB 0d9h
+1  3241	    0BE9  C1				 DB 0c1h
+1  3242	    0BEA  D9				 DB 0d9h
+1  3243	    0BEB  C9				 DB 0c9h
+1  3244
+1  3245	    0BEC			 L1236:	 ; checks if byte at (IX+0)
+1  3246
+1  3247	    0BEC  DD 7E	00			 DB 0ddh,7eh,+0
+1  3248
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 58
+msx_asm\tur_init.ASM
+
+
+
+1  3249	    0BEF			 L1239:	 ; in:	 A = byte to check
+1  3250						 ; out:	 A = 0 .. 9
+1  3251						 ;	 C-flag	set if A is a correct digit
+1  3252	    0BEF  D6 30				 DB 0d6h, '0'
+1  3253	    0BF1  3F				 DB 3fh
+1  3254	    0BF2  D0				 DB 0d0h
+1  3255	    0BF3  FE 0A				 DB 0feh, 10
+1  3256	    0BF5  C9				 DB 0c9h
+1  3257
+1  3258	    0BF6  F5			 L1240:	 DB 0f5h
+1  3259	    0BF7  B7				 DB 0b7h
+1  3260	    0BF8  F2				 DB 0f2h
+1  3261	    0BF9  0BFDr				 DW L1247
+1  3262	    0BFB  ED 44				 DB 0edh,44h
+1  3263
+1  3264	    0BFD  F5			 L1247:	 DB 0f5h
+1  3265	    0BFE  CB 3F				 DB 0cbh,3fh
+1  3266	    0C00  CB 3F				 DB 0cbh,3fh
+1  3267	    0C02  3C				 DB 3ch
+1  3268	    0C03  21				 DB 21h
+1  3269	    0C04  FFFA				 DW -6
+1  3270	    0C06  11				 DB 11h
+1  3271	    0C07  0006				 DW 6
+1  3272
+1  3273	    0C09  19			 L1253:	 DB 019h
+1  3274	    0C0A  3D				 DB 3dh
+1  3275	    0C0B  20 FC				 DB 20h,(L1253)-$-1
+1  3276	    0C0D  EB				 DB 0ebh
+1  3277	    0C0E  DD 21				 DB 0ddh,21h
+1  3278	    0C10  0C2Dr				 DW L1277
+1  3279	    0C12  DD 19				 DB 0ddh,019h
+1  3280	    0C14  CD				 DB 0cdh
+1  3281	    0C15  093Ar				 DW  L0F73		 ; get REAL at address IX
+1  3282	    0C17  F1				 DB 0f1h
+1  3283	    0C18  E6 03				 DB 0e6h, 3
+1  3284	    0C1A  28 08				 DB 28h,(L126E)-$-1
+1  3285
+1  3286	    0C1C  F5			 L1266:	 DB 0f5h
+1  3287	    0C1D  CD				 DB 0cdh
+1  3288	    0C1E  0C69r				 DW  L12B3
+1  3289	    0C20  F1				 DB 0f1h
+1  3290	    0C21  3D				 DB 3dh
+1  3291	    0C22  20 F8				 DB 20h,(L1266)-$-1
+1  3292	    0C24  F1			 L126E:	 DB 0f1h
+1  3293	    0C25  B7				 DB 0b7h
+1  3294	    0C26  F2				 DB 0f2h
+1  3295	    0C27  0789r				 DW L0A97
+1  3296	    0C29  D9				 DB 0d9h
+1  3297	    0C2A  C3				 DB 0c3h
+1  3298	    0C2B  0800r				 DW  L0AF5
+1  3299
+1  3300	    0C2D  81 00	00 00 00 00	 L1277:	 DB  81H,  0 ,	0 ,  0 ,  0 ,  0 ; 1.0E+00
+1  3301	    0C33  8E 00	00 00 40 1C		 DB  8EH,  0 ,	0 ,  0 , 40H, 1CH	 ; 1.0E+04
+1  3302	    0C39  9B 00	00 20 BC 3E		 DB  9BH,  0 ,	0 , 20H,0BCH, 3EH	 ; 1.0E+08
+1  3303	    0C3F  A8 00	10 A5 D4 68		 DB 0A8H,  0 , 10H,0A5H,0D4H, 68H	 ; 1.0E+12
+1  3304	    0C45  B6 04	BF C9 1B 0E		 DB 0B6H,  4 ,0BFH,0C9H, 1BH, 0EH	 ; 1.0E+16
+1  3305	    0C4B  C3 AC	C5 EB 78 2D		 DB 0C3H,0ACH,0C5H,0EBH, 78H, 2DH	 ; 1.0E+20
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 59
+msx_asm\tur_init.ASM
+
+
+
+1  3306	    0C51  D0 CD	CE 1B C2 53		 DB 0D0H,0CDH,0CEH, 1BH,0C2H, 53H	 ; 1.0E+24
+1  3307	    0C57  DE F9	78 39 3F 01		 DB 0DEH,0F9H, 78H, 39H, 3FH,  1 ; 1.0E+28
+1  3308	    0C5D  EB 2B	A8 AD C5 1D		 DB 0EBH, 2BH,0A8H,0ADH,0C5H, 1DH	 ; 1.0E+32
+1  3309	    0C63  F8 C9	7B CE 97 40		 DB 0F8H,0C9H, 7BH,0CEH, 97H, 40H	 ; 1.0E+36
+1  3310
+1  3311	    0C69  7D			 L12B3:	 DB 7dh
+1  3312	    0C6A  B7				 DB 0b7h
+1  3313	    0C6B  C8				 DB 0c8h
+1  3314	    0C6C  CB F8				 DB 0cbh,0f8h
+1  3315	    0C6E  C5				 DB 0c5h
+1  3316	    0C6F  D5				 DB 0d5h
+1  3317	    0C70  7C				 DB 7ch
+1  3318	    0C71  CD				 DB 0cdh
+1  3319	    0C72  08B7r				 DW  L0B7A
+1  3320	    0C74  CD				 DB 0cdh
+1  3321	    0C75  08B7r				 DW  L0B7A
+1  3322	    0C77  84				 DB 084h
+1  3323	    0C78  67				 DB 67h
+1  3324	    0C79  E3				 DB 0e3h
+1  3325	    0C7A  ED 5A				 DB 0EDH,05ah
+1  3326	    0C7C  EB				 DB 0ebh
+1  3327	    0C7D  E1				 DB 0e1h
+1  3328	    0C7E  E3				 DB 0e3h
+1  3329	    0C7F  ED 4A				 DB 0EDH,04ah
+1  3330	    0C81  44				 DB 44h
+1  3331	    0C82  4D				 DB 4dh
+1  3332	    0C83  E1				 DB 0e1h
+1  3333	    0C84  30 06				 DB 30h,(L12D6)-$-1
+1  3334	    0C86  CD				 DB 0cdh
+1  3335	    0C87  08B8r				 DW  L0B7B
+1  3336	    0C89  2C				 DB 2ch
+1  3337	    0C8A  37				 DB 37h
+1  3338	    0C8B  C8				 DB 0c8h
+1  3339
+1  3340	    0C8C  7D			 L12D6:	 DB 7dh
+1  3341	    0C8D  C6 03				 DB 0c6h,3
+1  3342	    0C8F  6F				 DB 6fh
+1  3343	    0C90  CB B8				 DB 0cbh,0b8h
+1  3344	    0C92  C9				 DB 0c9h
+1  3345
+1  3346
+1  3347	    0C93			 L149B:	  ; LIB
+1  3348						 ; sets	current	FIB address to standard	output (OUTPUT)
+1  3349						 ; in:	 HL = FIB address
+1  3350						 ; out:	 -
+1  3351	    0C93  E3				 DB 0e3h	 ; LIB,	for search ???
+1  3352	    0C94  22				 DB 22h
+1  3353	    0C95  018Er				 DW L00E4		 ; save	return address
+1  3354	    0C97  E3				 DB 0e3h
+1  3355	    0C98  E5				 DB 0e5h
+1  3356	    0C99  21				 DB 21h
+1  3357	    0C9A  016Cr				 DW OUTPUT
+1  3358	    0C9C  22				 DB 22h
+1  3359	    0C9D  018Cr				 DW L00E2
+1  3360	    0C9F  E1				 DB 0e1h
+1  3361	    0CA0  C9				 DB 0c9h
+1  3362
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 60
+msx_asm\tur_init.ASM
+
+
+
+1  3363
+1  3364	    0CA1  06 00			 L14E8:	  DB 06h,0		       ; ^Z is ignored when typed in
+1  3365
+1  3366	    0CA3  21			 L14EA:	  DB 21h
+1  3367	    0CA4  016Er				 DW BUFLEN
+1  3368	    0CA6  7E				 DB 7eh
+1  3369	    0CA7  FE 7F				 DB 0feh, 7FH			 ; < 127
+1  3370	    0CA9  38 02				 DB 38h,(L14F4)-$-1		 ; jump	if < 127
+1  3371
+1  3372	    0CAB  3E 7E				 DB 3eh,7EH		 ; trunc to a length of	126 characters
+1  3373	    0CAD  4F			 L14F4:	 DB 4fh
+1  3374	    0CAE  36 7E				 DB 36h,7EH
+1  3375	    0CB0  2A				 DB 02ah
+1  3376	    0CB1  0181r				 DW L00D2
+1  3377	    0CB3  22				 DB 22h
+1  3378	    0CB4  0183r				 DW L00D4
+1  3379	    0CB6  16 00			 L14FD:	 DB 16h,0
+1  3380
+1  3381	    0CB8  CD			 L14FF:	 DB 0cdh
+1  3382	    0CB9  047Br				 DW  L03E1		 ; A = character from console
+1  3383	    0CBB  77				 DB 77h
+1  3384
+1  3385	    0CBC  1E 01				 DB 1eh,1
+1  3386	    0CBE  FE 08				 DB 0feh, 8			 ; backspace ?
+1  3387	    0CC0  28 36				 DB 28h,(L153F)-$-1
+1  3388	    0CC2  FE 7F				 DB 0feh, 7FH
+1  3389	    0CC4  28 32				 DB 28h,(L153F)-$-1
+1  3390
+1  3391	    0CC6  1D				 DB 1dh			 ; E = 0
+1  3392	    0CC7  FE 18				 DB 0feh, 18H			 ; insert ?
+1  3393	    0CC9  28 2D				 DB 28h,(L153F)-$-1
+1  3394	    0CCB  FE 1B				 DB 0feh, 1BH			 ; escape ?
+1  3395	    0CCD  28 29				 DB 28h,(L153F)-$-1
+1  3396
+1  3397	    0CCF  FE 1A				 DB 0feh, 1AH			 ; ctrl-z ?
+1  3398	    0CD1  28 36				 DB 28h,(L1550)-$-1		 ; jump	to quit	with ^Z
+1  3399
+1  3400	    0CD3  FE 0D				 DB 0feh, 0DH			 ; return ?
+1  3401	    0CD5  28 38				 DB 28h,(L1556)-$-1
+1  3402
+1  3403	    0CD7  FE 20				 DB 0feh, ' '			  ; space ?
+1  3404	    0CD9  30 11				 DB 30h,(L1533)-$-1
+1  3405	    0CDB  FE 03				 DB 0feh, 3			 ; ctrl-break ?
+1  3406	    0CDD  20 D9				 DB 20h,(L14FF)-$-1
+1  3407	    0CDF  3A				 DB 3ah
+1  3408	    0CE0  0172r				 DW CBREAK
+1  3409	    0CE2  B7				 DB 0b7h
+1  3410	    0CE3  28 D3				 DB 28h,(L14FF)-$-1		 ; ignore character if no CBREAK handler
+1  3411	    0CE5  DD 2A				 DB 0ddh,02ah
+1  3412	    0CE7  018Er				 DW L00E4		 ; IX =	return address
+1  3413	    0CE9  C3				 DB 0c3h
+1  3414	    0CEA  0F43r				 DW  L2016		 ; force userbreak
+1  3415
+1  3416	    0CEC  79			 L1533:	 DB 79h
+1  3417	    0CED  BA				 DB 0bah
+1  3418	    0CEE  28 C8				 DB 28h,(L14FF)-$-1
+1  3419	    0CF0  7E				 DB 7eh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 61
+msx_asm\tur_init.ASM
+
+
+
+1  3420	    0CF1  14				 DB 14h
+1  3421	    0CF2  23				 DB 23h
+1  3422	    0CF3  CD				 DB 0cdh
+1  3423	    0CF4  0463r				 DW  L03C9		 ; print character
+1  3424	    0CF6  18 C0				 DB 18h,( L14FF)-$-1
+1  3425
+1  3426	    0CF8  15			 L153F:	 DB 15h
+1  3427	    0CF9  FA				 DB 0fah
+1  3428	    0CFA  0CB6r				 DW L14FD
+1  3429	    0CFC  2B				 DB 2bh
+1  3430	    0CFD  CD				 DB 0cdh
+1  3431	    0CFE  0287r				 DW  L0200
+1  3432	    0D00  08 20	08 00			 DB 8,'	',8,0		    ; backspace, space,	backspace
+1  3433	    0D04  1D				 DB 1dh
+1  3434	    0D05  28 B1				 DB 28h,(L14FF)-$-1
+1  3435	    0D07  18 EF				 DB 18h,( L153F)-$-1
+1  3436
+1  3437	    0D09  04			 L1550:	 DB 04h
+1  3438	    0D0A  05				 DB 05h
+1  3439	    0D0B  28 AB				 DB 28h,(L14FF)-$-1
+1  3440	    0D0D  18 04				 DB 18h,( L155A)-$-1		 ; quit	with ^Z
+1  3441
+1  3442	    0D0F  04			 L1556:	 DB 04h
+1  3443	    0D10  05				 DB 05h
+1  3444	    0D11  20 04				 DB 20h,(L155E)-$-1		 ; jump	if quit	with 0DH,0Ah
+1  3445
+1  3446	    0D13			 L155A:	 ; quit	with ^Z
+1  3447	    0D13  36 1A				 DB 36h,1AH
+1  3448	    0D15  18 08				 DB 18h,( L1566)-$-1		 ; quit
+1  3449
+1  3450	    0D17  CD			 L155E:	 DB 0cdh
+1  3451	    0D18  0268r				 DW  L01E1		 ; print CR, LF
+1  3452	    0D1A  36 0D				 DB 36h,0DH
+1  3453	    0D1C  23				 DB 23h
+1  3454	    0D1D  36 0A				 DB 36h,0AH
+1  3455	    0D1F  23			 L1566:	 DB 23h
+1  3456	    0D20  22				 DB 22h
+1  3457	    0D21  0185r				 DW L00D6		 ; save	end address
+1  3458	    0D23  C9				 DB 0c9h
+1  3459
+1  3460	    0D24			 L156B:	  ; read character from	current	file or	device
+1  3461						 ; out:	 A = character read
+1  3462	    0D24  2A				 DB 02ah
+1  3463	    0D25  018Cr				 DW L00E2
+1  3464	    0D27  3A				 DB 3ah
+1  3465	    0D28  0180r				 DW L00D0		 ; read	IORESULT
+1  3466	    0D2A  B7				 DB 0b7h
+1  3467	    0D2B  20 7B				 DB 20h,(L15ED)-$-1		 ; jump	if error occurred, return EOF
+1  3468
+1  3469	    0D2D  7E				 DB 7eh
+1  3470	    0D2E  CB 6F				 DB 0cbh,06fh
+1  3471	    0D30  20 72				 DB 20h,(L15E9)-$-1		 ; jump	if pre-read character present
+1  3472
+1  3473	    0D32  E6 0F				 DB 0e6h, 0FH
+1  3474	    0D34  20 30				 DB 20h,(L15AB)-$-1		 ; jump	if device
+1  3475
+1  3476						 ; read	character from text file
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 62
+msx_asm\tur_init.ASM
+
+
+
+1  3477						 OFF_HL	0 FIB_PTR
+2  3478		  =0002			 ??0000	     EQU (FIB_PTR)-(0)
+2  3479
+2  3480	    0D36  23				    DB 23h; INC	HL
+2  3481	    0D37  23				    DB 23h; INC	HL
+2  3482
+1  3483					 ;	  INC HL
+1  3484					 ;	  INC HL
+1  3485	    0D38  7E				 DB 7eh		 ; A = FIB_PTR
+1  3486	    0D39  B7				 DB 0b7h
+1  3487	    0D3A  F2				 DB 0f2h
+1  3488	    0D3B  0D52r				 DW L1597		 ; < 128 ?
+1  3489
+1  3490						 ; read	next FIB_BUF
+1  3491	    0D3D  0E 14				 DB 0eh,14H		 ; sequential read
+1  3492	    0D3F  E5				 DB 0e5h
+1  3493	    0D40  CD				 DB 0cdh
+1  3494	    0D41  0F1Er				 DW  L19BA		 ; sequential read from	current	position
+1  3495									 ; to FIB_BUF
+1  3496	    0D43  E1				 DB 0e1h
+1  3497	    0D44  28 0A				 DB 28h,(L1595)-$-1		 ; jump	if no error
+1  3498
+1  3499						 ; error occurred, fill	first byte of FIB_BUF with ^Z (end of file)
+1  3500	    0D46  E5				 DB 0e5h
+1  3501						 OFF_HL	FIB_PTR	FIB_BUF
+2  3502		  =002E			 ??0001	     EQU (FIB_BUF)-(FIB_PTR)
+2  3503
+2  3504	    0D47  D5					 DB 0D5H ; PUSH	DE
+2  3505	    0D48  11					 DB 11H
+2  3506	    0D49  002E					 DW ??0001
+2  3507	    0D4B  19					 DB 19H	 ; ADD HL,DE
+2  3508	    0D4C  D1					 DB 0D1H ; POP DE
+2  3509
+1  3510					 ;	  LD DE,2EH
+1  3511					 ;	  ADD HL,DE
+1  3512	    0D4D  36 1A				 DB 36h,1AH
+1  3513	    0D4F  E1				 DB 0e1h		 ; restore to FIB_PTR
+1  3514
+1  3515	    0D50  AF			 L1595:	 DB 0afh
+1  3516	    0D51  77				 DB 77h		 ; FIB_PTR = 0
+1  3517
+1  3518	    0D52  34			 L1597:	 DB 034h
+1  3519	    0D53  C6 2E				 DB 0c6h,FIB_BUF - FIB_PTR	 ; 2EH
+1  3520	    0D55  5F				 DB 5fh
+1  3521	    0D56  16 00				 DB 16h,0
+1  3522	    0D58  19				 DB 019h
+1  3523	    0D59  7E				 DB 7eh
+1  3524	    0D5A  FE 1A				 DB 0feh, 1AH			 ; first character = ^Z	(eof)
+1  3525	    0D5C  20 3D				 DB 20h,(L15E0)-$-1
+1  3526
+1  3527	    0D5E  2A				 DB 02ah
+1  3528	    0D5F  018Cr				 DW L00E2
+1  3529						 OFF_HL	0 FIB_PTR
+2  3530		  =0002			 ??0002	     EQU (FIB_PTR)-(0)
+2  3531
+2  3532	    0D61  23				    DB 23h; INC	HL
+2  3533	    0D62  23				    DB 23h; INC	HL
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 63
+msx_asm\tur_init.ASM
+
+
+
+2  3534
+1  3535					 ;	  INC HL
+1  3536					 ;	  INC HL
+1  3537	    0D63  35				 DB 035h		 ; FIB_PTR does	not move beyond	^Z
+1  3538	    0D64  18 35				 DB 18h,( L15E0)-$-1
+1  3539
+1  3540	    0D66  3D			 L15AB:	 DB 3dh			 ; device = 1, 'CON:' ?
+1  3541	    0D67  20 1B				 DB 20h,(L15C9)-$-1		 ; jump	if not 'CON:'
+1  3542	    0D69  2A				 DB 02ah
+1  3543	    0D6A  0183r				 DW L00D4
+1  3544	    0D6C  ED 5B				 DB 0edh,5bh
+1  3545	    0D6E  0185r				 DW L00D6
+1  3546	    0D70  B7				 DB 0b7h
+1  3547	    0D71  ED 52				 DB 0EDH,052h
+1  3548	    0D73  38 05				 DB 38h,(L15BF)-$-1		 ; read	from buffer until current = end	address
+1  3549
+1  3550	    0D75  06 FF				 DB 06h,0FFH
+1  3551	    0D77  CD				 DB 0cdh
+1  3552	    0D78  0CA3r				 DW  L14EA
+1  3553
+1  3554	    0D7A  2A			 L15BF:	 DB 02ah
+1  3555	    0D7B  0183r				 DW L00D4		 ; HL =	data pointer
+1  3556	    0D7D  7E				 DB 7eh		 ; A = data byte
+1  3557	    0D7E  23				 DB 23h
+1  3558	    0D7F  22				 DB 22h
+1  3559	    0D80  0183r				 DW L00D4		 ; save	new data pointer
+1  3560	    0D82  18 17				 DB 18h,( L15E0)-$-1		 ; put character in FIB_CHR
+1  3561
+1  3562	    0D84  3D			 L15C9:	 DB 3dh			 ; device = 2, 'KBD:' ?
+1  3563	    0D85  20 06				 DB 20h,(L15D2)-$-1		 ; jump	if not 'KBD:'
+1  3564
+1  3565	    0D87  CD				 DB 0cdh
+1  3566	    0D88  014Dr				 DW  CONINPTR
+1  3567	    0D8A  7D				 DB 7dh
+1  3568	    0D8B  18 0E				 DB 18h,( L15E0)-$-1		 ; put character in FIB_CHR
+1  3569
+1  3570	    0D8D  3D			 L15D2:	 DB 3dh			 ; skip	'LST:' (output device)
+1  3571	    0D8E  3D				 DB 3dh			 ; device = 4, 'AUX:' ?
+1  3572	    0D8F  20 06				 DB 20h,(L15DC)-$-1		 ; jump	if not 'AUX:', then device = 'USR:'
+1  3573
+1  3574	    0D91  CD				 DB 0cdh
+1  3575	    0D92  0159r				 DW  AUXINPTR
+1  3576	    0D94  7D				 DB 7dh
+1  3577	    0D95  18 04				 DB 18h,( L15E0)-$-1		 ; put character in FIB_CHR
+1  3578
+1  3579	    0D97  CD			 L15DC:	 DB 0cdh
+1  3580	    0D98  015Fr				 DW  USRINPTR
+1  3581	    0D9A  7D				 DB 7dh
+1  3582
+1  3583	    0D9B  2A			 L15E0:	 DB 02ah
+1  3584	    0D9C  018Cr				 DW L00E2		 ; HL =	address	of FIB
+1  3585	    0D9E  CB EE				 DB 0cbh,0eeh		 ; set write semaphore
+1  3586									 ; pre-read character ready
+1  3587						 OFF_HL	0 FIB_CHR
+2  3588		  =0001			 ??0003	     EQU (FIB_CHR)-(0)
+2  3589
+2  3590	    0DA0  23				   DB 23h; INC HL
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 64
+msx_asm\tur_init.ASM
+
+
+
+2  3591
+1  3592					 ;	  INC HL
+1  3593	    0DA1  77				 DB 77h		 ; put character in character buffer
+1  3594						 OFF_HL	FIB_CHR	0
+2  3595		  =-0001		 ??0004	     EQU (0)-(FIB_CHR)
+2  3596
+2  3597	    0DA2  2B				      DB 2bh; DEC HL
+2  3598
+1  3599					 ;	  DEC HL
+1  3600	    0DA3  C9				 DB 0c9h
+1  3601
+1  3602	    0DA4			 L15E9:	 OFF_HL	0 FIB_CHR
+2  3603		  =0001			 ??0005	     EQU (FIB_CHR)-(0)
+2  3604
+2  3605	    0DA4  23				   DB 23h; INC HL
+2  3606
+1  3607					 ;	  INC HL
+1  3608	    0DA5  7E				 DB 7eh		 ; read	pre-read from character	buffer
+1  3609						 OFF_HL	FIB_CHR	0
+2  3610		  =-0001		 ??0006	     EQU (0)-(FIB_CHR)
+2  3611
+2  3612	    0DA6  2B				      DB 2bh; DEC HL
+2  3613
+1  3614					 ;	  DEC HL
+1  3615	    0DA7  C9				 DB 0c9h
+1  3616
+1  3617	    0DA8  3E 1A			 L15ED:	 DB 3eh,1AH
+1  3618	    0DAA  C9				 DB 0c9h
+1  3619
+1  3620	    0DAB  E5			 L15F0:	 DB 0e5h
+1  3621	    0DAC  2A				 DB 02ah
+1  3622	    0DAD  018Cr				 DW L00E2		 ; HL =	address	of FIB
+1  3623	    0DAF  7E				 DB 7eh		 ; A = flags byte
+1  3624	    0DB0  E6 0F				 DB 0e6h, 0FH
+1  3625
+1  3626	    0DB2  FE 06				 DB 0feh, 6			 ; device 6 = used for 'val'
+1  3627	    0DB4  28 27				 DB 28h,(L1622)-$-1		 ; quit	immediately is device =	6
+1  3628
+1  3629	    0DB6  CD			 L15FB:	 DB 0cdh
+1  3630	    0DB7  0D24r				 DW  L156B		 ; read	character from file or device
+1  3631	    0DB9  FE 21				 DB 0feh, 21H
+1  3632	    0DBB  30 08				 DB 30h,(L160A)-$-1
+1  3633	    0DBD  FE 1A				 DB 0feh, 1AH
+1  3634	    0DBF  28 04				 DB 28h,(L160A)-$-1
+1  3635	    0DC1  CB AE				 DB 0cbh,0aeh
+1  3636	    0DC3  18 F1				 DB 18h,( L15FB)-$-1
+1  3637
+1  3638	    0DC5  11			 L160A:	 DB 11h
+1  3639	    0DC6  0126r				 DW L005D
+1  3640	    0DC8  06 1E				 DB 06h,1EH
+1  3641	    0DCA  C5			 L160F:	 DB 0c5h
+1  3642	    0DCB  D5				 DB 0d5h
+1  3643	    0DCC  CD				 DB 0cdh
+1  3644	    0DCD  0D24r				 DW  L156B		 ; read	character from file or device
+1  3645	    0DCF  D1				 DB 0d1h
+1  3646	    0DD0  C1				 DB 0c1h
+1  3647	    0DD1  FE 21				 DB 0feh, 21H
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 65
+msx_asm\tur_init.ASM
+
+
+
+1  3648	    0DD3  38 06				 DB 38h,(L1620)-$-1
+1  3649	    0DD5  CB AE				 DB 0cbh,0aeh
+1  3650	    0DD7  12				 DB 12h
+1  3651	    0DD8  13				 DB 13h
+1  3652	    0DD9  10 EF				 DB 10h,( L160F)-$-1
+1  3653	    0DDB  AF			 L1620:	 DB 0afh
+1  3654	    0DDC  12				 DB 12h
+1  3655	    0DDD  E1			 L1622:	 DB 0e1h
+1  3656	    0DDE  C9				 DB 0c9h
+1  3657
+1  3658	    0DDF			 L1624:	 ; in:	 -
+1  3659						 ; out:	 B = 0 and IX =	L005D --> no '-' found
+1  3660						 ;	 B = 1 and IX =	L005E --> a '-'	found
+1  3661						 ;	 Zero --> end of string	reached
+1  3662	    0DDF  DD 21				 DB 0ddh,21h
+1  3663	    0DE1  0126r				 DW L005D
+1  3664	    0DE3  DD 7E	00			 DB 0ddh,7eh,+0
+1  3665	    0DE6  B7				 DB 0b7h
+1  3666	    0DE7  C8				 DB 0c8h		 ; quit	if zero
+1  3667
+1  3668	    0DE8  06 00				 DB 06h,0			 ; assume positive
+1  3669	    0DEA  FE 2D				 DB 0feh, '-'			  ; minus sign ?
+1  3670	    0DEC  C0				 DB 0c0h		 ; quit	with NonZero of	something else
+1  3671
+1  3672	    0DED  04				 DB 04h			 ; no, negative	number
+1  3673	    0DEE  DD 23				 DB 0ddh,23h			 ; next	character
+1  3674						  ; quit with NonZero (INC B)
+1  3675	    0DF0  C9				 DB 0c9h
+1  3676
+1  3677	    0DF1			 L1636:	 ; checks a correct termination	of the parsed string
+1  3678						 ; in:	 IX = position of character after parsed string
+1  3679						 ;	 Carry flag -->	IORESULT = 10H
+1  3680						 ; out:	 NonCarry if '\0' found	at (IX), A not changed
+1  3681						 ;	 Carry if no '\0' found	at (IX), A changed
+1  3682						 ; changes: AF,	IORESULT
+1  3683
+1  3684	    0DF1  38 07				 DB 38h,(L163D)-$-1
+1  3685
+1  3686	    0DF3  DD 34	00			 DB 0ddh,034h,+0	 ; string correct ended	?
+1  3687	    0DF6  DD 35	00			 DB 0ddh,035h,+0
+1  3688	    0DF9  C8				 DB 0c8h		 ; yes,	quit
+1  3689
+1  3690	    0DFA  3E 10			 L163D:	 DB 3eh,10H
+1  3691	    0DFC  32				 DB 32h
+1  3692	    0DFD  0180r				 DW L00D0		 ; IORESULT = 10H, Error in numeric format
+1  3693	    0DFF  37				 DB 37h
+1  3694	    0E00  C9				 DB 0c9h
+1  3695
+1  3696
+1  3697	    0E01			 L164E:	  ; store as INTEGER
+1  3698	    0E01  AF				 DB 0afh		 ; store as INTEGER
+1  3699
+1  3700	    0E02			 L164F:	 ; in:	 HL = destination address for INTEGER value
+1  3701						 ;	 IX = address of first ASCII character
+1  3702						 ;	 C = 0,	store as INTEGER
+1  3703						 ;	 C = > 0, store	as BYTE
+1  3704						 ; out:	 HL = INTEGER value
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 66
+msx_asm\tur_init.ASM
+
+
+
+1  3705						 ;	 DE = destination address + 1
+1  3706	    0E02  4F				 DB 4fh
+1  3707	    0E03  C5				 DB 0c5h
+1  3708	    0E04  CD				 DB 0cdh
+1  3709	    0E05  0DABr				 DW  L15F0
+1  3710	    0E07  C1				 DB 0c1h
+1  3711	    0E08  CD				  DB 0cdh
+1  3712	    0E09  0DDFr				 DW  L1624		   ; read an optional sign
+1  3713	    0E0B  C8				  DB 0c8h		       ; quit if end of	ASCII-text
+1  3714
+1  3715						 ; B = 0, no sign
+1  3716						 ; B = 1, a sign
+1  3717	    0E0C  C5				 DB 0c5h
+1  3718	    0E0D  E5				 DB 0e5h		 ; save	destination address
+1  3719
+1  3720	    0E0E  CD				 DB 0cdh
+1  3721	    0E0F  0629r				 DW  L07F7		 ; convert hexadecimal or decimal to HL
+1  3722
+1  3723	    0E11  D1				 DB 0d1h		 ; DE =	destination address
+1  3724	    0E12  C1				 DB 0c1h		 ; B = sign flag
+1  3725						 ; Carry if error at conversion
+1  3726
+1  3727	    0E13  CD				 DB 0cdh
+1  3728	    0E14  0DF1r				 DW  L1636		 ; conversion ended correct ?
+1  3729	    0E16  D8				 DB 0d8h		 ; quit	if error
+1  3730
+1  3731	    0E17  05				 DB 05h			 ; B = 1 ?, a sign read	?
+1  3732	    0E18  CC				 DB 0cch
+1  3733	    0E19  05F0r				 DW L0783		 ; Zero	--> negate HL
+1  3734
+1  3735	    0E1B  EB				 DB 0ebh		 ; HL =	destination address
+1  3736									 ; DE =	INTEGER	value
+1  3737	    0E1C  73				 DB 73h		 ; store low-byte
+1  3738
+1  3739	    0E1D  0C				 DB 0ch			 ; byte	?
+1  3740	    0E1E  0D				 DB 0dh
+1  3741	    0E1F  20 02				 DB 20h,(L1670)-$-1		 ; yes,	only low-byte stored
+1  3742
+1  3743	    0E21  23				 DB 23h
+1  3744	    0E22  72				 DB 72h		 ; store high-byte
+1  3745
+1  3746	    0E23  EB			 L1670:	 DB 0ebh
+1  3747	    0E24  C9				 DB 0c9h
+1  3748
+1  3749	    0E25			 L1671:	 ; in:	 HL = destination address for LONGINT value
+1  3750						 ;	 IX = address of first ASCII character
+1  3751						 ; out:	 DE:HL = LONGINT value
+1  3752	    0E25  CD				 DB 0cdh
+1  3753	    0E26  0DABr				 DW  L15F0
+1  3754
+1  3755	    0E28  CD				 DB 0cdh
+1  3756	    0E29  0DDFr				 DW  L1624		 ; read	an optional sign
+1  3757	    0E2B  C8				 DB 0c8h
+1  3758
+1  3759						 ; B = 0, no sign
+1  3760						 ; B = 1, a sign
+1  3761	    0E2C  E5				 DB 0e5h		 ; save	destination address
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 67
+msx_asm\tur_init.ASM
+
+
+
+1  3762	    0E2D  C5				 DB 0c5h		 ; save	sign flag
+1  3763
+1  3764	    0E2E  CD				 DB 0cdh
+1  3765	    0E2F  066Cr				 DW  A2L		 ; convert hexadecimal or decimal to DE:HL
+1  3766
+1  3767	    0E31  C1				 DB 0c1h		 ; B = sign flag
+1  3768
+1  3769	    0E32  F5				 DB 0f5h
+1  3770	    0E33  05				 DB 05h
+1  3771	    0E34  CC				 DB 0cch
+1  3772	    0E35  0979r				 DW L_NEG		 ; Zero	--> negate LONGINT DE:HL
+1  3773	    0E37  F1				 DB 0f1h
+1  3774
+1  3775	    0E38  C1				 DB 0c1h		 ; BC =	destination address
+1  3776						 ; Carry if error at conversion
+1  3777
+1  3778	    0E39  CD				 DB 0cdh
+1  3779	    0E3A  0DF1r				 DW  L1636		 ; conversion ended correct ?
+1  3780	    0E3C  D8				 DB 0d8h		 ; quit	if error
+1  3781
+1  3782	    0E3D  C5				 DB 0c5h		 ; save	destination address
+1  3783	    0E3E  44				 DB 44h			 ; BC =	low-word
+1  3784	    0E3F  4D				 DB 4dh
+1  3785	    0E40  E1				 DB 0e1h		 ; HL =	destination address
+1  3786
+1  3787	    0E41  71				 DB 71h		 ; store low-word
+1  3788	    0E42  23				 DB 23h
+1  3789	    0E43  70				 DB 70h
+1  3790	    0E44  23				 DB 23h
+1  3791
+1  3792	    0E45  73				 DB 73h		 ; store high-word
+1  3793	    0E46  23				 DB 23h
+1  3794	    0E47  72				 DB 72h
+1  3795	    0E48  60				 DB 60h			 ; restore low-word
+1  3796	    0E49  69				 DB 69h
+1  3797						 ; return DE:HL
+1  3798	    0E4A  C9				 DB 0c9h
+1  3799
+1  3800
+1  3801	    0E4B			 L16C6:	 ; in:	 A = character
+1  3802						 ; out:	 character printed to a	device or a file
+1  3803	    0E4B  2A				 DB 02ah
+1  3804	    0E4C  018Cr				 DW L00E2		 ; HL =	FIB address
+1  3805	    0E4E  4F				 DB 4fh			 ; C = character data
+1  3806
+1  3807	    0E4F  3A				 DB 3ah
+1  3808	    0E50  0180r				 DW L00D0		 ; read	IORESULT
+1  3809	    0E52  B7				 DB 0b7h
+1  3810	    0E53  C0				 DB 0c0h		 ; quit	if an error occurred
+1  3811	    0E54  7E				 DB 7eh
+1  3812	    0E55  E6 0F				 DB 0e6h, 0FH
+1  3813	    0E57  20 10				 DB 20h,(L16E4)-$-1		 ; jump	if device
+1  3814
+1  3815						 OFF_HL	0 FIB_PTR
+2  3816		  =0002			 ??0007	     EQU (FIB_PTR)-(0)
+2  3817
+2  3818	    0E59  23				    DB 23h; INC	HL
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 68
+msx_asm\tur_init.ASM
+
+
+
+2  3819	    0E5A  23				    DB 23h; INC	HL
+2  3820
+1  3821					 ;	  INC HL
+1  3822					 ;	  INC HL		  ; offset to FIB_PTR
+1  3823	    0E5B  E5				 DB 0e5h
+1  3824	    0E5C  7E				 DB 7eh		 ; A = low byte	of FIB_PTR
+1  3825	    0E5D  C6 2E				 DB 0c6h,FIB_BUF-FIB_PTR ; 2EH,	distance between FIB_PTR and FIB_BUF
+1  3826	    0E5F  5F				 DB 5fh
+1  3827	    0E60  16 00				 DB 16h,0
+1  3828	    0E62  19				 DB 019h
+1  3829	    0E63  71				 DB 71h		 ; write character
+1  3830	    0E64  E1				 DB 0e1h
+1  3831	    0E65  34				 DB 034h		 ; increase FIB_PTR
+1  3832	    0E66  F0				 DB 0f0h		 ; quit	if < 128
+1  3833	    0E67  18 28				 DB 18h,( L170C)-$-1		 ; write buffer	if FIB_PTR = 128
+1  3834									 ; why not directly to 'LD (HL),0' ???
+1  3835
+1  3836	    0E69  FE 06			 L16E4:	 DB 0feh, 6
+1  3837	    0E6B  28 15				 DB 28h,(L16FD)-$-1		 ; what	kind of	a device is this ????
+1  3838
+1  3839	    0E6D  E1				 DB 0e1h		 ; pop return address
+1  3840	    0E6E  06 00				 DB 06h,0
+1  3841	    0E70  C5				 DB 0c5h		 ; push	BC = character data
+1  3842	    0E71  E5				 DB 0e5h		 ; push	return address
+1  3843
+1  3844	    0E72  3D				 DB 3dh			 ; 1: device = 'CON:' ?
+1  3845	    0E73  CA				 DB 0cah
+1  3846	    0E74  0150r				 DW CONOUTPTR
+1  3847	    0E76  3D				 DB 3dh
+1  3848	    0E77  3D				 DB 3dh			 ; 3: device = 'LST:' ?
+1  3849	    0E78  CA				 DB 0cah
+1  3850	    0E79  0153r				 DW LSTOUTPTR
+1  3851	    0E7B  3D				 DB 3dh			 ; 4: device = 'AUX:' ?
+1  3852	    0E7C  CA				 DB 0cah
+1  3853	    0E7D  0156r				 DW AUXOUTPTR
+1  3854	    0E7F  C3				 DB 0c3h
+1  3855	    0E80  015Cr				 DW  USROUTPTR		 ; 5: device = 'USR:' ?
+1  3856
+1  3857	    0E82  2A			 L16FD:	 DB 02ah
+1  3858	    0E83  0192r				 DW L00E8
+1  3859	    0E85  3A				 DB 3ah
+1  3860	    0E86  0194r				 DW L00EA
+1  3861	    0E88  BE				 DB 0beh
+1  3862	    0E89  C8				 DB 0c8h
+1  3863	    0E8A  34				 DB 034h
+1  3864	    0E8B  5E				 DB 5eh		 ; DE =	index
+1  3865	    0E8C  16 00				 DB 16h,0
+1  3866	    0E8E  19				 DB 019h
+1  3867	    0E8F  71				 DB 71h		 ; write character in buffer
+1  3868	    0E90  C9				 DB 0c9h
+1  3869
+1  3870	    0E91			 L170C:	 ; flushes the buffer to disk if it is not empty
+1  3871	    0E91  2A				 DB 02ah
+1  3872	    0E92  018Cr				 DW L00E2
+1  3873						 OFF_HL	0 FIB_PTR
+2  3874		  =0002			 ??0008	     EQU (FIB_PTR)-(0)
+2  3875
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 69
+msx_asm\tur_init.ASM
+
+
+
+2  3876	    0E94  23				    DB 23h; INC	HL
+2  3877	    0E95  23				    DB 23h; INC	HL
+2  3878
+1  3879					 ;	  INC HL
+1  3880					 ;	  INC HL
+1  3881	    0E96  7E				 DB 7eh		 ; A = low byte	of FIB_PTR
+1  3882	    0E97  B7				 DB 0b7h
+1  3883	    0E98  C8				 DB 0c8h		 ; quit	if nothing written
+1  3884	    0E99  36 00				 DB 36h,0		 ; reset to start of FIB_BUF
+1  3885
+1  3886	    0E9B  0E 15				 DB 0eh,15H		 ; sequential write 128	bytes
+1  3887	    0E9D  CD				 DB 0cdh
+1  3888	    0E9E  0F1Er				 DW  L19BA		 ; write FIB_BUF to current position
+1  3889	    0EA0  C8				 DB 0c8h		 ; quit	if no error
+1  3890	    0EA1  3E F0				 DB 3eh,0F0H
+1  3891	    0EA3  32				 DB 32h
+1  3892	    0EA4  0180r				 DW L00D0		 ; IORESULT = 0F0H, Disk write error
+1  3893	    0EA6  C9				 DB 0c9h
+1  3894
+1  3895
+1  3896	    0EA7			 L1726:	  ; LIB, print INTEGER
+1  3897						  ; in:	   value to print is pushed on stack
+1  3898						  ;	   HL =	size in	characters
+1  3899						  ;	   (L00D2) destination address for ASCII result
+1  3900						  ; out:   -
+1  3901	    0EA7  C1				  DB 0c1h		      ;	LIB
+1  3902	    0EA8  D1				 DB 0d1h
+1  3903	    0EA9  C5				 DB 0c5h
+1  3904	    0EAA  DD 2A				 DB 0ddh,02ah
+1  3905	    0EAC  0181r				 DW L00D2
+1  3906	    0EAE  CB 7C				 DB 0cbh,07ch
+1  3907	    0EB0  28 06				  DB 28h,(L1737)-$-1		     ; jump if size = positive
+1  3908
+1  3909	    0EB2  CD				  DB 0cdh
+1  3910	    0EB3  05F0r				 DW  L0783		   ; negate HL (size)
+1  3911	    0EB5  EB				  DB 0ebh		    ; HL = value, DE = size
+1  3912	    0EB6  18 0E				  DB 18h,( L1745)-$-1
+1  3913
+1  3914	    0EB8  EB			 L1737:	  DB 0ebh		    ; HL = value, DE = size
+1  3915	    0EB9  CB 7C				 DB 0cbh,07ch
+1  3916	    0EBB  28 09				  DB 28h,(L1745)-$-1		     ; jump if value = positive
+1  3917
+1  3918	    0EBD  CD				  DB 0cdh
+1  3919	    0EBE  05F0r				 DW  L0783		   ; negate HL
+1  3920	    0EC0  DD 36	00 2D			  DB 0ddh,36h,+0,'-'		  ; print minus	sign
+1  3921	    0EC4  DD 23				 DB 0ddh,23h
+1  3922
+1  3923	    0EC6  D5			 L1745:	  DB 0d5h		     ; push size
+1  3924
+1  3925	    0EC7  CD				  DB 0cdh
+1  3926	    0EC8  05F8r				 DW  L07C6		   ; unsigned INTEGER to ASCII
+1  3927
+1  3928	    0ECA			 L1749:	  ; print string from character	buffer (L00D2) with leading spaces if
+1  3929						  ; pushed size	> characters written in	buffer
+1  3930						  ; in:	   total size wanted is	pushed
+1  3931	    0ECA  E1				  DB 0e1h		      ;	size, (	WRITELN(int : size) )
+1  3932
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 70
+msx_asm\tur_init.ASM
+
+
+
+1  3933	    0ECB  CD				  DB 0cdh
+1  3934	    0ECC  0564r				 DW  L04C8		   ; int to byte
+1  3935						  ; A =	size
+1  3936
+1  3937	    0ECE  ED 5B				  DB 0edh,5bh
+1  3938	    0ED0  0181r				 DW L00D2	       ; DE = start of ASCII buffer
+1  3939	    0ED2  DD E5				 DB 0ddh,0e5h
+1  3940	    0ED4  E1				 DB 0e1h
+1  3941	    0ED5  B7				 DB 0b7h
+1  3942	    0ED6  ED 52				  DB 0EDH,052h
+1  3943	    0ED8  4D				  DB 4dh		     ; C = characters written in buffer
+1  3944
+1  3945	    0ED9  EB				  DB 0ebh		    ; HL = start of ASCII buffer
+1  3946
+1  3947	    0EDA			 L1759:	  ; in:	  HL = start of	ASCII buffer
+1  3948						  ;	   C = characters written in buffer
+1  3949	    0EDA  91				  DB 091h		       ; size -	characters written
+1  3950	    0EDB  38 0E				  DB 38h,(L176A)-$-1		     ; jump if size is less, no	spaces first
+1  3951	    0EDD  28 0C				  DB 28h,(L176A)-$-1		     ; jump if size is equal, no spaces	first
+1  3952
+1  3953	    0EDF  47				  DB 47h		     ; B = number of spaces to add
+1  3954	    0EE0  E5				  DB 0e5h		     ; save start of ASCII buffer
+1  3955
+1  3956	    0EE1  3E 20			 L1760:	  DB 3eh,' '
+1  3957	    0EE3  C5				 DB 0c5h
+1  3958	    0EE4  CD				  DB 0cdh
+1  3959	    0EE5  0E4Br				 DW  L16C6		   ; write space character
+1  3960	    0EE7  C1				 DB 0c1h
+1  3961	    0EE8  10 F7				  DB 10h,( L1760)-$-1		      ;	repeat
+1  3962
+1  3963	    0EEA  E1				  DB 0e1h		      ;	HL = start of ASCII buffer
+1  3964
+1  3965	    0EEB  41			 L176A:	  DB 41h		     ; B = characters in ASCII buffer
+1  3966	    0EEC  04				 DB 04h
+1  3967
+1  3968	    0EED  05			 L176C:	 DB 05h
+1  3969	    0EEE  C8				  DB 0c8h		       ; quit if all printed (or empty)
+1  3970
+1  3971	    0EEF  7E				  DB 7eh		  ; A =	chacacter to print
+1  3972	    0EF0  C5				 DB 0c5h
+1  3973	    0EF1  E5				 DB 0e5h
+1  3974	    0EF2  CD				  DB 0cdh
+1  3975	    0EF3  0E4Br				 DW  L16C6		   ; print character
+1  3976	    0EF5  E1				 DB 0e1h
+1  3977	    0EF6  C1				 DB 0c1h
+1  3978	    0EF7  23				  DB 23h		     ; next one
+1  3979	    0EF8  18 F3				 DB 18h,( L176C)-$-1
+1  3980
+1  3981	    0EFA			 L1779:	  ; LIB, print REAL
+1  3982						  ; in:	   push	REAL
+1  3983						  ;	   push	size
+1  3984						  ;	   HL =	number of digits after decimal point
+1  3985	    0EFA  C1				  DB 0c1h		      ;	return address
+1  3986
+1  3987	    0EFB  D1				  DB 0d1h		      ;	DE = size of real
+1  3988
+1  3989	    0EFC  D9				  DB 0d9h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 71
+msx_asm\tur_init.ASM
+
+
+
+1  3990	    0EFD  E1				 DB 0e1h		 ; HLDEBC = REAL to be printed
+1  3991	    0EFE  D1				 DB 0d1h
+1  3992	    0EFF  C1				 DB 0c1h
+1  3993	    0F00  D9				 DB 0d9h
+1  3994
+1  3995	    0F01  C5				  DB 0c5h		     ; return address
+1  3996
+1  3997	    0F02  DD 2A				  DB 0ddh,02ah
+1  3998	    0F04  0181r				 DW L00D2	       ; IX = destination address for ASCII
+1  3999	    0F06  D5				  DB 0d5h		     ; push size
+1  4000
+1  4001	    0F07  CD				  DB 0cdh
+1  4002	    0F08  09DDr				 DW  L1027		   ; convert REAL to ASCII
+1  4003
+1  4004	    0F0A  18 BE				  DB 18h,( L1749)-$-1
+1  4005
+1  4006
+1  4007	    0F0C  E3			 L18A4:	 DB 0e3h
+1  4008	    0F0D  22				 DB 22h
+1  4009	    0F0E  018Er				 DW L00E4
+1  4010	    0F10  E3				 DB 0e3h
+1  4011	    0F11  22				 DB 22h
+1  4012	    0F12  018Cr				 DW L00E2
+1  4013	    0F14  7E				 DB 7eh
+1  4014	    0F15  E6 C0				 DB 0e6h, 0C0H		 ; read	or write flags set?
+1  4015	    0F17  C0				 DB 0c0h		 ; yes,	quit
+1  4016
+1  4017	    0F18  3E 04			 L18B0:	 DB 3eh,4
+1  4018	    0F1A  32				 DB 32h
+1  4019	    0F1B  0180r				 DW L00D0		 ; IORESULT = 4, File not open
+1  4020	    0F1D  C9				 DB 0c9h
+1  4021
+1  4022	    0F1E			 L19BA:	 ; write FIB_BUF to current position according to FCB
+1  4023	    0F1E  2A				 DB 02ah
+1  4024	    0F1F  018Cr				 DW L00E2		 ; HL =	address	of FIB
+1  4025	    0F21  E5				 DB 0e5h
+1  4026	    0F22  C5				 DB 0c5h		 ; save	record to write
+1  4027
+1  4028						 OFF_HL	0 FIB_BUF
+2  4029		  =0030			 ??0009	     EQU (FIB_BUF)-(0)
+2  4030
+2  4031	    0F23  D5					 DB 0D5H ; PUSH	DE
+2  4032	    0F24  11					 DB 11H
+2  4033	    0F25  0030					 DW ??0009
+2  4034	    0F27  19					 DB 19H	 ; ADD HL,DE
+2  4035	    0F28  D1					 DB 0D1H ; POP DE
+2  4036
+1  4037					 ;	  LD DE,FIB_BUF		  ; offset to BUFFER
+1  4038					 ;	  ADD HL,DE
+1  4039	    0F29  EB				 DB 0ebh
+1  4040	    0F2A  0E 1A				 DB 0eh,1AH		 ; C = set dma at FIB buffer
+1  4041	    0F2C  CD				 DB 0cdh
+1  4042	    0F2D  0005				 DW  MSXDOS
+1  4043
+1  4044	    0F2F  C1				 DB 0c1h
+1  4045	    0F30  E1				 DB 0e1h
+1  4046						 OFF_HL	0 FIB_FCB
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 72
+msx_asm\tur_init.ASM
+
+
+
+2  4047		  =000C			 ??000A	     EQU (FIB_FCB)-(0)
+2  4048
+2  4049	    0F31  D5					 DB 0D5H ; PUSH	DE
+2  4050	    0F32  11					 DB 11H
+2  4051	    0F33  000C					 DW ??000A
+2  4052	    0F35  19					 DB 19H	 ; ADD HL,DE
+2  4053	    0F36  D1					 DB 0D1H ; POP DE
+2  4054
+1  4055					 ;	  LD DE,FIB_FCB		  ; offset to FCB
+1  4056					 ;	  ADD HL,DE
+1  4057	    0F37  EB				 DB 0ebh
+1  4058	    0F38  CD				 DB 0cdh
+1  4059	    0F39  0005				 DW  MSXDOS
+1  4060	    0F3B  B7				 DB 0b7h
+1  4061	    0F3C  C9				 DB 0c9h
+1  4062
+1  4063
+1  4064	    0F3D  3E 91			 L1A26:	 DB 3eh,91H
+1  4065	    0F3F  32				 DB 32h
+1  4066	    0F40  0180r				 DW L00D0		 ;  IORESULT = 91H, Seek beyond	end-of-file
+1  4067	    0F42  C9				 DB 0c9h
+1  4068
+1  4069
+1  4070	    0F43  11			 L2016:	  DB 11h
+1  4071	    0F44  0001				 DW 0001		 ; user	break, D = 0 with error	code = 1
+1  4072	    0F46  18 05				 DB 18h,( L202C)-$-1
+1  4073
+1  4074	    0F48			 L2027:	  ; Run-time error
+1  4075	    0F48  DD E1				 DB 0ddh,0e1h
+1  4076
+1  4077	    0F4A  5F				  DB 5fh		     ; E = error code
+1  4078	    0F4B  16 02				 DB 16h,2			 ; Run-time rror
+1  4079
+1  4080	    0F4D			 L202C:	  ; in:	   D = 0, user break
+1  4081						 ;	 D = 1,	I/O error, E = error number
+1  4082						 ;	 D = 2,	Run-time error	 E = error number
+1  4083	    0F4D  D5				 DB 0d5h
+1  4084	    0F4E  CD				 DB 0cdh
+1  4085	    0F4F  0412r				 DW  L037A
+1  4086	    0F51  D1				 DB 0d1h
+1  4087
+1  4088	    0F52  AF				 DB 0afh
+1  4089	    0F53  32				 DB 32h
+1  4090	    0F54  0172r				 DW CBREAK
+1  4091	    0F56  2A				 DB 02ah
+1  4092	    0F57  017Er				 DW L00CE
+1  4093	    0F59  7C				 DB 7ch
+1  4094	    0F5A  B5				 DB 0b5h
+1  4095	    0F5B  DD E5				 DB 0ddh,0e5h
+1  4096	    0F5D  E1				 DB 0e1h
+1  4097	    0F5E  ED 4B				  DB 0edh,4bh
+1  4098	    0F60  017Cr				 DW L00CC
+1  4099	    0F62  ED 42				 DB 0EDH,042h
+1  4100	    0F64  01				 DB 01h
+1  4101	    0F65  0015				 DW 0015H
+1  4102	    0F67  09				 DB 09h
+1  4103	    0F68  22				 DB 22h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 73
+msx_asm\tur_init.ASM
+
+
+
+1  4104	    0F69  017Er				 DW L00CE
+1  4105	    0F6B  B7				 DB 0b7h
+1  4106	    0F6C  20 07				 DB 20h,(L2054)-$-1
+1  4107	    0F6E  D5				 DB 0d5h		 ; save	error type and code
+1  4108
+1  4109	    0F6F  D5				 DB 0d5h
+1  4110	    0F70  E5				 DB 0e5h		 ; address where error occurred
+1  4111	    0F71  CD				  DB 0cdh
+1  4112	    0F72  016Fr				 DW  ERRORPTR
+1  4113	    0F74  D1				 DB 0d1h		 ; restore error type and code
+1  4114
+1  4115	    0F75  7A			 L2054:	 DB 7ah
+1  4116	    0F76  B7				 DB 0b7h
+1  4117	    0F77  20 14				 DB 20h,(L206C)-$-1
+1  4118	    0F79  CD				 DB 0cdh
+1  4119	    0F7A  0287r				 DW  L0200		 ; D = 0 >> User Break
+1  4120	    0F7C  5E 43	0D 0A			 DB '^C',0DH,0AH
+1  4121	    0F80  55 73	65 72 20 62 72+		 DB 'User break',0
+   4122		  65 61	6B 00
+1  4123	    0F8B  18 2B				 DB 18h,( L2097)-$-1
+1  4124
+1  4125	    0F8D  3D			 L206C:	  DB 3dh
+1  4126	    0F8E  20 0B				 DB 20h,(L207A)-$-1
+1  4127	    0F90  CD				 DB 0cdh
+1  4128	    0F91  0287r				 DW  L0200		 ; D = 1 >> I/O	error
+1  4129		  =_TEXT:0F96		 L2075	 EQU $+3
+1  4130	    0F93  0D 0A	49 2F 4F 00		 DB 0DH,0AH,'I/O',0
+1  4131	    0F99  18 0E				 DB 18h,( L2088)-$-1
+1  4132
+1  4133	    0F9B  CD			 L207A:	 DB 0cdh
+1  4134	    0F9C  0287r				 DW  L0200		 ; D = 2 >> Run-time error
+1  4135	    0F9E  0D 0A	52 75 6E 2D 74+		 DB 0DH,0AH,'Run-time',0
+   4136		  69 6D	65 00
+1  4137
+1  4138	    0FA9  CD			 L2088:	 DB 0cdh
+1  4139	    0FAA  0287r				 DW  L0200
+1  4140	    0FAC  20 65	72 72 6F 72 20+		 DB ' error ',0
+   4141		  00
+1  4142
+1  4143	    0FB4  7B			 L2093:	 DB 7bh
+1  4144	    0FB5  CD				 DB 0cdh
+1  4145	    0FB6  054Er				 DW  L04B4
+1  4146
+1  4147	    0FB8  CD			 L2097:	 DB 0cdh
+1  4148	    0FB9  0287r				 DW  L0200
+1  4149	    0FBB  2C 20	50 43 3D 00		 DB ', PC=',0
+1  4150	    0FC1  2A				 DB 02ah
+1  4151	    0FC2  017Er				 DW L00CE
+1  4152	    0FC4  CD				 DB 0cdh
+1  4153	    0FC5  0549r				 DW  L04AF
+1  4154	    0FC7  18 15				 DB 18h,( L20BD)-$-1
+1  4155
+1  4156	    0FC9  CD			 L20A8:	  DB 0cdh
+1  4157	    0FCA  0287r				 DW  L0200
+1  4158	    0FCC  4E 6F	74 20 65 6E 6F+		 DB 'Not enough	memory',0
+   4159		  75 67	68 20 6D 65 6D+
+   4160		  6F 72	79 00
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 74
+msx_asm\tur_init.ASM
+
+
+
+1  4161	    0FDE  CD			 L20BD:	 DB 0cdh
+1  4162	    0FDF  0287r				 DW  L0200
+1  4163	    0FE1  0D 0A	50 72 6F 67 72+		 DB 0DH,0AH,'Program aborted',0DH,0AH,0
+   4164		  61 6D	20 61 62 6F 72+
+   4165		  74 65	64 0D 0A 00
+1  4166
+1  4167	    0FF5  3A			 L20D4:	  DB 3ah
+1  4168	    0FF6  0187r				 DW L00D8
+1  4169	    0FF8  B7				 DB 0b7h
+1  4170					 ;	   JP Z,L278E
+1  4171	    0FF9  0E 00				 DB 0eh,0
+1  4172	    0FFB  CD				 DB 0cdh
+1  4173	    0FFC  0005				 DW  MSXDOS
+1  4174
+1  4175	    0FFE  E1			 L20DE:	 DB 0e1h
+1  4176	    0FFF  D1				 DB 0d1h
+1  4177	    1000  D1				 DB 0d1h
+1  4178	    1001  E9				 DB 0e9h
+1  4179
+1  4180					 ;L20E2:
+   4181
+   4182						  end L0100
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 75
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??0000				  Number 0002
+??0001				  Number 002E
+??0002				  Number 0002
+??0003				  Number 0001
+??0004				  Number -0001
+??0005				  Number 0001
+??0006				  Number -0001
+??0007				  Number 0002
+??0008				  Number 0002
+??0009				  Number 0030
+??000A				  Number 000C
+??DATE				  Text	 "03/26/99"
+??FILENAME			  Text	 "tur_init"
+??TIME				  Text	 "21:37:01"
+??VERSION			  Number 0314
+@32BIT				  Text	 0
+@CODE				  Text	 _TEXT
+@CODESIZE			  Text	 0
+@CPU				  Text	 1F1FH
+@CURSEG				  Text	 _TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 TUR_INIT
+@INTERFACE			  Text	 00H
+@MODEL				  Text	 2
+@STACK				  Text	 @STACK
+@WORDSIZE			  Text	 4
+A2L				  Near	 _TEXT:066C
+A2L02				  Near	 _TEXT:067C
+A2L04				  Near	 _TEXT:067E
+A2L20				  Near	 _TEXT:069E
+A2L36				  Near	 _TEXT:06D2
+A2L37				  Near	 _TEXT:06DF
+A2L38				  Near	 _TEXT:06E2
+A2L_FLAG			  Near	 _TEXT:066B
+A2L_HEX				  Near	 _TEXT:06C1
+AUXINPTR			  Near	 _TEXT:0159
+AUXOUTPTR			  Near	 _TEXT:0156
+BUFLEN				  Near	 _TEXT:016E
+CBREAK				  Near	 _TEXT:0172
+COMPMANTISSE			  Near	 _TEXT:086D
+CON1OUTPTR			  Near	 _TEXT:0151
+CONINPTR			  Near	 _TEXT:014D
+CONINPTR_1			  Near	 _TEXT:014E
+CONOUTPTR			  Near	 _TEXT:0150
+CONSTPTR			  Near	 _TEXT:014A
+CONSTPTR_1			  Near	 _TEXT:014B
+DIVREAL1			  Near	 _TEXT:0820
+DIVREAL2			  Near	 _TEXT:082C
+DIVREAL3			  Near	 _TEXT:083D
+DIVREAL4			  Near	 _TEXT:0852
+DIVREAL5			  Near	 _TEXT:0860
+DOS_BLEN			  Number 0004
+DOS_BUF				  Number 0051
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 76
+Symbol Table
+
+
+
+DOS_CHR				  Number 0001
+DOS_CUR				  Number 000C
+DOS_FCB				  Number 0010
+DOS_FLG				  Number 0000
+DOS_LEN				  Number 00D1
+DOS_NUM				  Number 0006
+DOS_PTR				  Number 0002
+DOS_REC				  Number 000A
+ERRORPTR			  Near	 _TEXT:016F
+ERRORPTR_1			  Near	 _TEXT:0170
+FASTREAL			  Near	 _TEXT:0000
+FCB_DRIVE			  Number 0000
+FCB_EXT				  Number 0009
+FCB_FILEPOS			  Number 0021
+FCB_FILESIZE			  Number 0010
+FCB_LEN				  Number 0024
+FCB_NAME			  Number 0001
+FCB_RECSIZE			  Number 000E
+FIB_BUF				  Number 0030
+FIB_CHR				  Number 0001
+FIB_CUR				  Number 0008
+FIB_F				  Number 0000
+FIB_FCB				  Number 000C
+FIB_LEN				  Number 00B0
+FIB_NUM				  Number 0004
+FIB_PTR				  Number 0002
+FIB_REC				  Number 0006
+FIL_HDR				  Number 0004
+HEAPPTR				  Near	 _TEXT:0174
+INITFILEIO			  Near	 _TEXT:---- Extern
+J0213				  Near	 _TEXT:02A4
+L005C				  Near	 _TEXT:0125
+L005D				  Near	 _TEXT:0126
+L0065				  Near	 _TEXT:012E
+L0066				  Near	 _TEXT:012F
+L0068				  Near	 _TEXT:0131
+L006C				  Near	 _TEXT:0135
+L0070				  Near	 _TEXT:0139
+L0074				  Near	 _TEXT:013D
+L007C				  Near	 _TEXT:0145
+L007D				  Near	 _TEXT:0146
+L0080				  Number 0080
+L00B8				  Near	 _TEXT:0162
+L00BA				  Near	 _TEXT:0164
+L00BE				  Near	 _TEXT:0168
+L00C0				  Near	 _TEXT:016A
+L00C8				  Near	 _TEXT:0178
+L00CB				  Near	 _TEXT:017B
+L00CC				  Near	 _TEXT:017C
+L00CE				  Near	 _TEXT:017E
+L00D0				  Near	 _TEXT:0180
+L00D2				  Near	 _TEXT:0181
+L00D4				  Near	 _TEXT:0183
+L00D6				  Near	 _TEXT:0185
+L00D8				  Near	 _TEXT:0187
+L00DC				  Near	 _TEXT:0188
+L00DE				  Near	 _TEXT:0189
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 77
+Symbol Table
+
+
+
+L00E0				  Near	 _TEXT:018B
+L00E2				  Near	 _TEXT:018C
+L00E4				  Near	 _TEXT:018E
+L00E6				  Near	 _TEXT:0190
+L00E8				  Near	 _TEXT:0192
+L00E9				  Number _TEXT:0193
+L00EA				  Near	 _TEXT:0194
+L00EC				  Near	 _TEXT:0196
+L00ED				  Near	 _TEXT:0197
+L00F0				  Near	 _TEXT:0199
+L00F2				  Near	 _TEXT:019B
+L00F4				  Near	 _TEXT:019D
+L00F6				  Near	 _TEXT:019F
+L00F8				  Near	 _TEXT:01A1
+L0100				  Near	 _TEXT:0100
+L0101				  Near	 _TEXT:0101
+L0124				  Near	 _TEXT:01AB
+L0126				  Near	 _TEXT:01AD
+L0153				  Near	 _TEXT:01DA
+L0168				  Near	 _TEXT:01EF
+L0169				  Near	 _TEXT:01F0
+L016B				  Near	 _TEXT:01F2
+L017B				  Near	 _TEXT:0202
+L018B				  Near	 _TEXT:0212
+L019B				  Near	 _TEXT:0222
+L019C				  Near	 _TEXT:0223
+L019D				  Near	 _TEXT:0224
+L019E				  Near	 _TEXT:0225
+L019F				  Near	 _TEXT:0226
+L01A0				  Near	 _TEXT:0227
+L01A2				  Near	 _TEXT:0229
+L01A8				  Near	 _TEXT:022F
+L01AE				  Near	 _TEXT:0235
+L01B4				  Near	 _TEXT:023B
+L01BA				  Near	 _TEXT:0241
+L01BC				  Near	 _TEXT:0243
+L01C2				  Near	 _TEXT:0249
+L01C8				  Near	 _TEXT:024F
+L01CE				  Near	 _TEXT:0255
+L01D0				  Near	 _TEXT:0257
+L01D4				  Near	 _TEXT:025B
+L01E1				  Near	 _TEXT:0268
+L01E8				  Near	 _TEXT:026F
+L01EE				  Near	 _TEXT:0275
+L01FA				  Near	 _TEXT:0281
+L0200				  Near	 _TEXT:0287
+L0204				  Near	 _TEXT:028B
+L0209				  Near	 _TEXT:0290
+L020B				  Near	 _TEXT:0292
+L020C				  Near	 _TEXT:0293
+L0212				  Near	 _TEXT:0299
+L0213				  Near	 _TEXT:02A5
+L0218				  Near	 _TEXT:029F
+L021D				  Near	 _TEXT:02A7
+L0226				  Near	 _TEXT:02B0
+L0235				  Near	 _TEXT:02BF
+L023E				  Near	 _TEXT:02C8
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 78
+Symbol Table
+
+
+
+L024B				  Near	 _TEXT:02D5
+L0259				  Near	 _TEXT:02E3
+L0262				  Near	 _TEXT:02EC
+L026B				  Near	 _TEXT:02F5
+L027C				  Near	 _TEXT:0306
+L0282				  Near	 _TEXT:030C
+L0284				  Near	 _TEXT:030E
+L0299				  Near	 _TEXT:0323
+L02A2				  Near	 _TEXT:032C
+L02DC				  Near	 _TEXT:0366
+L02EC				  Near	 _TEXT:0376
+L02F3				  Near	 _TEXT:037D
+L02F6				  Near	 _TEXT:0380
+L02FF				  Near	 _TEXT:0389
+L0302				  Near	 _TEXT:038C
+L030A				  Near	 _TEXT:0394
+L0310				  Near	 _TEXT:039A
+L0316				  Near	 _TEXT:03A0
+L0316_OK			  Near	 _TEXT:03AC
+L0320				  Near	 _TEXT:03AE
+L0323				  Near	 _TEXT:03BF
+L0326				  Near	 _TEXT:03C2
+L032A				  Near	 _TEXT:03C6
+L032F				  Near	 _TEXT:03CB
+L0334				  Near	 _TEXT:03D0
+L0339				  Near	 _TEXT:03D5
+L033C				  Near	 _TEXT:03D5
+L035D				  Near	 _TEXT:03F6
+L035D_1				  Near	 _TEXT:03F8
+L035F				  Near	 _TEXT:0406
+L0364				  Near	 _TEXT:040B
+L037A				  Near	 _TEXT:0412
+L03A5				  Near	 _TEXT:043F
+L03A5_L				  Number 0018
+L03BD				  Near	 _TEXT:0457
+L03C9				  Near	 _TEXT:0463
+L03D9				  Near	 _TEXT:0473
+L03E1				  Near	 _TEXT:047B
+L03E8				  Near	 _TEXT:0482
+L03EE				  Near	 _TEXT:0488
+L03F2				  Near	 _TEXT:048C
+L03F8				  Near	 _TEXT:0492
+L03FE				  Near	 _TEXT:0498
+L0406				  Near	 _TEXT:04A0
+L041F				  Near	 _TEXT:04B9
+L0420				  Near	 _TEXT:04BA
+L0421				  Near	 _TEXT:04BB
+L0443				  Near	 _TEXT:04DD
+L0453				  Near	 _TEXT:04ED
+L0458				  Near	 _TEXT:04F2
+L045E				  Near	 _TEXT:04F8
+L046B				  Near	 _TEXT:0505
+L0470				  Near	 _TEXT:050A
+L0476				  Near	 _TEXT:0510
+L0477				  Near	 _TEXT:0511
+L047B				  Near	 _TEXT:0515
+L047D				  Near	 _TEXT:0517
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 79
+Symbol Table
+
+
+
+L0482				  Near	 _TEXT:051C
+L04911				  Number 000E
+L0496				  Near	 _TEXT:0530
+L0498				  Near	 _TEXT:0532
+L04A6				  Near	 _TEXT:0540
+L04AF				  Near	 _TEXT:0549
+L04B4				  Near	 _TEXT:054E
+L04BD				  Near	 _TEXT:0557
+L04BE				  Near	 _TEXT:055F
+L04C8				  Near	 _TEXT:0564
+L04D2				  Near	 _TEXT:056D
+L04D2_D				  Near	 _TEXT:0571
+L0581				  Near	 _TEXT:0572
+L058B				  Near	 _TEXT:057C
+L0591				  Near	 _TEXT:0582
+L0597				  Near	 _TEXT:0588
+L0599				  Near	 _TEXT:058A
+L059B				  Near	 _TEXT:058C
+L05AB				  Near	 _TEXT:059C
+L05B6				  Near	 _TEXT:05A7
+L05BA				  Near	 _TEXT:05AB
+L05CD				  Near	 _TEXT:05BE
+L0612				  Near	 _TEXT:05C2
+L061F				  Near	 _TEXT:05CF
+L06F5				  Near	 _TEXT:05D3
+L0704				  Near	 _TEXT:05E2
+L070B				  Near	 _TEXT:05E9
+L0780				  Near	 _TEXT:05ED
+L0783				  Near	 _TEXT:05F0
+L07C6				  Near	 _TEXT:05F8
+L07E2				  Near	 _TEXT:0614
+L07E3				  Near	 _TEXT:0615
+L07EF				  Near	 _TEXT:0621
+L07F7				  Near	 _TEXT:0629
+L0802				  Near	 _TEXT:0634
+L0804				  Near	 _TEXT:0636
+L0820				  Near	 _TEXT:0652
+L082C				  Near	 _TEXT:065E
+L0837				  Near	 _TEXT:0669
+L09E9				  Near	 _TEXT:06EC
+L09EC				  Near	 _TEXT:06EF
+L0A03				  Near	 _TEXT:06F5
+L0A0D				  Near	 _TEXT:06FF
+L0A14				  Near	 _TEXT:0706
+L0A27				  Near	 _TEXT:0719
+L0A3C				  Near	 _TEXT:072E
+L0A47				  Near	 _TEXT:0739
+L0A5B				  Near	 _TEXT:074D
+L0A65				  Near	 _TEXT:0757
+L0A68				  Near	 _TEXT:075A
+L0A72				  Near	 _TEXT:0764
+L0A75				  Near	 _TEXT:0767
+L0A76				  Near	 _TEXT:0768
+L0A7A				  Near	 _TEXT:076C
+L0A7B				  Near	 _TEXT:076D
+L0A81				  Near	 _TEXT:0773
+L0A88				  Near	 _TEXT:077A
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 80
+Symbol Table
+
+
+
+L0A8F				  Near	 _TEXT:0781
+L0A97				  Near	 _TEXT:0789
+L0ADE				  Near	 _TEXT:07E8
+L0AE1				  Near	 _TEXT:07EB
+L0AE2				  Near	 _TEXT:07EC
+L0AF5				  Near	 _TEXT:0800
+L0B00				  Near	 _TEXT:080B
+L0B3B				  Near	 _TEXT:0860
+L0B47				  Near	 _TEXT:0881
+L0B4D				  Near	 _TEXT:0889
+L0B55				  Near	 _TEXT:0891
+L0B59				  Near	 _TEXT:0895
+L0B70				  Near	 _TEXT:08AD
+L0B72				  Near	 _TEXT:08AF
+L0B7A				  Near	 _TEXT:08B7
+L0B7B				  Near	 _TEXT:08B8
+L0B86				  Near	 _TEXT:08C3
+L0B87				  Near	 _TEXT:08C4
+L0B92				  Near	 _TEXT:08CF
+L0BAC				  Near	 _TEXT:08E9
+L0BC6				  Near	 _TEXT:0903
+L0BDF				  Near	 _TEXT:091C
+L0BE9				  Near	 _TEXT:0926
+L0BF3				  Near	 _TEXT:0930
+L0F73				  Near	 _TEXT:093A
+L0F86				  Near	 _TEXT:094D
+L10031				  Near	 _TEXT:0955
+L1008				  Near	 _TEXT:095A
+L1015				  Near	 _TEXT:0967
+L1027				  Near	 _TEXT:09DD
+L1033				  Near	 _TEXT:09E9
+L1040				  Near	 _TEXT:09F6
+L1044				  Near	 _TEXT:09FA
+L104A				  Near	 _TEXT:0A00
+L104B				  Near	 _TEXT:0A01
+L106B				  Near	 _TEXT:0A21
+L1071				  Near	 _TEXT:0A27
+L1076				  Near	 _TEXT:0A2C
+L107F				  Near	 _TEXT:0A35
+L1086				  Near	 _TEXT:0A3C
+L108F				  Near	 _TEXT:0A45
+L1096				  Near	 _TEXT:0A4C
+L109F				  Near	 _TEXT:0A55
+L10A8				  Near	 _TEXT:0A5E
+L10B1				  Near	 _TEXT:0A67
+L10C5				  Near	 _TEXT:0A7B
+L10CB				  Near	 _TEXT:0A81
+L10D9				  Near	 _TEXT:0A8F
+L10E3				  Near	 _TEXT:0A99
+L10E5				  Near	 _TEXT:0A9B
+L10EB				  Near	 _TEXT:0AA1
+L10F3				  Near	 _TEXT:0AA9
+L10FF				  Near	 _TEXT:0AB5
+L1119				  Near	 _TEXT:0ACF
+L112C				  Near	 _TEXT:0AE2
+L1135				  Near	 _TEXT:0AEB
+L113D				  Near	 _TEXT:0AF3
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 81
+Symbol Table
+
+
+
+L1143				  Near	 _TEXT:0AF9
+L117D				  Near	 _TEXT:0B33
+L1180				  Near	 _TEXT:0B36
+L118D				  Near	 _TEXT:0B43
+L119C				  Near	 _TEXT:0B52
+L11A3				  Near	 _TEXT:0B59
+L11AB				  Near	 _TEXT:0B61
+L11BD				  Near	 _TEXT:0B73
+L11C1				  Near	 _TEXT:0B77
+L11E3				  Near	 _TEXT:0B99
+L11E6				  Near	 _TEXT:0B9C
+L11FC				  Near	 _TEXT:0BB2
+L11FE				  Near	 _TEXT:0BB4
+L1215				  Near	 _TEXT:0BCB
+L121D				  Near	 _TEXT:0BD3
+L121E				  Near	 _TEXT:0BD4
+L1236				  Near	 _TEXT:0BEC
+L1239				  Near	 _TEXT:0BEF
+L1240				  Near	 _TEXT:0BF6
+L1247				  Near	 _TEXT:0BFD
+L1253				  Near	 _TEXT:0C09
+L1266				  Near	 _TEXT:0C1C
+L126E				  Near	 _TEXT:0C24
+L1277				  Near	 _TEXT:0C2D
+L12B3				  Near	 _TEXT:0C69
+L12D6				  Near	 _TEXT:0C8C
+L149B				  Near	 _TEXT:0C93
+L14E8				  Near	 _TEXT:0CA1
+L14EA				  Near	 _TEXT:0CA3
+L14F4				  Near	 _TEXT:0CAD
+L14FD				  Near	 _TEXT:0CB6
+L14FF				  Near	 _TEXT:0CB8
+L1533				  Near	 _TEXT:0CEC
+L153F				  Near	 _TEXT:0CF8
+L1550				  Near	 _TEXT:0D09
+L1556				  Near	 _TEXT:0D0F
+L155A				  Near	 _TEXT:0D13
+L155E				  Near	 _TEXT:0D17
+L1566				  Near	 _TEXT:0D1F
+L156B				  Near	 _TEXT:0D24
+L1595				  Near	 _TEXT:0D50
+L1597				  Near	 _TEXT:0D52
+L15AB				  Near	 _TEXT:0D66
+L15BF				  Near	 _TEXT:0D7A
+L15C9				  Near	 _TEXT:0D84
+L15D2				  Near	 _TEXT:0D8D
+L15DC				  Near	 _TEXT:0D97
+L15E0				  Near	 _TEXT:0D9B
+L15E9				  Near	 _TEXT:0DA4
+L15ED				  Near	 _TEXT:0DA8
+L15F0				  Near	 _TEXT:0DAB
+L15FB				  Near	 _TEXT:0DB6
+L160A				  Near	 _TEXT:0DC5
+L160F				  Near	 _TEXT:0DCA
+L1620				  Near	 _TEXT:0DDB
+L1622				  Near	 _TEXT:0DDD
+L1624				  Near	 _TEXT:0DDF
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 82
+Symbol Table
+
+
+
+L1636				  Near	 _TEXT:0DF1
+L163D				  Near	 _TEXT:0DFA
+L164E				  Near	 _TEXT:0E01
+L164F				  Near	 _TEXT:0E02
+L1670				  Near	 _TEXT:0E23
+L1671				  Near	 _TEXT:0E25
+L16C6				  Near	 _TEXT:0E4B
+L16E4				  Near	 _TEXT:0E69
+L16FD				  Near	 _TEXT:0E82
+L170C				  Near	 _TEXT:0E91
+L1726				  Near	 _TEXT:0EA7
+L1737				  Near	 _TEXT:0EB8
+L1745				  Near	 _TEXT:0EC6
+L1749				  Near	 _TEXT:0ECA
+L1759				  Near	 _TEXT:0EDA
+L1760				  Near	 _TEXT:0EE1
+L176A				  Near	 _TEXT:0EEB
+L176C				  Near	 _TEXT:0EED
+L1779				  Near	 _TEXT:0EFA
+L18A4				  Near	 _TEXT:0F0C
+L18B0				  Near	 _TEXT:0F18
+L19BA				  Near	 _TEXT:0F1E
+L1A26				  Near	 _TEXT:0F3D
+L2016				  Near	 _TEXT:0F43
+L2027				  Near	 _TEXT:0F48
+L202C				  Near	 _TEXT:0F4D
+L2054				  Near	 _TEXT:0F75
+L206C				  Near	 _TEXT:0F8D
+L2075				  Number _TEXT:0F96
+L207A				  Near	 _TEXT:0F9B
+L2088				  Near	 _TEXT:0FA9
+L2093				  Near	 _TEXT:0FB4
+L2097				  Near	 _TEXT:0FB8
+L20A8				  Near	 _TEXT:0FC9
+L20BD				  Near	 _TEXT:0FDE
+L20D4				  Near	 _TEXT:0FF5
+L20DE				  Near	 _TEXT:0FFE
+L20E2				  Near	 _TEXT:---- Extern
+LST				  Near	 _TEXT:0166
+LSTOUTPTR			  Near	 _TEXT:0153
+L_M2				  Near	 _TEXT:06E6
+L_NEG				  Near	 _TEXT:0979
+L_R				  Near	 _TEXT:0989
+L_R_SH				  Near	 _TEXT:0998
+MAGICNUMBER			  Near	 _TEXT:0103
+MSX				  Near	 _TEXT:0000
+MSXDOS				  Number 0005
+MULTREAL1			  Near	 _TEXT:07AC
+MULTREAL2			  Near	 _TEXT:07B3
+MULTREAL3			  Near	 _TEXT:07BE
+OUTPUT				  Near	 _TEXT:016C
+RECURPTR			  Near	 _TEXT:0176
+R_L				  Near	 _TEXT:09AD
+R_L_READY			  Near	 _TEXT:09CB
+R_L_SH				  Near	 _TEXT:09B7
+TAB110100			  Near	 _TEXT:0391
+TURBOPASCALVERSION		  Near	 _TEXT:0107
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 83
+Symbol Table
+
+
+
+USELIB				  Near	 _TEXT:0000
+USRINPTR			  Near	 _TEXT:015F
+USROUTPTR			  Near	 _TEXT:015C
+_AUXINPTR			  Number OFFSET	0177
+_AUXOUTPTR			  Number OFFSET	0174
+_BUFLEN				  Number OFFSET	018C
+_CBREAK				  Number OFFSET	0190
+_CONINPTR			  Number OFFSET	016B
+_CONOUTPTR			  Number OFFSET	016E
+_CONSTPTR			  Number OFFSET	0168
+_DOSERRORHANDLEROFF		  Number OFFSET	2887
+_DOSERRORHANDLERON		  Number OFFSET	2884
+_ERROREXIT			  Number OFFSET	286F
+_ERRORPTR			  Number OFFSET	018D
+_GETERROR_LIB			  Number OFFSET	2703
+_GIOSOK				  Number OFFSET	0581
+_GIOSVER			  Number OFFSET	0582
+_HEAPPTR			  Number OFFSET	0192
+_L00B8				  Number OFFSET	0180
+_L00BA				  Number OFFSET	0182
+_L00BE				  Number OFFSET	0186
+_L00C0				  Number OFFSET	0188
+_L021D				  Number OFFSET	02D0
+_L023E				  Number OFFSET	02F1
+_L0259				  Number OFFSET	030C
+_L0262				  Number OFFSET	0315
+_L026B				  Number OFFSET	031E
+_L0284				  Number OFFSET	0337
+_L0299				  Number OFFSET	034C
+_L030A				  Number OFFSET	03BD
+_L0310				  Number OFFSET	03C3
+_L0364				  Number OFFSET	0420
+_L04D4				  Number OFFSET	06C3
+_L0508				  Number OFFSET	06F4
+_L0522				  Number OFFSET	070E
+_L052C				  Number OFFSET	0717
+_L053A				  Number OFFSET	0725
+_L054D				  Number OFFSET	0738
+_L055D				  Number OFFSET	0748
+_L0581				  Number OFFSET	076C
+_L0591				  Number OFFSET	077C
+_L059B				  Number OFFSET	0786
+_L05D1				  Number OFFSET	07BC
+_L05E2				  Number OFFSET	07CD
+_L0601				  Number OFFSET	07EC
+_L0612				  Number OFFSET	07FD
+_L0623				  Number OFFSET	080E
+_L0638				  Number OFFSET	0823
+_L064C				  Number OFFSET	0837
+_L0656				  Number OFFSET	0841
+_L0666				  Number OFFSET	0851
+_L0676				  Number OFFSET	0861
+_L067F				  Number OFFSET	086A
+_L0688				  Number OFFSET	0889
+_L068D				  Number OFFSET	088F
+_L0692				  Number OFFSET	0895
+_L069B				  Number OFFSET	08A3
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 84
+Symbol Table
+
+
+
+_L06A0				  Number OFFSET	08A8
+_L06A5				  Number OFFSET	08AD
+_L06AE				  Number OFFSET	08BB
+_L06B3				  Number OFFSET	08C0
+_L06B8				  Number OFFSET	08C5
+_L06C2				  Number OFFSET	08D4
+_L06C7				  Number OFFSET	08D9
+_L06CC				  Number OFFSET	08DE
+_L06D6				  Number OFFSET	08ED
+_L06DB				  Number OFFSET	08F2
+_L06E0				  Number OFFSET	08F7
+_L06E9				  Number OFFSET	0905
+_L06EE				  Number OFFSET	090A
+_L06F3				  Number OFFSET	090F
+_L06F5				  Number OFFSET	0911
+_L070F				  Number OFFSET	092B
+_L073B				  Number OFFSET	0999
+_L0745				  Number OFFSET	09A3
+_L074E				  Number OFFSET	09B0
+_L0756				  Number OFFSET	09B8
+_L0780				  Number OFFSET	09E2
+_L0783				  Number OFFSET	09E5
+_L078B				  Number OFFSET	09ED
+_L083D				  Number OFFSET	0D66
+_L086B				  Number OFFSET	0D94
+_L08A3				  Number OFFSET	0DCC
+_L08B2				  Number OFFSET	0DDB
+_L08F3				  Number OFFSET	0E1C
+_L0920				  Number OFFSET	0E49
+_L0996				  Number OFFSET	0EBF
+_L09A2				  Number OFFSET	0ECB
+_L09E9				  Number OFFSET	0F12
+_L09F2				  Number OFFSET	0F1B
+_L09F7				  Number OFFSET	0F20
+_L09FA				  Number OFFSET	0F23
+_L09FF				  Number OFFSET	0F28
+_L0BFD				  Number OFFSET	1171
+_L0C34				  Number OFFSET	11A8
+_L0C46				  Number OFFSET	11BA
+_L0C7F				  Number OFFSET	11F3
+_L0C87				  Number OFFSET	11FB
+_L0D2B				  Number OFFSET	129F
+_L0DB6				  Number OFFSET	132A
+_L0E46				  Number OFFSET	13BA
+_L0FB4				  Number OFFSET	1528
+_L0FD0				  Number OFFSET	1544
+_L0FDE				  Number OFFSET	1552
+_L1008				  Number OFFSET	1581
+_L12DD				  Number OFFSET	18AA
+_L12E1				  Number OFFSET	18AE
+_L12FC				  Number OFFSET	18C9
+_L1300				  Number OFFSET	18CD
+_L1318				  Number OFFSET	18E5
+_L1326				  Number OFFSET	18F3
+_L1333				  Number OFFSET	1900
+_L134F				  Number OFFSET	191C
+_L136F				  Number OFFSET	193C
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 85
+Symbol Table
+
+
+
+_L1370				  Number OFFSET	193D
+_L13FE				  Number OFFSET	19D6
+_L13FF				  Number OFFSET	19D7
+_L1469				  Number OFFSET	1A45
+_L149B				  Number OFFSET	1A77
+_L14A9				  Number OFFSET	1A85
+_L14BA				  Number OFFSET	1A96
+_L14CB				  Number OFFSET	1AA7
+_L14CC				  Number OFFSET	1AAB
+_L1644				  Number OFFSET	1C67
+_L164D				  Number OFFSET	1C70
+_L164E				  Number OFFSET	1C74
+_L1671				  Number OFFSET	1C98
+_L1672				  Number OFFSET	1CBE
+_L168E				  Number OFFSET	1CDA
+_L16AB				  Number OFFSET	1CF7
+_L1722				  Number OFFSET	1D83
+_L1726				  Number OFFSET	1D87
+_L1779				  Number OFFSET	1DDA
+_L178B				  Number OFFSET	1E18
+_L17AA				  Number OFFSET	1E37
+_L17BA				  Number OFFSET	1E47
+_L17CD				  Number OFFSET	1E5A
+_L17D7				  Number OFFSET	1E64
+_L17DC				  Number OFFSET	1E69
+_L17E1				  Number OFFSET	1E6E
+_L17E6				  Number OFFSET	1E73
+_L1810				  Number OFFSET	1E9D
+_L1811				  Number OFFSET	1EA2
+_L187A				  Number OFFSET	1F40
+_L18A4				  Number OFFSET	1F4A
+_L18B6				  Number OFFSET	1F5E
+_L18DC				  Number OFFSET	1F80
+_L19A5				  Number OFFSET	1F8E
+_L19D5				  Number OFFSET	1FBA
+_L1A49				  Number OFFSET	2014
+_L1A55				  Number OFFSET	2028
+_L1A5D				  Number OFFSET	203F
+_L1A6F				  Number OFFSET	2052
+_L1A70				  Number OFFSET	2057
+_L1AB0				  Number OFFSET	20B8
+_L1ABA				  Number OFFSET	20C2
+_L1ABE				  Number OFFSET	20C6
+_L1AED				  Number OFFSET	2192
+_L1AF1				  Number OFFSET	2196
+_L1B6F				  Number OFFSET	21C4
+_L1B93				  Number OFFSET	2213
+_L1BA5				  Number OFFSET	224F
+_L1BEA				  Number OFFSET	227A
+_L1BEB				  Number OFFSET	227E
+_L1CDB				  Number OFFSET	23C6
+_L1CE5				  Number OFFSET	23D0
+_L1D7A				  Number OFFSET	2465
+_L1E3D				  Number OFFSET	2528
+_L1E44				  Number OFFSET	252F
+_L1EA3				  Number OFFSET	258E
+_L1EAB				  Number OFFSET	2596
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 86
+Symbol Table
+
+
+
+_L1EBC				  Number OFFSET	25A8
+_L1EBD				  Number OFFSET	25AC
+_L1EBE				  Number OFFSET	25B0
+_L1EF2				  Number OFFSET	25EC
+_L1EF3				  Number OFFSET	25F0
+_L1EF4				  Number OFFSET	25F4
+_L1F48				  Number OFFSET	2650
+_L1F4E				  Number OFFSET	2656
+_L1F64				  Number OFFSET	266C
+_L1F7D				  Number OFFSET	2685
+_L1F9B				  Number OFFSET	26A3
+_L1FDB				  Number OFFSET	26E3
+_L1FE4				  Number OFFSET	26EC
+_L1FEA				  Number OFFSET	26F2
+_L1FF1				  Number OFFSET	26F9
+_L201B				  Number OFFSET	272A
+_L20D4				  Number OFFSET	27FD
+_L20E2				  Number OFFSET	2E9B
+_LOADRUNOVERLAY			  Number OFFSET	2339
+_LOADRUNOVERLAYREC		  Number OFFSET	232C
+_LST				  Number OFFSET	0184
+_LSTOUTPTR			  Number OFFSET	0171
+_L_ABS				  Number OFFSET	0A61
+_L_ADD				  Number OFFSET	0A74
+_L_AND				  Number OFFSET	0A1E
+_L_DIV				  Number OFFSET	0B16
+_L_EQ				  Number OFFSET	0883
+_L_FOR_DOWNTO			  Number OFFSET	0851
+_L_FOR_TO			  Number OFFSET	0851
+_L_GT				  Number OFFSET	08E8
+_L_GTE				  Number OFFSET	08B6
+_L_LS				  Number OFFSET	0900
+_L_LSE				  Number OFFSET	08CF
+_L_MOD				  Number OFFSET	0B2C
+_L_MUL				  Number OFFSET	0A9A
+_L_NEG				  Number OFFSET	0A64
+_L_NEQ				  Number OFFSET	089E
+_L_NOT				  Number OFFSET	0A54
+_L_OR				  Number OFFSET	0A30
+_L_PRED				  Number OFFSET	0873
+_L_R				  Number OFFSET	15A0
+_L_SHL				  Number OFFSET	0BD5
+_L_SHR				  Number OFFSET	0BF1
+_L_SQR				  Number OFFSET	0A94
+_L_SUB				  Number OFFSET	0A7F
+_L_SUCC				  Number OFFSET	087C
+_L_XOR				  Number OFFSET	0A42
+_MEMMAN				  Number OFFSET	057E
+_MEMMNVER			  Number OFFSET	057F
+_OUTPUT				  Number OFFSET	018A
+_OVERLAYLOADPTR			  Number OFFSET	238E
+_OVERLAYREC1			  Number OFFSET	2301
+_PRT_LONG			  Number OFFSET	1DEC
+_RECURPTR			  Number OFFSET	0194
+_RENAMEFILE_LIB			  Number OFFSET	2225
+_RUNGIOS			  Number OFFSET	057B
+_R_L				  Number OFFSET	15C4
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 87
+Symbol Table
+
+
+
+_TSRPRESENT			  Number OFFSET	052E
+_USRINPTR			  Number OFFSET	017D
+_USROUTPTR			  Number OFFSET	017A
+
+Macro Name
+
+DC
+GLOBAL2
+GLOBALS
+OFF_HL
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0000 Word	  Public  DATA
+_TEXT				  16  1002 Word	  Public  CODE
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:01	    Page 88
+Error Summary
+
+
+
+*Warning* LIBDEFS.INC(38) Global type doesn't match symbol type: L0080
+

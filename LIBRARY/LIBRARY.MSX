@@ -1,0 +1,8 @@
+.PATH.obj=OBJ
+TFLAGS=/m4
+LFLAGS=/s /Tdc
+
+msx_obj\fileio.obj : fileio.mac fileio.inc macros.inc
+                ..\2pc\z80 fileio.mac msx_asm\fileio.asm msx
+                ..\bin\tasmx msx_asm\fileio.asm , msx_obj\fileio.obj $(TFLAGS);
+

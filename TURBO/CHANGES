@@ -1,0 +1,59 @@
+         Veranderingen
+
+- EXTERNAL <expressie>, er wordt nu code gegeneerd voor de external. Deze
+  code evalueert de expressie en voert de code op het berekende adres uit.
+
+- Een procedure of functie mag nu beginnen met een INLINE-statement. Het
+  INLINE-statement moet nu zelf de parameters afvangen en kan b.v. ook
+  meteen doorgaan naar een GIOS routine zonder parameter verlies.
+
+- Er is een variable OverLayPtr gemaakt. Hiermee kan de gebruiker zelf de
+  afhandeling van het inladen van een overlay maken.
+  B.v. OldOverLayPtr:=OverLayPtr;
+       OverLayPtr:=addr(OverLayLoadProcedure);
+
+- BlockRead en BlockWrite syntax:
+  BlockRead (var F: file; var Dest: Type; Num: integer [; var result: integer]);
+  BlockWrite(var F: file; var Dest: Type; Num: integer [; var result: integer]);
+  Dit staat niet in de originele handleiding op pagina 305.
+  Verder geeft de versie zonder 'result' een foutmelding in 'ioresult' op het
+  lezen voorbij het einde en kan een 'write error' geven.
+  De versie met 'result' geeft nooit een foutmelding (behalve een foutmelding
+  vanwege een read of write only file), dit moet de gebruiker maar afvangen.
+
+- File Interface Blocks
+   de lengte van het FCB is van 36 naar 37 gegaan
+
+   Old   New   Beschrijving
+   @+0   @+0   Flags byte
+   @+1   @+1   Character buffer
+   @+2   @+2   Sector buffer pointer (LSB)
+   @+3   @+3   Sector buffer pointer (MSB)
+   @+4   @+4   Number of records (LSB)
+   @+5   @+5   Number of records (MSB)
+   @+6   @+6   Record length (LSB)
+   @+7   @+7   Record length (MSB)
+   @+8   @+8   Current record (LSB)
+   @+9   @+9   Current record (MSB)
+   @+10  @+10  Unused
+   @+11  @+11  Unused
+   @+12  @+12  First byte of CP/M FCB
+   .
+   .
+   @+47  @+48  Last byte of CP/M FCB
+   @+48  @+49  First byte of sector buffer
+   .
+   .
+   @+175 @+176 Last byte of sector buffer
+
+- Het FLUSH commando staat niet in de handleiding.
+
+- De functie IOresult is van het type boolean in de handleiding op pagina 307.
+
+- FAST KeyPressed gemaakt. Deze maakt gebruikt van de begin- en eindpointers
+  van de keyboard buffer.
+
+- FAST character output via CALL CHPUT (CALL 00A2H).
+
+- FAST character input via CALL CHGET (CALL 009FH).
+

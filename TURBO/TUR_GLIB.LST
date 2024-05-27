@@ -1,0 +1,2703 @@
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 1
+msx_asm\tur_glib.ASM
+
+
+
+      1	    0000				  .model small
+      2	    0000				  .code
+      3						  .486 ; .8086
+      4
+      5						  include msx_gen\glib.mc
+1     6	    0000			 MSX:
+1     7
+1     8		  =0005			 MSXDOS	  EQU 5
+1     9
+1    10						  INCLUDE STDIO.INC
+2    11		  =0004			 FIL_HDR  EQU 4			     ; length of FILE header
+2    12
+2    13						  include ..\library\fileio.inc
+3    14
+3    15					 ; FILEIO.MAC global definitions file
+3    16
+3    17						  GLOBAL DOS2Present:NEAR
+3    18						  GLOBAL InitFileIO:NEAR
+3    19						  GLOBAL GetError:NEAR
+3    20						  GLOBAL SetErrorHandler:NEAR
+3    21						  GLOBAL ResErrorHandler:NEAR
+3    22
+3    23						  GLOBAL ParseName:NEAR
+3    24						  GLOBAL SetExtension:NEAR
+3    25
+3    26						  GLOBAL CreateFile:NEAR
+3    27						  GLOBAL OpenFile:NEAR
+3    28						  GLOBAL ReadFile:NEAR
+3    29						  GLOBAL WriteFile:NEAR
+3    30						  GLOBAL CloseFile:NEAR
+3    31						  GLOBAL FileSeek:NEAR
+3    32						  GLOBAL FilePos:NEAR
+3    33						  GLOBAL FileSize:NEAR
+3    34						  GLOBAL DeleteFile:NEAR     ; or subdirectory
+3    35						  GLOBAL RenameFile:NEAR     ; or subdirectory
+3    36						  GLOBAL GetCurrentDirectory:NEAR
+3    37
+3    38						  GLOBAL FatalError:NEAR     ; 0 = no fatal error, NonZero = fatal
+3    39						  GLOBAL ErrorNumber:NEAR    ; 0 = no error, NonZero = DOS 2 error code
+3    40
+3    41		  =0024			 FCB_LEN	   EQU 36	     ; length of an FCB
+3    42
+3    43		  =0000			 FCB_DRIVE	   EQU 0	     ; Drive Number
+3    44		  =0001			 FCB_NAME	   EQU 1	     ; Name
+3    45		  =0009			 FCB_EXT	   EQU 9	     ; Extension
+3    46		  =000E			 FCB_RECSIZE	   EQU 0EH	     ; Record Size (word)
+3    47		  =0010			 FCB_FILESIZE	   EQU 10H	     ; File Size (long)
+3    48		  =0021			 FCB_FILEPOS	   EQU 21H	     ; File Position (long)
+3    49
+3    50
+2    51
+2    52		  =0000			 FIB_F	  EQU 0			     ; Flags byte
+2    53		  =0001			 FIB_CHR  EQU 1			     ; Character buffer
+2    54		  =0002			 FIB_PTR  EQU 2			     ; Sector buffer pointer
+2    55		  =0004			 FIB_NUM  EQU 4			     ; Number of records
+2    56		  =0006			 FIB_REC  EQU 6			     ; Record length
+2    57		  =0008			 FIB_CUR  EQU 8			     ; Current record
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 2
+msx_asm\tur_glib.ASM
+
+
+
+2    58		  =000C			 FIB_FCB  EQU 12		     ; First byte of FCB
+2    59		  =0030			 FIB_BUF  EQU 48		     ; First byte of sector buffer
+2    60
+2    61		  =00B0			 FIB_LEN  EQU FIB_BUF+128	     ; total length of a complete FIB
+2    62
+2    63		  =0000			 DOS_FLG  EQU 0			     ; Flags byte
+2    64		  =0001			 DOS_CHR  EQU 1			     ; Character buffer
+2    65		  =0002			 DOS_PTR  EQU 2			     ; Sector buffer pointer
+2    66		  =0004			 DOS_BLEN EQU 4			     ; Sector buffer length
+2    67		  =0006			 DOS_NUM  EQU 6			     ; Number of records
+2    68		  =000A			 DOS_REC  EQU 10		     ; Record length
+2    69		  =000C			 DOS_CUR  EQU 12		     ; Current record
+2    70		  =0010			 DOS_FCB  EQU 16		     ; First byte FCB/Handle structure
+2    71		  =0051			 DOS_BUF  EQU (16 + 65)		     ; First byte of sector buffer
+2    72
+2    73		  =00D1			 DOS_LEN  EQU (DOS_BUF + 128)
+2    74
+2    75						  include ..\library\macros.inc
+3    76					 OFF_HL	  MACRO	CURRENT,NEW
+3    77						  LOCAL	DIF
+3    78					 DIF	  EQU (NEW)-(CURRENT)
+3    79
+3    80					 IFDEF MSX
+3    81						  IFE DIF-1
+3    82						   DB 23h; INC HL
+3    83						  ELSE
+3    84						   IFE DIF-2
+3    85						    DB 23h; INC	HL
+3    86						    DB 23h; INC	HL
+3    87						   ELSE
+3    88						    IFE	DIF-3
+3    89						     DB	23h; INC HL
+3    90						     DB	23h; INC HL
+3    91						     DB	23h; INC HL
+3    92						    ELSE
+3    93						     IFE DIF+1
+3    94						      DB 2bh; DEC HL
+3    95						     ELSE
+3    96						      IFE DIF+2
+3    97						       DB 2bh; DEC HL
+3    98						       DB 2bh; DEC HL
+3    99						      ELSE
+3   100						       IFE DIF+3
+3   101							DB 2bh;	DEC HL
+3   102							DB 2bh;	DEC HL
+3   103							DB 2bh;	DEC HL
+3   104						       ELSE
+3   105							IFE DIF
+3   106							ELSE
+3   107							 DB 0D5H ; PUSH	DE
+3   108							 DB 11H
+3   109							 DW DIF
+3   110							 DB 19H	 ; ADD HL,DE
+3   111							 DB 0D1H ; POP DE
+3   112							ENDIF
+3   113						       ENDIF
+3   114						      ENDIF
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 3
+msx_asm\tur_glib.ASM
+
+
+
+3   115						     ENDIF
+3   116						    ENDIF
+3   117						   ENDIF
+3   118						  ENDIF
+3   119					 ELSE
+3   120						  IFE DIF-1
+3   121						   INC bx
+3   122						  ELSE
+3   123						   IFE DIF-2
+3   124						    INC	bx
+3   125						    INC	bx
+3   126						   ELSE
+3   127						    IFE	DIF-3
+3   128						     INC bx
+3   129						     INC bx
+3   130						     INC bx
+3   131						    ELSE
+3   132						     IFE DIF+1
+3   133						      DEC bx
+3   134						     ELSE
+3   135						      IFE DIF+2
+3   136						       DEC bx
+3   137						       DEC bx
+3   138						      ELSE
+3   139						       IFE DIF+3
+3   140							DEC bx
+3   141							DEC bx
+3   142							DEC bx
+3   143						       ELSE
+3   144							IFE DIF
+3   145							ELSE
+3   146							 push dx
+3   147							 mov dx,DIF
+3   148							 ADD bx,dx
+3   149							 pop dx
+3   150							ENDIF
+3   151						       ENDIF
+3   152						      ENDIF
+3   153						     ENDIF
+3   154						    ENDIF
+3   155						   ENDIF
+3   156						  ENDIF
+3   157					 ENDIF
+3   158
+3   159						  ENDM
+3   160
+3   161					 dc	 macro string
+3   162
+3   163						 strsize sizestr <string>
+3   164						 pos = 0
+3   165
+3   166						 irpc parameter,string
+3   167							 pos = pos + 1
+3   168
+3   169							 if pos	EQ strsize - 1
+3   170							 db '&parameter' + 80h
+3   171							 endif
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 4
+msx_asm\tur_glib.ASM
+
+
+
+3   172
+3   173							 if pos	GT 1
+3   174								 if pos	LT strsize -1
+3   175									 db '&parameter'
+3   176								 endif
+3   177							 endif
+3   178
+3   179						 endm
+3   180
+3   181						 endm
+3   182
+3   183
+2   184
+1   185
+1   186						  INCLUDE LIBDEFS.INC
+2   187
+2   188
+2   189					 GLOBAL2  MACRO	NAME
+2   190						  GLOBAL NAME :	NEAR
+2   191
+2   192						  IFDEF	MSX
+2   193						  IFDEF	RUNTIME
+2   194						  GLOBAL _&NAME	: NEAR
+2   195					 _&NAME:
+2   196						  ELSE
+2   197							   _&NAME EQU NAME
+2   198						  ENDIF
+2   199						  ELSE
+2   200							   _&NAME EQU NAME
+2   201						  ENDIF
+2   202
+2   203						  ENDM
+2   204
+2   205					 GLOBALS MACRO NAMES
+2   206
+2   207						  IRP NAME,<NAMES>
+2   208							   GLOBAL2 <NAME>
+2   209						  ENDM
+2   210
+2   211						  ENDM
+2   212
+2   213						  GLOBAL L0004:NEAR	     ; def. init.mac
+2   214						  GLOBAL L0006:NEAR	     ; def. init.mac
+2   215						  GLOBAL L005C:NEAR	     ; def. init.mac
+2   216						  GLOBAL L005D:NEAR	     ; def. init.mac
+2   217						  GLOBAL L0065:NEAR	     ; def. init.mac
+2   218						  GLOBAL L0066:NEAR	     ; def. init.mac
+2   219						  GLOBAL L006C:NEAR	     ; def. init.mac
+2   220						  GLOBAL L0080:NEAR	     ; def. init.mac
+2   221						  GLOBAL L00CE:NEAR	     ; def. init.mac
+2   222						  GLOBAL L00E0:NEAR	     ; def. init.mac
+2   223						  GLOBAL L0100:NEAR	     ; def. init.mac
+2   224						  GLOBAL L0101:NEAR	     ; def. init.mac
+2   225						  GLOBAL L0168:NEAR	     ; def. init.mac
+2   226						  GLOBAL L0169:NEAR	     ; def. init.mac
+2   227						  GLOBAL L01AE:NEAR	     ; def. init.mac
+2   228						  GLOBAL L01B4:NEAR	     ; def. init.mac
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 5
+msx_asm\tur_glib.ASM
+
+
+
+2   229						  GLOBAL L01BC:NEAR	     ; def. init.mac
+2   230						  GLOBAL L01D0:NEAR	     ; def. init.mac
+2   231						  GLOBAL L01E1:NEAR	     ; def. init.mac
+2   232						  GLOBAL L01E8:NEAR	     ; def. init.mac
+2   233						  GLOBAL L01FA:NEAR	     ; def. init.mac
+2   234						  GLOBAL L0200:NEAR	     ; def. init.mac
+2   235						  GLOBAL L023E:NEAR	     ; def. init.mac
+2   236						  GLOBAL L0259:NEAR	     ; def. init.mac
+2   237						  GLOBAL L0262:NEAR	     ; def. init.mac
+2   238						  GLOBAL L026B:NEAR	     ; def. init.mac
+2   239						  GLOBAL L0284:NEAR	     ; def. init.mac
+2   240						  GLOBAL L0299:NEAR	     ; def. init.mac
+2   241						  GLOBAL L02A2:NEAR	     ; def. init.mac
+2   242						  GLOBAL L030A:NEAR	     ; def. init.mac
+2   243						  GLOBAL L0310:NEAR	     ; def. init.mac
+2   244						  GLOBAL L0364:NEAR	     ; def. init.mac
+2   245						  GLOBAL L03C9:NEAR	     ; def. init.mac
+2   246						  GLOBAL L03E1:NEAR	     ; def. init.mac
+2   247						  GLOBAL L03EE:NEAR	     ; def. init.mac
+2   248						  GLOBAL L0406:NEAR	     ; def. init.mac
+2   249						  GLOBAL L04A6:NEAR	     ; def. init.mac
+2   250						  GLOBAL L04B4:NEAR	     ; def. init.mac
+2   251						  GLOBAL L04D2:NEAR	     ; def. init.mac
+2   252						  GLOBAL L04AF:NEAR	     ; def. init.mac
+2   253						  GLOBAL L0581:NEAR	     ; def. init.mac
+2   254						  GLOBAL L0591:NEAR	     ; def. init.mac
+2   255						  GLOBAL L059B:NEAR	     ; def. init.mac
+2   256						  GLOBAL L0612:NEAR	     ; def. init.mac
+2   257						  GLOBAL L0783:NEAR	     ; def. init.mac
+2   258						  GLOBAL L07F7:NEAR	     ; def. init.mac
+2   259						  GLOBAL L1008:NEAR	     ; def. init.mac
+2   260						  GLOBAL L11A3:NEAR	     ; def. init.mac
+2   261						  GLOBAL L149B:NEAR	     ; def. init.mac
+2   262						  GLOBAL L14E8:NEAR	     ; def. init.mac
+2   263						  GLOBAL L1726:NEAR	     ; def. init.mac
+2   264						  GLOBAL L20E2:NEAR	     ; def. init.mac
+2   265
+2   266						  GLOBAL CON1OUTPTR:NEAR     ; def. init.mac
+2   267						  GLOBAL CONSTPTR:NEAR	     ; def. init.mac
+2   268						  GLOBAL A2L:NEAR	     ; def. init.mac
+2   269						  GLOBAL L_NEG:NEAR	     ; def. init.mac
+2   270						  GLOBAL L_R:NEAR	     ; def. init.mac
+2   271						  GLOBAL PREFIX:NEAR	     ; def. init.mac
+2   272
+2   273						  GLOBAL DEF_TYPE:NEAR	     ; def. compiler.mac
+2   274						  GLOBAL L72E1:NEAR	     ; def. compiler.mac, no conditon error
+2   275						  GLOBAL L7B5C:NEAR	     ; def. compiler.mac
+2   276						  GLOBAL L7B62:NEAR	     ; def. compiler.mac
+2   277
+2   278						  GLOBAL L7BF5:NEAR	     ; def. end.mac
+2   279
+2   280						  GLOBAL O_BYTE:NEAR,O_CALHL:NEAR,O_CODE:NEAR,O_HL:NEAR
+2   281						  GLOBAL O_JPHL:NEAR,O_LDDE:NEAR,O_LDHL:NEAR,O_PSHHL:NEAR
+2   282
+2   283						  GLOBAL ParseByteVar:NEAR   ; def. glib.mac
+2   284						  GLOBAL ParseIntVar:NEAR    ; def. glib.mac
+2   285						  GLOBAL ParseIntError:NEAR  ; def. glib.mac
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 6
+msx_asm\tur_glib.ASM
+
+
+
+2   286						  GLOBAL ParseStrVAR64:NEAR  ; def. glib.mac
+2   287						  GLOBAL ParseVAR64:NEAR     ; def. glib.mac
+2   288
+2   289						  GLOBAL TableIndex2:NEAR    ; def. compiler.mac
+2   290
+2   291						  ; GIOS Procedures
+2   292						  GLOBAL P_DELETEFILE:NEAR   ; def. glib.mac
+2   293						  GLOBAL P_DEFINEPICTURE:NEAR; def. glib.mac
+2   294						  GLOBAL P_PFILLSHAPE:NEAR   ; def. glib.mac
+2   295						  GLOBAL P_PPAINT:NEAR	     ; def. glib.mac
+2   296						  GLOBAL P_MEMEXPAND:NEAR    ; def. glib.mac
+2   297						  GLOBAL P_MEMTOVRAM:NEAR    ; def. glib.mac
+2   298						  GLOBAL P_MEMLOADPICTURE:NEAR;	def. glib.mac
+2   299						  GLOBAL P_MEMUNCRUNCH:NEAR  ; def. glib.mac
+2   300						  GLOBAL P_MEMSAVEPICTURE:NEAR;	def. glib.mac
+2   301						  GLOBAL P_SETCLIPPING:NEAR  ; def. glib.mac
+2   302						  GLOBAL P_SETVIEWPORT:NEAR  ; def. glib.mac
+2   303						  GLOBAL P_GETVIEWPORT:NEAR  ; def. glib.mac
+2   304						  GLOBAL P_MEMCOPY:NEAR	     ; def. glib.mac
+2   305						  GLOBAL P_BLOAD:NEAR	     ; def. glib.mac
+2   306						  GLOBAL P_BSAVE:NEAR	     ; def. glib.mac
+2   307						  GLOBAL P_CHANGECOLOR:NEAR  ; def. glib.mac
+2   308						  GLOBAL P_CHANGESCREEN:NEAR ; def. glib.mac
+2   309						  GLOBAL P_CIRCLE:NEAR	     ; def. glib.mac
+2   310						  GLOBAL P_CLEARMEM:NEAR     ; def. glib.mac
+2   311						  GLOBAL P_DATE:NEAR	     ; def. glib.mac
+2   312						  GLOBAL P_DISPLAYPAGE:NEAR  ; def. glib.mac
+2   313						  GLOBAL P_ELLIPSE:NEAR	     ; def. glib.mac
+2   314						  GLOBAL P_EXPAND:NEAR	     ; def. glib.mac
+2   315						  GLOBAL P_FASTBOX:NEAR	     ; def. glib.mac
+2   316						  GLOBAL P_FASTCOPY:NEAR     ; def. glib.mac
+2   317						  GLOBAL P_FILLBOX:NEAR	     ; def. glib.mac
+2   318						  GLOBAL P_FILLSHAPE:NEAR    ; def. glib.mac
+2   319						  GLOBAL P_FILLSPRITE:NEAR   ; def. glib.mac
+2   320						  GLOBAL P_GCOPY:NEAR	     ; def. glib.mac
+2   321						  GLOBAL P_GETDOSVERSION:NEAR; def. glib.mac
+2   322						  GLOBAL P_LINE:NEAR	     ; def. glib.mac
+2   323						  GLOBAL P_LOADPICTURE:NEAR  ; def. glib.mac
+2   324						  GLOBAL P_LOADVRAM:NEAR     ; def. glib.mac
+2   325						  GLOBAL P_MEMREADFILE:NEAR  ; def. glib.mac
+2   326						  GLOBAL P_MEMWRITEFILE:NEAR ; def. glib.mac
+2   327						  GLOBAL P_MEMAPPENDFILE:NEAR; def. glib.mac
+2   328						  GLOBAL P_MOVEVRAM:NEAR     ; def. glib.mac
+2   329						  GLOBAL P_PAINT:NEAR	     ; def. glib.mac
+2   330						  GLOBAL P_PSET:NEAR	     ; def. glib.mac
+2   331						  GLOBAL P_PUTSPRITE:NEAR    ; def. glib.mac
+2   332						  GLOBAL P_READMEM:NEAR	     ; def. glib.mac
+2   333						  GLOBAL P_READSECTOR:NEAR   ; def. glib.mac
+2   334						  GLOBAL P_SAVEPICTURE:NEAR  ; def. glib.mac
+2   335						  GLOBAL P_SAVEVRAM:NEAR     ; def. glib.mac
+2   336						  GLOBAL P_SCREEN:NEAR	     ; def. glib.mac
+2   337						  GLOBAL P_SCREENOFF:NEAR    ; def. glib.mac
+2   338						  GLOBAL P_SCREENON:NEAR     ; def. glib.mac
+2   339						  GLOBAL P_SETCHANNEL:NEAR   ; def. glib.mac
+2   340						  GLOBAL P_SOUND:NEAR	     ; def. glib.mac
+2   341						  GLOBAL P_SPRITEATTRIBUTEADDRESS:NEAR	; def. glib.mac
+2   342						  GLOBAL P_SPRITECOLOR:NEAR  ; def. glib.mac
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 7
+msx_asm\tur_glib.ASM
+
+
+
+2   343						  GLOBAL P_SPRITEPATTERN:NEAR; def. glib.mac
+2   344						  GLOBAL P_SPRITEPATTERNADDRESS:NEAR	; def. glib.mac
+2   345						  GLOBAL P_SPRITESIZE:NEAR   ; def. glib.mac
+2   346						  GLOBAL P_SPRITESOFF:NEAR   ; def. glib.mac
+2   347						  GLOBAL P_SPRITESON:NEAR    ; def. glib.mac
+2   348						  GLOBAL P_TIME:NEAR	     ; def. glib.mac
+2   349						  GLOBAL P_UNCRUNCH:NEAR     ; def. glib.mac
+2   350						  GLOBAL P_VPOKE:NEAR	     ; def. glib.mac
+2   351						  GLOBAL P_WAITVDP:NEAR	     ; def. glib.mac
+2   352						  GLOBAL P_WRITEMEM:NEAR     ; def. glib.mac
+2   353						  GLOBAL P_WRITESECTOR:NEAR  ; def. glib.mac
+2   354						  GLOBAL P_WRITEVDP:NEAR     ; def. glib.mac
+2   355
+2   356						  ; GIOS Functions
+2   357						  GLOBAL F_TSRPRESENT:NEAR   ; def. glib.mac
+2   358						  GLOBAL F_GETCLIPPING:NEAR  ; def. glib.mac
+2   359						  GLOBAL F_SIMULATEDDISK:NEAR; def. glib.mac
+2   360						  GLOBAL F_FINDFIRST:NEAR    ; def. glib.mac
+2   361						  GLOBAL F_FINDNEXT:NEAR     ; def. glib.mac
+2   362						  GLOBAL F_GETDRIVE:NEAR     ; def. glib.mac
+2   363						  GLOBAL F_TESTDRIVE:NEAR    ; def. glib.mac
+2   364						  GLOBAL F_GETERROR:NEAR     ; def. glib.mac
+2   365						  GLOBAL F_GETFKEY:NEAR	     ; def. glib.mac
+2   366						  GLOBAL F_GETPAD:NEAR	     ; def. glib.mac
+2   367						  GLOBAL F_GETPDL:NEAR	     ; def. glib.mac
+2   368						  GLOBAL F_GETCHANNEL:NEAR   ; def. glib.mac
+2   369						  GLOBAL F_GETPAGEID:NEAR    ; def. glib.mac
+2   370						  GLOBAL F_POINT:NEAR	     ; def. glib.mac
+2   371						  GLOBAL F_READPSG:NEAR	     ; def. glib.mac
+2   372						  GLOBAL F_READSTATUS:NEAR   ; def. glib.mac
+2   373						  GLOBAL F_READVDP:NEAR	     ; def. glib.mac
+2   374						  GLOBAL F_SEARCH:NEAR	     ; def. glib.mac
+2   375						  GLOBAL F_SETDATE:NEAR	     ; def. glib.mac
+2   376						  GLOBAL F_SETMEM:NEAR	     ; def. glib.mac
+2   377						  GLOBAL F_SETTIME:NEAR	     ; def. glib.mac
+2   378						  GLOBAL F_STICK:NEAR	     ; def. glib.mac
+2   379						  GLOBAL F_STRIG:NEAR	     ; def. glib.mac
+2   380						  GLOBAL F_VPEEK:NEAR	     ; def. glib.mac
+2   381
+2   382
+1   383
+1   384						  INCLUDE LIBCONST.INC
+2   385		  =OFFSET 0177		 _AUXINPTR EQU offset 00177h
+2   386		  =OFFSET 0174		 _AUXOUTPTR EQU	offset 00174h
+2   387		  =OFFSET 018C		 _BUFLEN EQU offset 0018Ch
+2   388		  =OFFSET 0190		 _CBREAK EQU offset 00190h
+2   389		  =OFFSET 016B		 _CONINPTR EQU offset 0016Bh
+2   390		  =OFFSET 016E		 _CONOUTPTR EQU	offset 0016Eh
+2   391		  =OFFSET 0168		 _CONSTPTR EQU offset 00168h
+2   392		  =OFFSET 2887		 _DOSERRORHANDLEROFF EQU offset	02887h
+2   393		  =OFFSET 2884		 _DOSERRORHANDLERON EQU	offset 02884h
+2   394		  =OFFSET 286F		 _ERROREXIT EQU	offset 0286Fh
+2   395		  =OFFSET 018D		 _ERRORPTR EQU offset 0018Dh
+2   396		  =OFFSET 2703		 _GETERROR_LIB EQU offset 02703h
+2   397		  =OFFSET 0581		 _GIOSOK EQU offset 00581h
+2   398		  =OFFSET 0582		 _GIOSVER EQU offset 00582h
+2   399		  =OFFSET 0192		 _HEAPPTR EQU offset 00192h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 8
+msx_asm\tur_glib.ASM
+
+
+
+2   400		  =OFFSET 0180		 _L00B8	EQU offset 00180h
+2   401		  =OFFSET 0182		 _L00BA	EQU offset 00182h
+2   402		  =OFFSET 0186		 _L00BE	EQU offset 00186h
+2   403		  =OFFSET 0188		 _L00C0	EQU offset 00188h
+2   404		  =OFFSET 02D0		 _L021D	EQU offset 002D0h
+2   405		  =OFFSET 02F1		 _L023E	EQU offset 002F1h
+2   406		  =OFFSET 030C		 _L0259	EQU offset 0030Ch
+2   407		  =OFFSET 0315		 _L0262	EQU offset 00315h
+2   408		  =OFFSET 031E		 _L026B	EQU offset 0031Eh
+2   409		  =OFFSET 0337		 _L0284	EQU offset 00337h
+2   410		  =OFFSET 034C		 _L0299	EQU offset 0034Ch
+2   411		  =OFFSET 03BD		 _L030A	EQU offset 003BDh
+2   412		  =OFFSET 03C3		 _L0310	EQU offset 003C3h
+2   413		  =OFFSET 0420		 _L0364	EQU offset 00420h
+2   414		  =OFFSET 06C3		 _L04D4	EQU offset 006C3h
+2   415		  =OFFSET 06F4		 _L0508	EQU offset 006F4h
+2   416		  =OFFSET 070E		 _L0522	EQU offset 0070Eh
+2   417		  =OFFSET 0717		 _L052C	EQU offset 00717h
+2   418		  =OFFSET 0725		 _L053A	EQU offset 00725h
+2   419		  =OFFSET 0738		 _L054D	EQU offset 00738h
+2   420		  =OFFSET 0748		 _L055D	EQU offset 00748h
+2   421		  =OFFSET 076C		 _L0581	EQU offset 0076Ch
+2   422		  =OFFSET 077C		 _L0591	EQU offset 0077Ch
+2   423		  =OFFSET 0786		 _L059B	EQU offset 00786h
+2   424		  =OFFSET 07BC		 _L05D1	EQU offset 007BCh
+2   425		  =OFFSET 07CD		 _L05E2	EQU offset 007CDh
+2   426		  =OFFSET 07EC		 _L0601	EQU offset 007ECh
+2   427		  =OFFSET 07FD		 _L0612	EQU offset 007FDh
+2   428		  =OFFSET 080E		 _L0623	EQU offset 0080Eh
+2   429		  =OFFSET 0823		 _L0638	EQU offset 00823h
+2   430		  =OFFSET 0837		 _L064C	EQU offset 00837h
+2   431		  =OFFSET 0841		 _L0656	EQU offset 00841h
+2   432		  =OFFSET 0851		 _L0666	EQU offset 00851h
+2   433		  =OFFSET 0861		 _L0676	EQU offset 00861h
+2   434		  =OFFSET 086A		 _L067F	EQU offset 0086Ah
+2   435		  =OFFSET 0889		 _L0688	EQU offset 00889h
+2   436		  =OFFSET 088F		 _L068D	EQU offset 0088Fh
+2   437		  =OFFSET 0895		 _L0692	EQU offset 00895h
+2   438		  =OFFSET 08A3		 _L069B	EQU offset 008A3h
+2   439		  =OFFSET 08A8		 _L06A0	EQU offset 008A8h
+2   440		  =OFFSET 08AD		 _L06A5	EQU offset 008ADh
+2   441		  =OFFSET 08BB		 _L06AE	EQU offset 008BBh
+2   442		  =OFFSET 08C0		 _L06B3	EQU offset 008C0h
+2   443		  =OFFSET 08C5		 _L06B8	EQU offset 008C5h
+2   444		  =OFFSET 08D4		 _L06C2	EQU offset 008D4h
+2   445		  =OFFSET 08D9		 _L06C7	EQU offset 008D9h
+2   446		  =OFFSET 08DE		 _L06CC	EQU offset 008DEh
+2   447		  =OFFSET 08ED		 _L06D6	EQU offset 008EDh
+2   448		  =OFFSET 08F2		 _L06DB	EQU offset 008F2h
+2   449		  =OFFSET 08F7		 _L06E0	EQU offset 008F7h
+2   450		  =OFFSET 0905		 _L06E9	EQU offset 00905h
+2   451		  =OFFSET 090A		 _L06EE	EQU offset 0090Ah
+2   452		  =OFFSET 090F		 _L06F3	EQU offset 0090Fh
+2   453		  =OFFSET 0911		 _L06F5	EQU offset 00911h
+2   454		  =OFFSET 092B		 _L070F	EQU offset 0092Bh
+2   455		  =OFFSET 0999		 _L073B	EQU offset 00999h
+2   456		  =OFFSET 09A3		 _L0745	EQU offset 009A3h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 9
+msx_asm\tur_glib.ASM
+
+
+
+2   457		  =OFFSET 09B0		 _L074E	EQU offset 009B0h
+2   458		  =OFFSET 09B8		 _L0756	EQU offset 009B8h
+2   459		  =OFFSET 09E2		 _L0780	EQU offset 009E2h
+2   460		  =OFFSET 09E5		 _L0783	EQU offset 009E5h
+2   461		  =OFFSET 09ED		 _L078B	EQU offset 009EDh
+2   462		  =OFFSET 0D66		 _L083D	EQU offset 00D66h
+2   463		  =OFFSET 0D94		 _L086B	EQU offset 00D94h
+2   464		  =OFFSET 0DCC		 _L08A3	EQU offset 00DCCh
+2   465		  =OFFSET 0DDB		 _L08B2	EQU offset 00DDBh
+2   466		  =OFFSET 0E1C		 _L08F3	EQU offset 00E1Ch
+2   467		  =OFFSET 0E49		 _L0920	EQU offset 00E49h
+2   468		  =OFFSET 0EBF		 _L0996	EQU offset 00EBFh
+2   469		  =OFFSET 0ECB		 _L09A2	EQU offset 00ECBh
+2   470		  =OFFSET 0F12		 _L09E9	EQU offset 00F12h
+2   471		  =OFFSET 0F1B		 _L09F2	EQU offset 00F1Bh
+2   472		  =OFFSET 0F20		 _L09F7	EQU offset 00F20h
+2   473		  =OFFSET 0F23		 _L09FA	EQU offset 00F23h
+2   474		  =OFFSET 0F28		 _L09FF	EQU offset 00F28h
+2   475		  =OFFSET 1171		 _L0BFD	EQU offset 01171h
+2   476		  =OFFSET 11A8		 _L0C34	EQU offset 011A8h
+2   477		  =OFFSET 11BA		 _L0C46	EQU offset 011BAh
+2   478		  =OFFSET 11F3		 _L0C7F	EQU offset 011F3h
+2   479		  =OFFSET 11FB		 _L0C87	EQU offset 011FBh
+2   480		  =OFFSET 129F		 _L0D2B	EQU offset 0129Fh
+2   481		  =OFFSET 132A		 _L0DB6	EQU offset 0132Ah
+2   482		  =OFFSET 13BA		 _L0E46	EQU offset 013BAh
+2   483		  =OFFSET 1528		 _L0FB4	EQU offset 01528h
+2   484		  =OFFSET 1544		 _L0FD0	EQU offset 01544h
+2   485		  =OFFSET 1552		 _L0FDE	EQU offset 01552h
+2   486		  =OFFSET 1581		 _L1008	EQU offset 01581h
+2   487		  =OFFSET 18AA		 _L12DD	EQU offset 018AAh
+2   488		  =OFFSET 18AE		 _L12E1	EQU offset 018AEh
+2   489		  =OFFSET 18C9		 _L12FC	EQU offset 018C9h
+2   490		  =OFFSET 18CD		 _L1300	EQU offset 018CDh
+2   491		  =OFFSET 18E5		 _L1318	EQU offset 018E5h
+2   492		  =OFFSET 18F3		 _L1326	EQU offset 018F3h
+2   493		  =OFFSET 1900		 _L1333	EQU offset 01900h
+2   494		  =OFFSET 191C		 _L134F	EQU offset 0191Ch
+2   495		  =OFFSET 193C		 _L136F	EQU offset 0193Ch
+2   496		  =OFFSET 193D		 _L1370	EQU offset 0193Dh
+2   497		  =OFFSET 19D6		 _L13FE	EQU offset 019D6h
+2   498		  =OFFSET 19D7		 _L13FF	EQU offset 019D7h
+2   499		  =OFFSET 1A45		 _L1469	EQU offset 01A45h
+2   500		  =OFFSET 1A77		 _L149B	EQU offset 01A77h
+2   501		  =OFFSET 1A85		 _L14A9	EQU offset 01A85h
+2   502		  =OFFSET 1A96		 _L14BA	EQU offset 01A96h
+2   503		  =OFFSET 1AA7		 _L14CB	EQU offset 01AA7h
+2   504		  =OFFSET 1AAB		 _L14CC	EQU offset 01AABh
+2   505		  =OFFSET 1C67		 _L1644	EQU offset 01C67h
+2   506		  =OFFSET 1C70		 _L164D	EQU offset 01C70h
+2   507		  =OFFSET 1C74		 _L164E	EQU offset 01C74h
+2   508		  =OFFSET 1C98		 _L1671	EQU offset 01C98h
+2   509		  =OFFSET 1CBE		 _L1672	EQU offset 01CBEh
+2   510		  =OFFSET 1CDA		 _L168E	EQU offset 01CDAh
+2   511		  =OFFSET 1CF7		 _L16AB	EQU offset 01CF7h
+2   512		  =OFFSET 1D83		 _L1722	EQU offset 01D83h
+2   513		  =OFFSET 1D87		 _L1726	EQU offset 01D87h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 10
+msx_asm\tur_glib.ASM
+
+
+
+2   514		  =OFFSET 1DDA		 _L1779	EQU offset 01DDAh
+2   515		  =OFFSET 1E18		 _L178B	EQU offset 01E18h
+2   516		  =OFFSET 1E37		 _L17AA	EQU offset 01E37h
+2   517		  =OFFSET 1E47		 _L17BA	EQU offset 01E47h
+2   518		  =OFFSET 1E5A		 _L17CD	EQU offset 01E5Ah
+2   519		  =OFFSET 1E64		 _L17D7	EQU offset 01E64h
+2   520		  =OFFSET 1E69		 _L17DC	EQU offset 01E69h
+2   521		  =OFFSET 1E6E		 _L17E1	EQU offset 01E6Eh
+2   522		  =OFFSET 1E73		 _L17E6	EQU offset 01E73h
+2   523		  =OFFSET 1E9D		 _L1810	EQU offset 01E9Dh
+2   524		  =OFFSET 1EA2		 _L1811	EQU offset 01EA2h
+2   525		  =OFFSET 1F40		 _L187A	EQU offset 01F40h
+2   526		  =OFFSET 1F4A		 _L18A4	EQU offset 01F4Ah
+2   527		  =OFFSET 1F5E		 _L18B6	EQU offset 01F5Eh
+2   528		  =OFFSET 1F80		 _L18DC	EQU offset 01F80h
+2   529		  =OFFSET 1F8E		 _L19A5	EQU offset 01F8Eh
+2   530		  =OFFSET 1FBA		 _L19D5	EQU offset 01FBAh
+2   531		  =OFFSET 2014		 _L1A49	EQU offset 02014h
+2   532		  =OFFSET 2028		 _L1A55	EQU offset 02028h
+2   533		  =OFFSET 203F		 _L1A5D	EQU offset 0203Fh
+2   534		  =OFFSET 2052		 _L1A6F	EQU offset 02052h
+2   535		  =OFFSET 2057		 _L1A70	EQU offset 02057h
+2   536		  =OFFSET 20B8		 _L1AB0	EQU offset 020B8h
+2   537		  =OFFSET 20C2		 _L1ABA	EQU offset 020C2h
+2   538		  =OFFSET 20C6		 _L1ABE	EQU offset 020C6h
+2   539		  =OFFSET 2192		 _L1AED	EQU offset 02192h
+2   540		  =OFFSET 2196		 _L1AF1	EQU offset 02196h
+2   541		  =OFFSET 21C4		 _L1B6F	EQU offset 021C4h
+2   542		  =OFFSET 2213		 _L1B93	EQU offset 02213h
+2   543		  =OFFSET 224F		 _L1BA5	EQU offset 0224Fh
+2   544		  =OFFSET 227A		 _L1BEA	EQU offset 0227Ah
+2   545		  =OFFSET 227E		 _L1BEB	EQU offset 0227Eh
+2   546		  =OFFSET 23C6		 _L1CDB	EQU offset 023C6h
+2   547		  =OFFSET 23D0		 _L1CE5	EQU offset 023D0h
+2   548		  =OFFSET 2465		 _L1D7A	EQU offset 02465h
+2   549		  =OFFSET 2528		 _L1E3D	EQU offset 02528h
+2   550		  =OFFSET 252F		 _L1E44	EQU offset 0252Fh
+2   551		  =OFFSET 258E		 _L1EA3	EQU offset 0258Eh
+2   552		  =OFFSET 2596		 _L1EAB	EQU offset 02596h
+2   553		  =OFFSET 25A8		 _L1EBC	EQU offset 025A8h
+2   554		  =OFFSET 25AC		 _L1EBD	EQU offset 025ACh
+2   555		  =OFFSET 25B0		 _L1EBE	EQU offset 025B0h
+2   556		  =OFFSET 25EC		 _L1EF2	EQU offset 025ECh
+2   557		  =OFFSET 25F0		 _L1EF3	EQU offset 025F0h
+2   558		  =OFFSET 25F4		 _L1EF4	EQU offset 025F4h
+2   559		  =OFFSET 2650		 _L1F48	EQU offset 02650h
+2   560		  =OFFSET 2656		 _L1F4E	EQU offset 02656h
+2   561		  =OFFSET 266C		 _L1F64	EQU offset 0266Ch
+2   562		  =OFFSET 2685		 _L1F7D	EQU offset 02685h
+2   563		  =OFFSET 26A3		 _L1F9B	EQU offset 026A3h
+2   564		  =OFFSET 26E3		 _L1FDB	EQU offset 026E3h
+2   565		  =OFFSET 26EC		 _L1FE4	EQU offset 026ECh
+2   566		  =OFFSET 26F2		 _L1FEA	EQU offset 026F2h
+2   567		  =OFFSET 26F9		 _L1FF1	EQU offset 026F9h
+2   568		  =OFFSET 272A		 _L201B	EQU offset 0272Ah
+2   569		  =OFFSET 27FD		 _L20D4	EQU offset 027FDh
+2   570		  =OFFSET 2E9B		 _L20E2	EQU offset 02E9Bh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 11
+msx_asm\tur_glib.ASM
+
+
+
+2   571		  =OFFSET 2339		 _LOADRUNOVERLAY EQU offset 02339h
+2   572		  =OFFSET 232C		 _LOADRUNOVERLAYREC EQU	offset 0232Ch
+2   573		  =OFFSET 0184		 _LST EQU offset 00184h
+2   574		  =OFFSET 0171		 _LSTOUTPTR EQU	offset 00171h
+2   575		  =OFFSET 0A61		 _L_ABS	EQU offset 00A61h
+2   576		  =OFFSET 0A74		 _L_ADD	EQU offset 00A74h
+2   577		  =OFFSET 0A1E		 _L_AND	EQU offset 00A1Eh
+2   578		  =OFFSET 0B16		 _L_DIV	EQU offset 00B16h
+2   579		  =OFFSET 0883		 _L_EQ EQU offset 00883h
+2   580		  =OFFSET 0851		 _L_FOR_DOWNTO EQU offset 00851h
+2   581		  =OFFSET 0851		 _L_FOR_TO EQU offset 00851h
+2   582		  =OFFSET 08E8		 _L_GT EQU offset 008E8h
+2   583		  =OFFSET 08B6		 _L_GTE	EQU offset 008B6h
+2   584		  =OFFSET 0900		 _L_LS EQU offset 00900h
+2   585		  =OFFSET 08CF		 _L_LSE	EQU offset 008CFh
+2   586		  =OFFSET 0B2C		 _L_MOD	EQU offset 00B2Ch
+2   587		  =OFFSET 0A9A		 _L_MUL	EQU offset 00A9Ah
+2   588		  =OFFSET 0A64		 _L_NEG	EQU offset 00A64h
+2   589		  =OFFSET 089E		 _L_NEQ	EQU offset 0089Eh
+2   590		  =OFFSET 0A54		 _L_NOT	EQU offset 00A54h
+2   591		  =OFFSET 0A30		 _L_OR EQU offset 00A30h
+2   592		  =OFFSET 0873		 _L_PRED EQU offset 00873h
+2   593		  =OFFSET 15A0		 _L_R EQU offset 015A0h
+2   594		  =OFFSET 0BD5		 _L_SHL	EQU offset 00BD5h
+2   595		  =OFFSET 0BF1		 _L_SHR	EQU offset 00BF1h
+2   596		  =OFFSET 0A94		 _L_SQR	EQU offset 00A94h
+2   597		  =OFFSET 0A7F		 _L_SUB	EQU offset 00A7Fh
+2   598		  =OFFSET 087C		 _L_SUCC EQU offset 0087Ch
+2   599		  =OFFSET 0A42		 _L_XOR	EQU offset 00A42h
+2   600		  =OFFSET 057E		 _MEMMAN EQU offset 0057Eh
+2   601		  =OFFSET 057F		 _MEMMNVER EQU offset 0057Fh
+2   602		  =OFFSET 018A		 _OUTPUT EQU offset 0018Ah
+2   603		  =OFFSET 238E		 _OVERLAYLOADPTR EQU offset 0238Eh
+2   604		  =OFFSET 2301		 _OVERLAYREC1 EQU offset 02301h
+2   605		  =OFFSET 1DEC		 _PRT_LONG EQU offset 01DECh
+2   606		  =OFFSET 0194		 _RECURPTR EQU offset 00194h
+2   607		  =OFFSET 2225		 _RENAMEFILE_LIB EQU offset 02225h
+2   608		  =OFFSET 057B		 _RUNGIOS EQU offset 0057Bh
+2   609		  =OFFSET 15C4		 _R_L EQU offset 015C4h
+2   610		  =OFFSET 052E		 _TSRPRESENT EQU offset	0052Eh
+2   611		  =OFFSET 017D		 _USRINPTR EQU offset 0017Dh
+2   612		  =OFFSET 017A		 _USROUTPTR EQU	offset 0017Ah
+2   613		  =OFFSET 0168		 _CONSTPTR EQU offset 00168h
+2   614		  =OFFSET 016B		 _CONINPTR EQU offset 0016Bh
+2   615		  =OFFSET 016E		 _CONOUTPTR EQU	offset 0016Eh
+2   616		  =OFFSET 0171		 _LSTOUTPTR EQU	offset 00171h
+2   617		  =OFFSET 0174		 _AUXOUTPTR EQU	offset 00174h
+2   618		  =OFFSET 0177		 _AUXINPTR EQU offset 00177h
+2   619		  =OFFSET 017A		 _USROUTPTR EQU	offset 0017Ah
+2   620		  =OFFSET 017D		 _USRINPTR EQU offset 0017Dh
+2   621		  =OFFSET 0180		 _L00B8	EQU offset 00180h
+2   622		  =OFFSET 0182		 _L00BA	EQU offset 00182h
+2   623		  =OFFSET 0184		 _LST EQU offset 00184h
+2   624		  =OFFSET 0186		 _L00BE	EQU offset 00186h
+2   625		  =OFFSET 0188		 _L00C0	EQU offset 00188h
+2   626		  =OFFSET 018A		 _OUTPUT EQU offset 0018Ah
+2   627		  =OFFSET 018C		 _BUFLEN EQU offset 0018Ch
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 12
+msx_asm\tur_glib.ASM
+
+
+
+2   628		  =OFFSET 018D		 _ERRORPTR EQU offset 0018Dh
+2   629		  =OFFSET 0190		 _CBREAK EQU offset 00190h
+2   630		  =OFFSET 0192		 _HEAPPTR EQU offset 00192h
+2   631		  =OFFSET 0194		 _RECURPTR EQU offset 00194h
+2   632		  =OFFSET 02D0		 _L021D	EQU offset 002D0h
+2   633		  =OFFSET 02F1		 _L023E	EQU offset 002F1h
+2   634		  =OFFSET 030C		 _L0259	EQU offset 0030Ch
+2   635		  =OFFSET 0315		 _L0262	EQU offset 00315h
+2   636		  =OFFSET 031E		 _L026B	EQU offset 0031Eh
+2   637		  =OFFSET 0337		 _L0284	EQU offset 00337h
+2   638		  =OFFSET 034C		 _L0299	EQU offset 0034Ch
+2   639		  =OFFSET 03BD		 _L030A	EQU offset 003BDh
+2   640		  =OFFSET 03C3		 _L0310	EQU offset 003C3h
+2   641		  =OFFSET 0420		 _L0364	EQU offset 00420h
+2   642		  =OFFSET 052E		 _TSRPRESENT EQU offset	0052Eh
+2   643		  =OFFSET 057B		 _RUNGIOS EQU offset 0057Bh
+2   644		  =OFFSET 057E		 _MEMMAN EQU offset 0057Eh
+2   645		  =OFFSET 057F		 _MEMMNVER EQU offset 0057Fh
+2   646		  =OFFSET 0581		 _GIOSOK EQU offset 00581h
+2   647		  =OFFSET 0582		 _GIOSVER EQU offset 00582h
+2   648		  =OFFSET 06C3		 _L04D4	EQU offset 006C3h
+2   649		  =OFFSET 06F4		 _L0508	EQU offset 006F4h
+2   650		  =OFFSET 070E		 _L0522	EQU offset 0070Eh
+2   651		  =OFFSET 0717		 _L052C	EQU offset 00717h
+2   652		  =OFFSET 0725		 _L053A	EQU offset 00725h
+2   653		  =OFFSET 0738		 _L054D	EQU offset 00738h
+2   654		  =OFFSET 0748		 _L055D	EQU offset 00748h
+2   655		  =OFFSET 076C		 _L0581	EQU offset 0076Ch
+2   656		  =OFFSET 077C		 _L0591	EQU offset 0077Ch
+2   657		  =OFFSET 0786		 _L059B	EQU offset 00786h
+2   658		  =OFFSET 07BC		 _L05D1	EQU offset 007BCh
+2   659		  =OFFSET 07CD		 _L05E2	EQU offset 007CDh
+2   660		  =OFFSET 07EC		 _L0601	EQU offset 007ECh
+2   661		  =OFFSET 07FD		 _L0612	EQU offset 007FDh
+2   662		  =OFFSET 080E		 _L0623	EQU offset 0080Eh
+2   663		  =OFFSET 0823		 _L0638	EQU offset 00823h
+2   664		  =OFFSET 0837		 _L064C	EQU offset 00837h
+2   665		  =OFFSET 0841		 _L0656	EQU offset 00841h
+2   666		  =OFFSET 0851		 _L_FOR_TO EQU offset 00851h
+2   667		  =OFFSET 0851		 _L0666	EQU offset 00851h
+2   668		  =OFFSET 0851		 _L_FOR_DOWNTO EQU offset 00851h
+2   669		  =OFFSET 0861		 _L0676	EQU offset 00861h
+2   670		  =OFFSET 086A		 _L067F	EQU offset 0086Ah
+2   671		  =OFFSET 0873		 _L_PRED EQU offset 00873h
+2   672		  =OFFSET 087C		 _L_SUCC EQU offset 0087Ch
+2   673		  =OFFSET 0883		 _L_EQ EQU offset 00883h
+2   674		  =OFFSET 0889		 _L0688	EQU offset 00889h
+2   675		  =OFFSET 088F		 _L068D	EQU offset 0088Fh
+2   676		  =OFFSET 0895		 _L0692	EQU offset 00895h
+2   677		  =OFFSET 089E		 _L_NEQ	EQU offset 0089Eh
+2   678		  =OFFSET 08A3		 _L069B	EQU offset 008A3h
+2   679		  =OFFSET 08A8		 _L06A0	EQU offset 008A8h
+2   680		  =OFFSET 08AD		 _L06A5	EQU offset 008ADh
+2   681		  =OFFSET 08B6		 _L_GTE	EQU offset 008B6h
+2   682		  =OFFSET 08BB		 _L06AE	EQU offset 008BBh
+2   683		  =OFFSET 08C0		 _L06B3	EQU offset 008C0h
+2   684		  =OFFSET 08C5		 _L06B8	EQU offset 008C5h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 13
+msx_asm\tur_glib.ASM
+
+
+
+2   685		  =OFFSET 08CF		 _L_LSE	EQU offset 008CFh
+2   686		  =OFFSET 08D4		 _L06C2	EQU offset 008D4h
+2   687		  =OFFSET 08D9		 _L06C7	EQU offset 008D9h
+2   688		  =OFFSET 08DE		 _L06CC	EQU offset 008DEh
+2   689		  =OFFSET 08E8		 _L_GT EQU offset 008E8h
+2   690		  =OFFSET 08ED		 _L06D6	EQU offset 008EDh
+2   691		  =OFFSET 08F2		 _L06DB	EQU offset 008F2h
+2   692		  =OFFSET 08F7		 _L06E0	EQU offset 008F7h
+2   693		  =OFFSET 0900		 _L_LS EQU offset 00900h
+2   694		  =OFFSET 0905		 _L06E9	EQU offset 00905h
+2   695		  =OFFSET 090A		 _L06EE	EQU offset 0090Ah
+2   696		  =OFFSET 090F		 _L06F3	EQU offset 0090Fh
+2   697		  =OFFSET 0911		 _L06F5	EQU offset 00911h
+2   698		  =OFFSET 092B		 _L070F	EQU offset 0092Bh
+2   699		  =OFFSET 0999		 _L073B	EQU offset 00999h
+2   700		  =OFFSET 09A3		 _L0745	EQU offset 009A3h
+2   701		  =OFFSET 09B0		 _L074E	EQU offset 009B0h
+2   702		  =OFFSET 09B8		 _L0756	EQU offset 009B8h
+2   703		  =OFFSET 09E2		 _L0780	EQU offset 009E2h
+2   704		  =OFFSET 09E5		 _L0783	EQU offset 009E5h
+2   705		  =OFFSET 09ED		 _L078B	EQU offset 009EDh
+2   706		  =OFFSET 0A1E		 _L_AND	EQU offset 00A1Eh
+2   707		  =OFFSET 0A30		 _L_OR EQU offset 00A30h
+2   708		  =OFFSET 0A42		 _L_XOR	EQU offset 00A42h
+2   709		  =OFFSET 0A54		 _L_NOT	EQU offset 00A54h
+2   710		  =OFFSET 0A61		 _L_ABS	EQU offset 00A61h
+2   711		  =OFFSET 0A64		 _L_NEG	EQU offset 00A64h
+2   712		  =OFFSET 0A74		 _L_ADD	EQU offset 00A74h
+2   713		  =OFFSET 0A7F		 _L_SUB	EQU offset 00A7Fh
+2   714		  =OFFSET 0A94		 _L_SQR	EQU offset 00A94h
+2   715		  =OFFSET 0A9A		 _L_MUL	EQU offset 00A9Ah
+2   716		  =OFFSET 0B16		 _L_DIV	EQU offset 00B16h
+2   717		  =OFFSET 0B2C		 _L_MOD	EQU offset 00B2Ch
+2   718		  =OFFSET 0BD5		 _L_SHL	EQU offset 00BD5h
+2   719		  =OFFSET 0BF1		 _L_SHR	EQU offset 00BF1h
+2   720		  =OFFSET 0D66		 _L083D	EQU offset 00D66h
+2   721		  =OFFSET 0D94		 _L086B	EQU offset 00D94h
+2   722		  =OFFSET 0DCC		 _L08A3	EQU offset 00DCCh
+2   723		  =OFFSET 0DDB		 _L08B2	EQU offset 00DDBh
+2   724		  =OFFSET 0E1C		 _L08F3	EQU offset 00E1Ch
+2   725		  =OFFSET 0E49		 _L0920	EQU offset 00E49h
+2   726		  =OFFSET 0EBF		 _L0996	EQU offset 00EBFh
+2   727		  =OFFSET 0ECB		 _L09A2	EQU offset 00ECBh
+2   728		  =OFFSET 0F12		 _L09E9	EQU offset 00F12h
+2   729		  =OFFSET 0F1B		 _L09F2	EQU offset 00F1Bh
+2   730		  =OFFSET 0F20		 _L09F7	EQU offset 00F20h
+2   731		  =OFFSET 0F23		 _L09FA	EQU offset 00F23h
+2   732		  =OFFSET 0F28		 _L09FF	EQU offset 00F28h
+2   733		  =OFFSET 1171		 _L0BFD	EQU offset 01171h
+2   734		  =OFFSET 11A8		 _L0C34	EQU offset 011A8h
+2   735		  =OFFSET 11BA		 _L0C46	EQU offset 011BAh
+2   736		  =OFFSET 11F3		 _L0C7F	EQU offset 011F3h
+2   737		  =OFFSET 11FB		 _L0C87	EQU offset 011FBh
+2   738		  =OFFSET 129F		 _L0D2B	EQU offset 0129Fh
+2   739		  =OFFSET 132A		 _L0DB6	EQU offset 0132Ah
+2   740		  =OFFSET 13BA		 _L0E46	EQU offset 013BAh
+2   741		  =OFFSET 1528		 _L0FB4	EQU offset 01528h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 14
+msx_asm\tur_glib.ASM
+
+
+
+2   742		  =OFFSET 1544		 _L0FD0	EQU offset 01544h
+2   743		  =OFFSET 1552		 _L0FDE	EQU offset 01552h
+2   744		  =OFFSET 1581		 _L1008	EQU offset 01581h
+2   745		  =OFFSET 15A0		 _L_R EQU offset 015A0h
+2   746		  =OFFSET 15C4		 _R_L EQU offset 015C4h
+2   747		  =OFFSET 18AA		 _L12DD	EQU offset 018AAh
+2   748		  =OFFSET 18AE		 _L12E1	EQU offset 018AEh
+2   749		  =OFFSET 18C9		 _L12FC	EQU offset 018C9h
+2   750		  =OFFSET 18CD		 _L1300	EQU offset 018CDh
+2   751		  =OFFSET 18E5		 _L1318	EQU offset 018E5h
+2   752		  =OFFSET 18F3		 _L1326	EQU offset 018F3h
+2   753		  =OFFSET 1900		 _L1333	EQU offset 01900h
+2   754		  =OFFSET 191C		 _L134F	EQU offset 0191Ch
+2   755		  =OFFSET 193C		 _L136F	EQU offset 0193Ch
+2   756		  =OFFSET 193D		 _L1370	EQU offset 0193Dh
+2   757		  =OFFSET 19D6		 _L13FE	EQU offset 019D6h
+2   758		  =OFFSET 19D7		 _L13FF	EQU offset 019D7h
+2   759		  =OFFSET 1A45		 _L1469	EQU offset 01A45h
+2   760		  =OFFSET 1A77		 _L149B	EQU offset 01A77h
+2   761		  =OFFSET 1A85		 _L14A9	EQU offset 01A85h
+2   762		  =OFFSET 1A96		 _L14BA	EQU offset 01A96h
+2   763		  =OFFSET 1AA7		 _L14CB	EQU offset 01AA7h
+2   764		  =OFFSET 1AAB		 _L14CC	EQU offset 01AABh
+2   765		  =OFFSET 1C67		 _L1644	EQU offset 01C67h
+2   766		  =OFFSET 1C70		 _L164D	EQU offset 01C70h
+2   767		  =OFFSET 1C74		 _L164E	EQU offset 01C74h
+2   768		  =OFFSET 1C98		 _L1671	EQU offset 01C98h
+2   769		  =OFFSET 1CBE		 _L1672	EQU offset 01CBEh
+2   770		  =OFFSET 1CDA		 _L168E	EQU offset 01CDAh
+2   771		  =OFFSET 1CF7		 _L16AB	EQU offset 01CF7h
+2   772		  =OFFSET 1D83		 _L1722	EQU offset 01D83h
+2   773		  =OFFSET 1D87		 _L1726	EQU offset 01D87h
+2   774		  =OFFSET 1DDA		 _L1779	EQU offset 01DDAh
+2   775		  =OFFSET 1DEC		 _PRT_LONG EQU offset 01DECh
+2   776		  =OFFSET 1E18		 _L178B	EQU offset 01E18h
+2   777		  =OFFSET 1E37		 _L17AA	EQU offset 01E37h
+2   778		  =OFFSET 1E47		 _L17BA	EQU offset 01E47h
+2   779		  =OFFSET 1E5A		 _L17CD	EQU offset 01E5Ah
+2   780		  =OFFSET 1E64		 _L17D7	EQU offset 01E64h
+2   781		  =OFFSET 1E69		 _L17DC	EQU offset 01E69h
+2   782		  =OFFSET 1E6E		 _L17E1	EQU offset 01E6Eh
+2   783		  =OFFSET 1E73		 _L17E6	EQU offset 01E73h
+2   784		  =OFFSET 1E9D		 _L1810	EQU offset 01E9Dh
+2   785		  =OFFSET 1EA2		 _L1811	EQU offset 01EA2h
+2   786		  =OFFSET 1F40		 _L187A	EQU offset 01F40h
+2   787		  =OFFSET 1F4A		 _L18A4	EQU offset 01F4Ah
+2   788		  =OFFSET 1F5E		 _L18B6	EQU offset 01F5Eh
+2   789		  =OFFSET 1F80		 _L18DC	EQU offset 01F80h
+2   790		  =OFFSET 1F8E		 _L19A5	EQU offset 01F8Eh
+2   791		  =OFFSET 1FBA		 _L19D5	EQU offset 01FBAh
+2   792		  =OFFSET 2014		 _L1A49	EQU offset 02014h
+2   793		  =OFFSET 2028		 _L1A55	EQU offset 02028h
+2   794		  =OFFSET 203F		 _L1A5D	EQU offset 0203Fh
+2   795		  =OFFSET 2052		 _L1A6F	EQU offset 02052h
+2   796		  =OFFSET 2057		 _L1A70	EQU offset 02057h
+2   797		  =OFFSET 20B8		 _L1AB0	EQU offset 020B8h
+2   798		  =OFFSET 20C2		 _L1ABA	EQU offset 020C2h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 15
+msx_asm\tur_glib.ASM
+
+
+
+2   799		  =OFFSET 20C6		 _L1ABE	EQU offset 020C6h
+2   800		  =OFFSET 2192		 _L1AED	EQU offset 02192h
+2   801		  =OFFSET 2196		 _L1AF1	EQU offset 02196h
+2   802		  =OFFSET 21C4		 _L1B6F	EQU offset 021C4h
+2   803		  =OFFSET 2213		 _L1B93	EQU offset 02213h
+2   804		  =OFFSET 2225		 _RENAMEFILE_LIB EQU offset 02225h
+2   805		  =OFFSET 224F		 _L1BA5	EQU offset 0224Fh
+2   806		  =OFFSET 227A		 _L1BEA	EQU offset 0227Ah
+2   807		  =OFFSET 227E		 _L1BEB	EQU offset 0227Eh
+2   808		  =OFFSET 2301		 _OVERLAYREC1 EQU offset 02301h
+2   809		  =OFFSET 232C		 _LOADRUNOVERLAYREC EQU	offset 0232Ch
+2   810		  =OFFSET 2339		 _LOADRUNOVERLAY EQU offset 02339h
+2   811		  =OFFSET 238E		 _OVERLAYLOADPTR EQU offset 0238Eh
+2   812		  =OFFSET 23C6		 _L1CDB	EQU offset 023C6h
+2   813		  =OFFSET 23D0		 _L1CE5	EQU offset 023D0h
+2   814		  =OFFSET 2465		 _L1D7A	EQU offset 02465h
+2   815		  =OFFSET 2528		 _L1E3D	EQU offset 02528h
+2   816		  =OFFSET 252F		 _L1E44	EQU offset 0252Fh
+2   817		  =OFFSET 258E		 _L1EA3	EQU offset 0258Eh
+2   818		  =OFFSET 2596		 _L1EAB	EQU offset 02596h
+2   819		  =OFFSET 25A8		 _L1EBC	EQU offset 025A8h
+2   820		  =OFFSET 25AC		 _L1EBD	EQU offset 025ACh
+2   821		  =OFFSET 25B0		 _L1EBE	EQU offset 025B0h
+2   822		  =OFFSET 25EC		 _L1EF2	EQU offset 025ECh
+2   823		  =OFFSET 25F0		 _L1EF3	EQU offset 025F0h
+2   824		  =OFFSET 25F4		 _L1EF4	EQU offset 025F4h
+2   825		  =OFFSET 2650		 _L1F48	EQU offset 02650h
+2   826		  =OFFSET 2656		 _L1F4E	EQU offset 02656h
+2   827		  =OFFSET 266C		 _L1F64	EQU offset 0266Ch
+2   828		  =OFFSET 2685		 _L1F7D	EQU offset 02685h
+2   829		  =OFFSET 26A3		 _L1F9B	EQU offset 026A3h
+2   830		  =OFFSET 26E3		 _L1FDB	EQU offset 026E3h
+2   831		  =OFFSET 26EC		 _L1FE4	EQU offset 026ECh
+2   832		  =OFFSET 26F2		 _L1FEA	EQU offset 026F2h
+2   833		  =OFFSET 26F9		 _L1FF1	EQU offset 026F9h
+2   834		  =OFFSET 2703		 _GETERROR_LIB EQU offset 02703h
+2   835		  =OFFSET 272A		 _L201B	EQU offset 0272Ah
+2   836		  =OFFSET 27FD		 _L20D4	EQU offset 027FDh
+2   837		  =OFFSET 286F		 _ERROREXIT EQU	offset 0286Fh
+2   838		  =OFFSET 2884		 _DOSERRORHANDLERON EQU	offset 02884h
+2   839		  =OFFSET 2887		 _DOSERRORHANDLEROFF EQU offset	02887h
+2   840		  =OFFSET 2E9B		 _L20E2	EQU offset 02E9Bh
+2   841
+1   842
+1   843						  EXTRN	L5960		     ; match(')') and gen. 'CALL HL'
+1   844						  EXTRN	L5E97		     ; parse integer expression
+1   845						  EXTRN	L5EB0		     ; parse boolean expression
+1   846						  EXTRN	L5ED0		     ; parse string expression
+1   847						  EXTRN	L5EE8		     ; parse expression, B = expresson type res.
+1   848						  EXTRN	L65DE		     ; parse '(', integer expression and ')'
+1   849						  EXTRN	L5CAD		     ; parse VAR string	variable
+1   850						  EXTRN	L6148		     ; generates code to push a	variable of
+1   851									     ; type given in B
+1   852						  EXTRN	L677F		     ; parse VAR parameter
+1   853						  EXTRN	L6F13		     ; match(','), if present
+1   854						  EXTRN	L6F5E		     ; match(',')
+1   855						  EXTRN	L6F66		     ; match('(')
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 16
+msx_asm\tur_glib.ASM
+
+
+
+1   856						  EXTRN	L6F6E		     ; match(')')
+1   857						  EXTRN	OP_L_I		     ; generate	code to	convert	HL to
+1   858									     ; LONGINT with sign extension
+1   859						  PUBLIC PARSELONG
+1   860
+1   861					 ;	   DB 'GIOS Library'
+1   862
+1   863	    0000			 GENGIOS_BOOLEAN:
+1   864						  ; generate GIOS CALL and return BOOLEAN type
+1   865						  ; in:	   A = entry
+1   866	    0000  06 0B				  DB 06h,0BH		       ; return	BOOLEAN	type
+1   867
+1   868	    0002			 GENGIOS:
+1   869	    0002  67				  DB 67h
+1   870	    0003  2E 3E				  DB 2eh,3EH		       ; opcode: LD A,
+1   871	    0005  CD				  DB 0cdh
+1   872	    0006  0000e				 DW  O_HL
+1   873	    0008  21				  DB 21h
+1   874	    0009  057B				 DW _RUNGIOS
+1   875	    000B  C3				  DB 0c3h
+1   876	    000C  0000e				 DW  O_CALHL
+1   877
+1   878	    000E			 PARSEBYTEVAR:
+1   879						  ; parses a VAR byte variable,	not a VAR integer variable !!
+1   880	    000E  CD				  DB 0cdh
+1   881	    000F  0000e				 DW  L677F		   ; parse VAR parameter
+1   882	    0011  CD				  DB 0cdh
+1   883	    0012  0000e				 DW  O_PSHHL
+1   884	    0014  3A				  DB 3ah
+1   885	    0015  0000e				 DW L7B5C
+1   886	    0017  FE 0A				  DB 0feh, 0AH			   ; type = integer ?
+1   887	    0019  20 05				  DB 20h,(PARSEBYTEERROR)-$-1	    ; jump if not integer
+1   888
+1   889	    001B  3A				  DB 3ah
+1   890	    001C  0000e				 DW L7B62		; A = sizeof var parameter (BYTE/INTEGER)
+1   891	    001E  3D				  DB 3dh
+1   892	    001F  C8				  DB 0c8h		       ; return	if size	= 1
+1   893
+1   894	    0020			 PARSEBYTEERROR:
+1   895	    0020  CD				  DB 0cdh
+1   896	    0021  0000e				 DW  L72E1		   ; no	condition
+1   897	    0023  13				  DB 13H		     ; error 24: Byte variable expected
+1   898
+1   899	    0024			 PARSEINTVAR:
+1   900						  ; parses a VAR integer variable, not a VAR byte variable !!
+1   901	    0024  CD				  DB 0cdh
+1   902	    0025  0000e				 DW  L677F		   ; parse VAR parameter
+1   903	    0027  CD				  DB 0cdh
+1   904	    0028  0000e				 DW  O_PSHHL
+1   905	    002A  3A				  DB 3ah
+1   906	    002B  0000e				 DW L7B5C
+1   907	    002D  FE 0A				  DB 0feh, 0AH			   ; type = integer ?
+1   908	    002F  20 05				  DB 20h,(PARSEINTERROR)-$-1	    ; jump if not integer
+1   909
+1   910	    0031  3A				  DB 3ah
+1   911	    0032  0000e				 DW L7B62		; A = sizeof var parameter (BYTE/INTEGER)
+1   912	    0034  3D				  DB 3dh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 17
+msx_asm\tur_glib.ASM
+
+
+
+1   913	    0035  C0				  DB 0c0h		      ;	return if size >= 2, can only be 2
+1   914
+1   915	    0036			 PARSEINTERROR:
+1   916	    0036  CD				  DB 0cdh
+1   917	    0037  0000e				 DW  L72E1		   ; no	condition
+1   918	    0039  18				  DB 18H		     ; error 24: Integer variable expected
+1   919
+1   920	    003A			 PARSESTRVAR64:
+1   921						  ; parses a VAR string	variable of length 63 +	1
+1   922	    003A  CD				  DB 0cdh
+1   923	    003B  0000e				 DW  L5CAD		   ; parse VAR string variable
+1   924
+1   925	    003D			 PARSEVAR64_L:
+1   926	    003D  3A				  DB 3ah
+1   927	    003E  0000e				 DW L7B62
+1   928	    0040  FE 40				  DB 0feh, 63 +	1		   ; STRING[63]	?
+1   929	    0042  C8				  DB 0c8h
+1   930
+1   931	    0043			 TYPEMISMATCH:
+1   932	    0043  CD				  DB 0cdh
+1   933	    0044  0000e				 DW  L72E1		   ; NonZero --> error
+1   934	    0046  2C				  DB 2CH		     ; error 44: Type mismatch
+1   935
+1   936	    0047			 PARSEVAR64:
+1   937						  ; parse a VAR	parameter of length 64
+1   938	    0047  CD				  DB 0cdh
+1   939	    0048  0000e				 DW  L677F		   ; parse VAR parameter
+1   940	    004A  18 F1				  DB 18h,( PARSEVAR64_L)-$-1
+1   941
+1   942	    004C			 PARSELONG:
+1   943						  ; parse a LONGINT and	REAL with conversion to	a LONGINT
+1   944	    004C  3E 0E				  DB 3eh,0EH		       ; default type =	LONGINT
+1   945	    004E  CD				  DB 0cdh
+1   946	    004F  0000e				 DW  L5EE8		   ; parse expression
+1   947	    0051  78				  DB 78h		     ; A = expression type
+1   948
+1   949	    0052  21				  DB 21h
+1   950	    0053  15C4				 DW _R_L		 ; REAL	to LONGINT conversion
+1   951	    0055  FE 09				  DB 0feh, 09H
+1   952	    0057  28 0B				  DB 28h,(PARSELONG1)-$-1	     ; jump to convert REAL to LONG
+1   953
+1   954	    0059  FE 0E				  DB 0feh, 0EH
+1   955	    005B  28 0A				  DB 28h,(PARSELONG2)-$-1	     ; jump if LONGINT
+1   956
+1   957	    005D  FE 0A				  DB 0feh, 0AH
+1   958	    005F  28 09				  DB 28h,(PARSELONG3)-$-1	     ; jump to convert INTEGER to LONG
+1   959									     ; unsigned	conversion
+1   960
+1   961	    0061  C3				  DB 0c3h
+1   962	    0062  0043r				 DW  TYPEMISMATCH
+1   963
+1   964	    0064			 PARSELONG1:
+1   965	    0064  CD				  DB 0cdh
+1   966	    0065  0000e				 DW  O_CALHL		   ; generate conversion CALL
+1   967
+1   968	    0067			 PARSELONG2:
+1   969	    0067  06 0E				  DB 06h,0Eh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 18
+msx_asm\tur_glib.ASM
+
+
+
+1   970	    0069  C9				  DB 0c9h			 ; 33e
+1   971					 ;	   JP L6148		      ;	generate code to PUSH a	LONGINT
+1   972
+1   973	    006A			 PARSELONG3:
+1   974	    006A  C3				  DB 0c3h
+1   975	    006B  0000e				 DW  OP_L_I		     ; 33e convert signed INTEGER TO LONGINT
+1   976					 ;	   CALL	OP_L_I		      ;	convert	signed INTEGER to LONGINT
+1   977					 ;	   JP L6148		      ;	generate code to PUSH a	LONGINT
+1   978
+1   979	    006D			 PARSEREAL:
+1   980						  ; parse an INTEGER, LONGINT and REAL with conversions	to a REAL
+1   981	    006D  3E FF				  DB 3eh,0FFH		       ; default type =	smart
+1   982	    006F  CD				  DB 0cdh
+1   983	    0070  0000e				 DW  L5EE8		   ; parse expression
+1   984	    0072  78				  DB 78h		     ; A = expression type
+1   985
+1   986	    0073  21				  DB 21h
+1   987	    0074  15A0				 DW _L_R		 ; LONGINT to REAL conversion
+1   988	    0076  FE 0E				  DB 0feh, 0EH			   ; type = LONGINT ?
+1   989	    0078  28 0E				  DB 28h,(PARSEREAL1)-$-1
+1   990
+1   991	    007A  21				  DB 21h
+1   992	    007B  1581				 DW _L1008		 ; INTEGER to REAL conversion
+1   993	    007D  FE 0A				  DB 0feh, 0AH			   ; type = INTEGER ?
+1   994	    007F  28 07				  DB 28h,(PARSEREAL1)-$-1
+1   995
+1   996	    0081  FE 09				  DB 0feh, 09H
+1   997	    0083  28 06				  DB 28h,(PARSEREAL2)-$-1	     ; jump if no conversion needed
+1   998
+1   999	    0085  C3				  DB 0c3h
+1  1000	    0086  0043r				 DW  TYPEMISMATCH
+1  1001
+1  1002	    0088			 PARSEREAL1:
+1  1003	    0088  CD				  DB 0cdh
+1  1004	    0089  0000e				 DW  O_CALHL		   ; generate conversion CALL
+1  1005
+1  1006	    008B			 PARSEREAL2:
+1  1007	    008B  06 09				  DB 06h,9
+1  1008	    008D  C3				  DB 0c3h
+1  1009	    008E  0000e				 DW  L6148		     ; generate	code to	PUSH a REAL
+1  1010
+1  1011						  ; --------------
+1  1012						  ; GIOS Functions
+1  1013						  ; --------------
+1  1014
+1  1015	    0090			 F_TSRPRESENT:
+1  1016						  ; FUNCTION TsrPresent(Str: STRING): BOOLEAN;
+1  1017	    0090  CD				  DB 0cdh
+1  1018	    0091  0000e				 DW  L6F66		   ; match('(')
+1  1019	    0093  CD				  DB 0cdh
+1  1020	    0094  0000e				 DW  L5ED0		   ; parse string expression
+1  1021	    0096  21				  DB 21h
+1  1022	    0097  052E				 DW _TSRPRESENT		 ; LIB entry
+1  1023	    0099  06 0B				  DB 06h,0BH		       ; return	boolean	type
+1  1024	    009B  C3				  DB 0c3h
+1  1025	    009C  0000e				 DW  L5960		     ; match(')'), CALL	HL
+1  1026
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 19
+msx_asm\tur_glib.ASM
+
+
+
+1  1027	    009E			 F_GETCLIPPING:
+1  1028						  ; FUNCTION GetClipping: BOOLEAN;
+1  1029	    009E  3E 38				  DB 3eh,56		       ; GetClipping entry
+1  1030	    00A0  C3				  DB 0c3h
+1  1031	    00A1  0000r				 DW  GENGIOS_BOOLEAN
+1  1032
+1  1033	    00A3			 F_SIMULATEDDISK:
+1  1034						  ; FUNCTION SimulatedDisk(disk: BYTE):	BOOLEAN;
+1  1035	    00A3  CD				  DB 0cdh
+1  1036	    00A4  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1037	    00A6  CD				  DB 0cdh
+1  1038	    00A7  0000e				 DW  O_PSHHL
+1  1039	    00A9  3E 55				  DB 3eh,85		       ; SimulatedDisk entry
+1  1040	    00AB  C3				  DB 0c3h
+1  1041	    00AC  0000r				 DW  GENGIOS_BOOLEAN	     ; GIOS CALL and return BOOLEAN type
+1  1042
+1  1043	    00AE			 F_FINDFIRST:
+1  1044						  ; FUNCTION FindFirst(SearchPathAdres:	STRING;
+1  1045						  ;		       VAR InfoBlock: Type[64];	{ 64 bytes length }
+1  1046						  ;		       VAR Attributes: BYTE;
+1  1047						  ;		       VAR Name: STR63): BOOLEAN;
+1  1048	    00AE  CD				  DB 0cdh
+1  1049	    00AF  0000e				 DW  L6F66		   ; match('(')
+1  1050	    00B1  CD				  DB 0cdh
+1  1051	    00B2  0000e				 DW  L5ED0		   ; parse string expression
+1  1052
+1  1053	    00B4  CD				  DB 0cdh
+1  1054	    00B5  0000e				 DW  L6F5E		   ; match(',')
+1  1055	    00B7  3E 45				  DB 3eh,69
+1  1056	    00B9  F5				  DB 0f5h
+1  1057
+1  1058	    00BA			 F_FINDFIRST1:
+1  1059	    00BA  CD				  DB 0cdh
+1  1060	    00BB  0047r				 DW  PARSEVAR64		   ; parse VAR of 64 bytes length
+1  1061	    00BD  CD				  DB 0cdh
+1  1062	    00BE  0000e				 DW  O_PSHHL		   ; push address of InfoBlock
+1  1063
+1  1064	    00C0  CD				  DB 0cdh
+1  1065	    00C1  0000e				 DW  L6F5E		   ; match(',')
+1  1066	    00C3  CD				  DB 0cdh
+1  1067	    00C4  000Er				 DW  PARSEBYTEVAR	   ; parse VAR byte variable
+1  1068
+1  1069	    00C6  CD				  DB 0cdh
+1  1070	    00C7  0000e				 DW  L6F5E		   ; match(',')
+1  1071
+1  1072	    00C9  CD				  DB 0cdh
+1  1073	    00CA  0000e				 DW  L5CAD		   ; parse VAR string variable
+1  1074
+1  1075	    00CC  3A				  DB 3ah
+1  1076	    00CD  0000e				 DW L7B62
+1  1077	    00CF  FE 0D				  DB 0feh, 12 +	1		   ; STRING[12]	or greater ?
+1  1078	    00D1  DA				  DB 0dah
+1  1079	    00D2  0043r				 DW TYPEMISMATCH	  ; no,	Type Mismatch
+1  1080
+1  1081	    00D4  CD				  DB 0cdh
+1  1082	    00D5  0000e				 DW  O_PSHHL		   ; push address of Name
+1  1083
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 20
+msx_asm\tur_glib.ASM
+
+
+
+1  1084	    00D7  F1				  DB 0f1h
+1  1085
+1  1086	    00D8			 GENGIOS_CL_BOOLEAN:
+1  1087						  ; match(')'),	generate GIOS CALL and return BOOLEAN type
+1  1088						  ; in:	   A = entry
+1  1089	    00D8  F5				  DB 0f5h
+1  1090
+1  1091	    00D9			 GENGIOS_CL_BOOLEAN1:
+1  1092	    00D9  CD				  DB 0cdh
+1  1093	    00DA  0000e				 DW  L6F6E		   ; match(')')
+1  1094	    00DC  F1				  DB 0f1h
+1  1095	    00DD  C3				  DB 0c3h
+1  1096	    00DE  0000r				 DW  GENGIOS_BOOLEAN
+1  1097
+1  1098	    00E0			 F_FINDNEXT:
+1  1099						  ; FUNCTION FindNext(VAR InfoBlok: Type[64];  { 64 bytes length }
+1  1100						  ;		      VAR Attributes: BYTE;
+1  1101						  ;		      VAR Name:	STR63):	BOOLEAN;
+1  1102	    00E0  CD				  DB 0cdh
+1  1103	    00E1  0000e				 DW  L6F66		   ; match('(')
+1  1104
+1  1105	    00E3  3E 46				  DB 3eh,70		       ; FindNext entry
+1  1106	    00E5  F5				  DB 0f5h
+1  1107
+1  1108	    00E6  C3				  DB 0c3h
+1  1109	    00E7  00BAr				 DW  F_FINDFIRST1
+1  1110
+1  1111	    00E9			 F_GETDRIVE:
+1  1112						  ; FUNCTION GetDrive: INTEGER;
+1  1113	    00E9  3E 50				  DB 3eh,80		       ; GetDrive entry
+1  1114	    00EB  06 0A				  DB 06h,0AH		       ; return	INTEGER	type
+1  1115	    00ED  C3				  DB 0c3h
+1  1116	    00EE  0002r				 DW  GENGIOS
+1  1117
+1  1118	    00F0			 F_TESTDRIVE:
+1  1119						  ; FUNCTION TestDrive(Drive: INTEGER):	BOOLEAN;
+1  1120	    00F0  CD				  DB 0cdh
+1  1121	    00F1  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1122	    00F3  CD				  DB 0cdh
+1  1123	    00F4  0000e				 DW  O_PSHHL
+1  1124	    00F6  3E 51				  DB 3eh,81		       ; TestDrive entry
+1  1125	    00F8  06 0B				  DB 06h,0BH		       ; return	BOOLEAN	type
+1  1126	    00FA  C3				  DB 0c3h
+1  1127	    00FB  0000r				 DW  GENGIOS_BOOLEAN
+1  1128
+1  1129	    00FD			 F_GETERROR:
+1  1130						  ; FUNCTION GetError: INTEGER;
+1  1131	    00FD  21				  DB 21h
+1  1132	    00FE  2703				 DW _GETERROR_LIB
+1  1133	    0100  06 0A				  DB 06h,0AH		       ; return	INTEGER	type
+1  1134	    0102  C3				  DB 0c3h
+1  1135	    0103  0000e				 DW  O_CALHL
+1  1136
+1  1137					 ;	   LD A,75		      ;	GetError entry
+1  1138					 ;
+1  1139	    0105			 GENGIOS_INTEGER:
+1  1140	    0105  06 0A				  DB 06h,0AH		       ; return	INTEGER	type
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 21
+msx_asm\tur_glib.ASM
+
+
+
+1  1141	    0107  C3				  DB 0c3h
+1  1142	    0108  0002r				 DW  GENGIOS
+1  1143
+1  1144	    010A			 F_GETFKEY:
+1  1145						  ; FUNCTION GetFKey: INTEGER;
+1  1146	    010A  3E 2E				  DB 3eh,46		       ; GetFKey entry
+1  1147	    010C  C3				  DB 0c3h
+1  1148	    010D  0105r				 DW  GENGIOS_INTEGER
+1  1149
+1  1150	    010F			 F_GETPAD:
+1  1151						  ; FUNCTION GetPad(N: INTEGER): INTEGER;
+1  1152	    010F  CD				  DB 0cdh
+1  1153	    0110  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1154	    0112  CD				  DB 0cdh
+1  1155	    0113  0000e				 DW  O_PSHHL
+1  1156	    0115  3E 35				  DB 3eh,53		       ; GetPad	entry
+1  1157	    0117  C3				  DB 0c3h
+1  1158	    0118  0105r				 DW  GENGIOS_INTEGER
+1  1159
+1  1160	    011A			 F_GETPDL:
+1  1161						  ; FUNCTION GetPdl(N: INTEGER): INTEGER;
+1  1162	    011A  CD				  DB 0cdh
+1  1163	    011B  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1164	    011D  CD				  DB 0cdh
+1  1165	    011E  0000e				 DW  O_PSHHL
+1  1166	    0120  3E 0C				  DB 3eh,12		       ; GetPdl	entry
+1  1167	    0122  C3				  DB 0c3h
+1  1168	    0123  0105r				 DW  GENGIOS_INTEGER
+1  1169
+1  1170	    0125			 F_GETCHANNEL:
+1  1171						  ; FUNCTION GetChannel(Channel: INTEGER): REAL;
+1  1172	    0125  CD				  DB 0cdh
+1  1173	    0126  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1174	    0128  CD				  DB 0cdh
+1  1175	    0129  0000e				 DW  O_PSHHL
+1  1176	    012B  3E 41				  DB 3eh,65		       ; GetChannel entry
+1  1177
+1  1178	    012D			 GENGIOS_REAL:
+1  1179	    012D  06 09				  DB 06h,9
+1  1180	    012F  C3				  DB 0c3h
+1  1181	    0130  0002r				 DW  GENGIOS
+1  1182
+1  1183	    0132			 F_GETPAGEID:
+1  1184						  ; FUNCTION GetPageID(Channel:	INTEGER): INTEGER;
+1  1185	    0132  CD				  DB 0cdh
+1  1186	    0133  0000e				 DW  L65DE		   ;  parse '(', integer expression and	')'
+1  1187	    0135  CD				  DB 0cdh
+1  1188	    0136  0000e				 DW  O_PSHHL
+1  1189	    0138  3E 40				  DB 3eh,64		       ; GetPageID entry
+1  1190	    013A  C3				  DB 0c3h
+1  1191	    013B  0105r				 DW  GENGIOS_INTEGER
+1  1192
+1  1193	    013D			 F_POINT:
+1  1194						  ; FUNCTION Point(X: INTEGER; Y: BYTE): BYTE;
+1  1195	    013D  CD				  DB 0cdh
+1  1196	    013E  0000e				 DW  L6F66		   ; match('(')
+1  1197	    0140  CD				  DB 0cdh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 22
+msx_asm\tur_glib.ASM
+
+
+
+1  1198	    0141  0000e				 DW  L5E97		   ; parse integer expression
+1  1199	    0143  CD				  DB 0cdh
+1  1200	    0144  0000e				 DW  O_PSHHL
+1  1201
+1  1202	    0146  CD				  DB 0cdh
+1  1203	    0147  0000e				 DW  L6F5E		   ; match(',')
+1  1204	    0149  CD				  DB 0cdh
+1  1205	    014A  0000e				 DW  L5E97		   ; parse integer expression
+1  1206	    014C  CD				  DB 0cdh
+1  1207	    014D  0000e				 DW  O_PSHHL
+1  1208
+1  1209	    014F  CD				  DB 0cdh
+1  1210	    0150  0000e				 DW  L6F6E		   ; match(')')
+1  1211	    0152  3E 0E				  DB 3eh,14		       ; Point entry
+1  1212	    0154  C3				  DB 0c3h
+1  1213	    0155  0105r				 DW  GENGIOS_INTEGER
+1  1214
+1  1215	    0157			 F_READPSG:
+1  1216						  ; FUNCTION ReadPSG(Register: BYTE): BYTE;
+1  1217	    0157  CD				  DB 0cdh
+1  1218	    0158  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1219	    015A  CD				  DB 0cdh
+1  1220	    015B  0000e				 DW  O_PSHHL
+1  1221	    015D  3E 34				  DB 3eh,52		       ; ReadPSG entry
+1  1222	    015F  C3				  DB 0c3h
+1  1223	    0160  0105r				 DW  GENGIOS_INTEGER
+1  1224
+1  1225	    0162			 F_READSTATUS:
+1  1226						  ; FUNCTION ReadStatus(Register: BYTE): BYTE;
+1  1227	    0162  CD				  DB 0cdh
+1  1228	    0163  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1229	    0165  CD				  DB 0cdh
+1  1230	    0166  0000e				 DW  O_PSHHL
+1  1231	    0168  3E 03				  DB 3eh,3		       ; ReadStatus entry
+1  1232	    016A  C3				  DB 0c3h
+1  1233	    016B  0105r				 DW  GENGIOS_INTEGER
+1  1234
+1  1235	    016D			 F_READVDP:
+1  1236						  ; FUNCTION ReadVDP(Register: BYTE): BYTE;
+1  1237	    016D  CD				  DB 0cdh
+1  1238	    016E  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1239	    0170  CD				  DB 0cdh
+1  1240	    0171  0000e				 DW  O_PSHHL
+1  1241	    0173  3E 07				  DB 3eh,7		       ; ReadVDP entry
+1  1242	    0175  C3				  DB 0c3h
+1  1243	    0176  0105r				 DW  GENGIOS_INTEGER
+1  1244
+1  1245	    0178			 F_SEARCH:
+1  1246						  ; FUNCTION Search(X,Y,Color,Condition: INTEGER): INTEGER;
+1  1247	    0178  CD				  DB 0cdh
+1  1248	    0179  0000e				 DW  L6F66		   ; match('(')
+1  1249	    017B  CD				  DB 0cdh
+1  1250	    017C  0000e				 DW  L5E97		   ; parse integer expression
+1  1251	    017E  CD				  DB 0cdh
+1  1252	    017F  0000e				 DW  O_PSHHL		   ; push X
+1  1253
+1  1254	    0181  CD				  DB 0cdh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 23
+msx_asm\tur_glib.ASM
+
+
+
+1  1255	    0182  0000e				 DW  L6F5E		   ; match(',')
+1  1256	    0184  CD				  DB 0cdh
+1  1257	    0185  0000e				 DW  L5E97		   ; parse integer expression
+1  1258	    0187  CD				  DB 0cdh
+1  1259	    0188  0000e				 DW  O_PSHHL		   ; push Y
+1  1260
+1  1261	    018A  CD				  DB 0cdh
+1  1262	    018B  0000e				 DW  L6F5E		   ; match(',')
+1  1263	    018D  CD				  DB 0cdh
+1  1264	    018E  0000e				 DW  L5E97		   ; parse integer expression
+1  1265	    0190  CD				  DB 0cdh
+1  1266	    0191  0000e				 DW  O_PSHHL		   ; push Color
+1  1267
+1  1268	    0193  CD				  DB 0cdh
+1  1269	    0194  0000e				 DW  L6F5E		   ; match(',')
+1  1270	    0196  CD				  DB 0cdh
+1  1271	    0197  0000e				 DW  L5E97		   ; parse integer expression
+1  1272	    0199  CD				  DB 0cdh
+1  1273	    019A  0000e				 DW  O_PSHHL		   ; push Condition
+1  1274
+1  1275	    019C  CD				  DB 0cdh
+1  1276	    019D  0000e				 DW  L6F6E		   ; match(')')
+1  1277	    019F  3E 2F				  DB 3eh,47
+1  1278	    01A1  C3				  DB 0c3h
+1  1279	    01A2  0105r				 DW  GENGIOS_INTEGER
+1  1280
+1  1281	    01A4			 F_SETDATE:
+1  1282						  ; FUNCTION SetDate(Year: INTEGER; Month,Day: BYTE): BOOLEAN;
+1  1283	    01A4  3E 3B				  DB 3eh,59
+1  1284
+1  1285	    01A6			 O_INT_INT_INT_C:
+1  1286	    01A6  F5				  DB 0f5h
+1  1287	    01A7  CD				  DB 0cdh
+1  1288	    01A8  0000e				 DW  L6F66		   ; match('(')
+1  1289	    01AA  CD				  DB 0cdh
+1  1290	    01AB  0000e				 DW  L5E97		   ; parse integer expression
+1  1291	    01AD  CD				  DB 0cdh
+1  1292	    01AE  0000e				 DW  O_PSHHL
+1  1293
+1  1294	    01B0  CD				  DB 0cdh
+1  1295	    01B1  0000e				 DW  L6F5E		   ; match(',')
+1  1296	    01B3  CD				  DB 0cdh
+1  1297	    01B4  0000e				 DW  L5E97		   ; parse integer expression
+1  1298	    01B6  CD				  DB 0cdh
+1  1299	    01B7  0000e				 DW  O_PSHHL
+1  1300
+1  1301	    01B9  CD				  DB 0cdh
+1  1302	    01BA  0000e				 DW  L6F5E		   ; match(',')
+1  1303	    01BC  CD				  DB 0cdh
+1  1304	    01BD  0000e				 DW  L5E97		   ; parse integer expression
+1  1305	    01BF  CD				  DB 0cdh
+1  1306	    01C0  0000e				 DW  O_PSHHL
+1  1307
+1  1308	    01C2  CD				  DB 0cdh
+1  1309	    01C3  0000e				 DW  L6F6E		   ; match(')')
+1  1310
+1  1311	    01C5  F1				  DB 0f1h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 24
+msx_asm\tur_glib.ASM
+
+
+
+1  1312	    01C6  C3				  DB 0c3h
+1  1313	    01C7  0000r				 DW  GENGIOS_BOOLEAN
+1  1314
+1  1315	    01C9			 F_SETMEM:
+1  1316						  ; FUNCTION SetMem(Block: INTEGER): INTEGER;
+1  1317	    01C9  CD				  DB 0cdh
+1  1318	    01CA  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1319	    01CC  CD				  DB 0cdh
+1  1320	    01CD  0000e				 DW  O_PSHHL
+1  1321	    01CF  3E 29				  DB 3eh,41		       ; ReadVDP entry
+1  1322	    01D1  C3				  DB 0c3h
+1  1323	    01D2  0105r				 DW  GENGIOS_INTEGER
+1  1324
+1  1325	    01D4			 F_SETTIME:
+1  1326						  ; FUNCTION SetTime(Hour,Minute,Second: BYTE):	BOOLEAN;
+1  1327	    01D4  3E 3C				  DB 3eh,60
+1  1328	    01D6  C3				  DB 0c3h
+1  1329	    01D7  01A6r				 DW  O_INT_INT_INT_C	     ; ( INT , INT , INT )
+1  1330
+1  1331	    01D9			 F_STICK:
+1  1332						  ; FUNCTION Stick(StickNum: BYTE): BYTE;
+1  1333	    01D9  CD				  DB 0cdh
+1  1334	    01DA  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1335	    01DC  CD				  DB 0cdh
+1  1336	    01DD  0000e				 DW  O_PSHHL
+1  1337	    01DF  3E 19				  DB 3eh,25		       ; Stick entry
+1  1338	    01E1  C3				  DB 0c3h
+1  1339	    01E2  0105r				 DW  GENGIOS_INTEGER
+1  1340
+1  1341	    01E4			 F_STRIG:
+1  1342						  ; FUNCTION Strig(StrigNum: BYTE): BOOLEAN;
+1  1343	    01E4  CD				  DB 0cdh
+1  1344	    01E5  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1345	    01E7  CD				  DB 0cdh
+1  1346	    01E8  0000e				 DW  O_PSHHL
+1  1347	    01EA  3E 20				  DB 3eh,32		       ; Strig entry
+1  1348	    01EC  C3				  DB 0c3h
+1  1349	    01ED  0000r				 DW  GENGIOS_BOOLEAN
+1  1350
+1  1351	    01EF			 F_VPEEK:
+1  1352						  ; FUNCTION VPeek(Address: INTEGER): BYTE;
+1  1353	    01EF  CD				  DB 0cdh
+1  1354	    01F0  0000e				 DW  L65DE		   ; parse '(',	integer	expression and ')'
+1  1355	    01F2  CD				  DB 0cdh
+1  1356	    01F3  0000e				 DW  O_PSHHL
+1  1357	    01F5  3E 06				  DB 3eh,6		       ; VPeek entry
+1  1358	    01F7  C3				  DB 0c3h
+1  1359	    01F8  0105r				 DW  GENGIOS_INTEGER
+1  1360
+1  1361	    01FA			 STRING_C_GIOS:
+1  1362						  ; parses: STRING ')'
+1  1363						  ; in:	   GIOS	entry number pushed at stack
+1  1364	    01FA  CD				  DB 0cdh
+1  1365	    01FB  0000e				 DW  L5ED0		   ; parse string expression
+1  1366
+1  1367	    01FD  CD			 C_GIOS:  DB 0cdh
+1  1368	    01FE  0000e				 DW  L6F6E		   ; match(')')
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 25
+msx_asm\tur_glib.ASM
+
+
+
+1  1369	    0200  F1				  DB 0f1h
+1  1370	    0201  C3				  DB 0c3h
+1  1371	    0202  0002r				 DW  GENGIOS
+1  1372
+1  1373	    0204			 O_INT:	  ; parses: '('	INTEGER
+1  1374	    0204  CD				  DB 0cdh
+1  1375	    0205  0000e				 DW  L6F66		   ; match('(')
+1  1376	    0207  CD				  DB 0cdh
+1  1377	    0208  0000e				 DW  L5E97		   ; parse integer expression
+1  1378	    020A  C3				  DB 0c3h
+1  1379	    020B  0000e				 DW  O_PSHHL
+1  1380
+1  1381	    020D			 COMMA_6_INT:
+1  1382	    020D  CD				  DB 0cdh
+1  1383	    020E  021Cr				 DW  COMMA_INT
+1  1384
+1  1385	    0210			 COMMA_5_INT:
+1  1386	    0210  CD				  DB 0cdh
+1  1387	    0211  021Cr				 DW  COMMA_INT
+1  1388
+1  1389	    0213			 COMMA_4_INT:
+1  1390	    0213  CD				  DB 0cdh
+1  1391	    0214  021Cr				 DW  COMMA_INT
+1  1392
+1  1393	    0216			 COMMA_3_INT:
+1  1394	    0216  CD				  DB 0cdh
+1  1395	    0217  021Cr				 DW  COMMA_INT
+1  1396
+1  1397	    0219			 COMMA_2_INT:
+1  1398	    0219  CD				  DB 0cdh
+1  1399	    021A  021Cr				 DW  COMMA_INT
+1  1400
+1  1401	    021C			 COMMA_INT:
+1  1402	    021C  CD				  DB 0cdh
+1  1403	    021D  0000e				 DW  L6F5E		   ; match(',')
+1  1404	    021F  CD				  DB 0cdh
+1  1405	    0220  0000e				 DW  L5E97		   ; parse integer expression
+1  1406	    0222  C3				  DB 0c3h
+1  1407	    0223  0000e				 DW  O_PSHHL
+1  1408
+1  1409	    0225			 COMMA_V_INT:
+1  1410						  ; parses: ','	VAR INTEGER
+1  1411	    0225  CD				  DB 0cdh
+1  1412	    0226  0000e				 DW  L6F5E		   ; match(',')
+1  1413	    0228  C3				  DB 0c3h
+1  1414	    0229  0024r				 DW  PARSEINTVAR
+1  1415
+1  1416	    022B			 COMMA_V_BYTE:
+1  1417						  ; parses: ','	VAR BYTE
+1  1418	    022B  CD				  DB 0cdh
+1  1419	    022C  0000e				 DW  L6F5E		   ; match(',')
+1  1420	    022E  C3				  DB 0c3h
+1  1421	    022F  000Er				 DW  PARSEBYTEVAR
+1  1422
+1  1423	    0231			 COMMA_REAL:
+1  1424						  ; parses: ','	REAL
+1  1425	    0231  CD				  DB 0cdh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 26
+msx_asm\tur_glib.ASM
+
+
+
+1  1426	    0232  0000e				 DW  L6F5E		   ; match(',')
+1  1427	    0234  C3				  DB 0c3h
+1  1428	    0235  006Dr				 DW  PARSEREAL
+1  1429
+1  1430	    0237			 O_7_INT_C_GIOS:
+1  1431	    0237  F5				  DB 0f5h
+1  1432	    0238  CD				  DB 0cdh
+1  1433	    0239  0204r				 DW  O_INT		   ; '(' INT
+1  1434	    023B  CD				  DB 0cdh
+1  1435	    023C  020Dr				 DW  COMMA_6_INT	   ; 6x	',' INT
+1  1436	    023E  C3				  DB 0c3h
+1  1437	    023F  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1438
+1  1439	    0241			 O_5_INT_C_GIOS:
+1  1440	    0241  F5				  DB 0f5h
+1  1441	    0242  CD				  DB 0cdh
+1  1442	    0243  0204r				 DW  O_INT		   ; '(' INT
+1  1443	    0245  CD				  DB 0cdh
+1  1444	    0246  0213r				 DW  COMMA_4_INT	   ; 3x	',' INT
+1  1445	    0248  C3				  DB 0c3h
+1  1446	    0249  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1447
+1  1448	    024B			 O_4_INT_C_GIOS:
+1  1449	    024B  F5				  DB 0f5h
+1  1450	    024C  CD				  DB 0cdh
+1  1451	    024D  0204r				 DW  O_INT		   ; '(' INT
+1  1452	    024F  CD				  DB 0cdh
+1  1453	    0250  0216r				 DW  COMMA_3_INT	   ; 3x	',' INT
+1  1454	    0252  C3				  DB 0c3h
+1  1455	    0253  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1456
+1  1457	    0255			 O_3_INT_C_GIOS:
+1  1458	    0255  F5				  DB 0f5h
+1  1459	    0256  CD				  DB 0cdh
+1  1460	    0257  0204r				 DW  O_INT		   ; '(' INT
+1  1461	    0259  CD				  DB 0cdh
+1  1462	    025A  0219r				 DW  COMMA_2_INT	   ; ',' INT ',' INT
+1  1463	    025C  C3				  DB 0c3h
+1  1464	    025D  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1465
+1  1466	    025F			 O_2_INT_C_GIOS:
+1  1467	    025F  F5				  DB 0f5h
+1  1468	    0260  CD				  DB 0cdh
+1  1469	    0261  0204r				 DW  O_INT		   ; '(' INT
+1  1470	    0263  CD				  DB 0cdh
+1  1471	    0264  021Cr				 DW  COMMA_INT		   ; ',' INT
+1  1472	    0266  C3				  DB 0c3h
+1  1473	    0267  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1474
+1  1475	    0269			 O_3_V_INT_C_GIOS:
+1  1476	    0269  F5				  DB 0f5h
+1  1477	    026A  CD				  DB 0cdh
+1  1478	    026B  0000e				 DW  L6F66		   ; match('(')
+1  1479	    026D  CD				  DB 0cdh
+1  1480	    026E  0024r				 DW  PARSEINTVAR	   ; VAR INT
+1  1481	    0270  18 0A				  DB 18h,( O_4_V_INT_C_GIOS1)-$-1
+1  1482
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 27
+msx_asm\tur_glib.ASM
+
+
+
+1  1483	    0272			 O_4_V_INT_C_GIOS:
+1  1484	    0272  F5				  DB 0f5h
+1  1485	    0273  CD				  DB 0cdh
+1  1486	    0274  0000e				 DW  L6F66		   ; match('(')
+1  1487	    0276  CD				  DB 0cdh
+1  1488	    0277  0024r				 DW  PARSEINTVAR	   ; VAR INT
+1  1489	    0279  CD				  DB 0cdh
+1  1490	    027A  0225r				 DW  COMMA_V_INT	   ; ',' VAR INT
+1  1491
+1  1492	    027C			 O_4_V_INT_C_GIOS1:
+1  1493	    027C  CD				  DB 0cdh
+1  1494	    027D  0225r				 DW  COMMA_V_INT	   ; ',' VAR_INT
+1  1495	    027F  CD				  DB 0cdh
+1  1496	    0280  0225r				 DW  COMMA_V_INT	   ; ',' VAR_INT
+1  1497	    0282  C3				  DB 0c3h
+1  1498	    0283  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1499
+1  1500						  ; ---------------
+1  1501						  ; GIOS Procedures
+1  1502						  ; ---------------
+1  1503	    0285			 P_DELETEFILE:
+1  1504						  ; PROCEDURE DeleteFile(FileName: Str63);
+1  1505	    0285  3E 61				  DB 3eh,97		       ; DeleteFile entry
+1  1506	    0287  F5				  DB 0f5h
+1  1507	    0288  CD				  DB 0cdh
+1  1508	    0289  0000e				 DW  L6F66		   ; match('(')
+1  1509	    028B  C3				  DB 0c3h
+1  1510	    028C  01FAr				 DW  STRING_C_GIOS	     ; STRING ')' GENGIOS
+1  1511
+1  1512
+1  1513	    028E			 P_DEFINEPICTURE:
+1  1514						  ; PROCEDURE DefinePicture(X1,Y1,X2,Y2,OX,OY,Page: INTEGER);
+1  1515	    028E  3E 5B				  DB 3eh,91		       ; DefinePicture entry
+1  1516	    0290  F5				  DB 0f5h
+1  1517	    0291  CD				  DB 0cdh
+1  1518	    0292  0204r				 DW  O_INT		   ; '(' INT
+1  1519	    0294  CD				  DB 0cdh
+1  1520	    0295  020Dr				 DW  COMMA_6_INT	   ; 6 x ',' INT
+1  1521	    0297  C3				  DB 0c3h
+1  1522	    0298  01FDr				 DW  C_GIOS
+1  1523
+1  1524	    029A			 P_PFILLSHAPE:
+1  1525						  ; PROCEDURE PFillShape(X,Y: INTEGER);
+1  1526	    029A  3E 5C				  DB 3eh,92		       ; PFillShape entry
+1  1527	    029C  C3				  DB 0c3h
+1  1528	    029D  025Fr				 DW  O_2_INT_C_GIOS
+1  1529
+1  1530	    029F			 P_PPAINT:
+1  1531						  ; PROCEDURE PPaint(X,Y,Border: INTEGER);
+1  1532	    029F  3E 5D				  DB 3eh,93		       ; PPaint	entry
+1  1533	    02A1  C3				  DB 0c3h
+1  1534	    02A2  0255r				 DW  O_3_INT_C_GIOS
+1  1535
+1  1536	    02A4			 P_MEMEXPAND:
+1  1537						  ; PROCEDURE MemExpand(DX: INTEGER; DY,Page,Channel: BYTE);
+1  1538	    02A4  3E 56				  DB 3eh,86		       ; MemExpand entry
+1  1539	    02A6  C3				  DB 0c3h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 28
+msx_asm\tur_glib.ASM
+
+
+
+1  1540	    02A7  024Br				 DW  O_4_INT_C_GIOS
+1  1541
+1  1542	    02A9			 P_MEMTOVRAM:
+1  1543						  ; PROCEDURE MemtoVRAM(Offset:	INTEGER; Page,Channel: BYTE);
+1  1544	    02A9  C9				  DB 0c9h
+1  1545
+1  1546	    02AA			 P_MEMLOADPICTURE:
+1  1547						  ; PROCEDURE MemLoadPicture(X:	INTEGER; Y,Page,Channel: BYTE);
+1  1548	    02AA  3E 58				  DB 3eh,88		       ; MemLoadPicture	entry
+1  1549	    02AC  C3				  DB 0c3h
+1  1550	    02AD  024Br				 DW  O_4_INT_C_GIOS
+1  1551
+1  1552					 ;P_MEMUNCRUNCH:
+1  1553					 ;	   ; PROCEDURE MemUnCrunch(X: INTEGER; Y,Page,Channel: BYTE);
+1  1554					 ;	   LD A,89		      ;	MemUnCrunch entry
+1  1555					 ;	   JP O_4_INT_C_GIOS
+1  1556
+1  1557	    02AF			 P_MEMSAVEPICTURE:
+1  1558						  ; PROCEDURE MemSavePicture(X1,Y1,X2,Y2: INTEGER; Page,Channel: BYTE);
+1  1559	    02AF  3E 5A				  DB 3eh,90		       ; MemSavePicture	entry
+1  1560	    02B1  F5				  DB 0f5h
+1  1561	    02B2  CD				  DB 0cdh
+1  1562	    02B3  0204r				 DW  O_INT		   ; '(' INT
+1  1563	    02B5  CD				  DB 0cdh
+1  1564	    02B6  0210r				 DW  COMMA_5_INT	   ; 5 x ',' INT
+1  1565	    02B8  C3				  DB 0c3h
+1  1566	    02B9  01FDr				 DW  C_GIOS
+1  1567
+1  1568	    02BB			 P_SETCLIPPING:
+1  1569						  ; PROCEDURE SetClipping(Clipping: BOOLEAN);
+1  1570	    02BB  3E 37				  DB 3eh,55		       ; SetClipping entry
+1  1571	    02BD  F5				  DB 0f5h
+1  1572	    02BE  CD				  DB 0cdh
+1  1573	    02BF  0000e				 DW  L6F66		   ; match('(')
+1  1574	    02C1  CD				  DB 0cdh
+1  1575	    02C2  0000e				 DW  L5EB0		   ; parse boolean expression
+1  1576	    02C4  CD				  DB 0cdh
+1  1577	    02C5  0000e				 DW  O_PSHHL
+1  1578	    02C7  C3				  DB 0c3h
+1  1579	    02C8  01FDr				 DW  C_GIOS
+1  1580
+1  1581	    02CA			 P_SETVIEWPORT:
+1  1582						  ; PROCEDURE SetViewPort(X1,Y1,X2,Y2: INTEGER);
+1  1583	    02CA  3E 16				  DB 3eh,22		       ; SetViewPort entry
+1  1584	    02CC  C3				  DB 0c3h
+1  1585	    02CD  024Br				 DW  O_4_INT_C_GIOS
+1  1586
+1  1587	    02CF			 P_GETVIEWPORT:
+1  1588						  ; PROCEDURE GetViewPort(VAR X1,Y1,X2,Y2: INTEGER);
+1  1589	    02CF  3E 17				  DB 3eh,23		       ; GetViewPort entry
+1  1590	    02D1  C3				  DB 0c3h
+1  1591	    02D2  0272r				 DW  O_4_V_INT_C_GIOS
+1  1592
+1  1593	    02D4			 P_MEMCOPY:
+1  1594						  ; PROCEDURE MemCopy(Source,Destination: INTEGER; Length: REAL);
+1  1595	    02D4  3E 54				  DB 3eh,84		       ; MemCopy entry
+1  1596	    02D6  F5				  DB 0f5h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 29
+msx_asm\tur_glib.ASM
+
+
+
+1  1597	    02D7  CD				  DB 0cdh
+1  1598	    02D8  0204r				 DW  O_INT		   ; '(' INT
+1  1599	    02DA  CD				  DB 0cdh
+1  1600	    02DB  021Cr				 DW  COMMA_INT		   ; ',' INT
+1  1601	    02DD  CD				  DB 0cdh
+1  1602	    02DE  0231r				 DW  COMMA_REAL		   ; ',' REAL
+1  1603	    02E0  C3				  DB 0c3h
+1  1604	    02E1  01FDr				 DW  C_GIOS
+1  1605
+1  1606	    02E3			 P_BLOAD:
+1  1607						  ; PROCEDURE BLoad(Offset: INTEGER; Page: BYTE; FileName: Str63);
+1  1608	    02E3  3E 49				  DB 3eh,73		       ; BLoad entry
+1  1609	    02E5  F5				  DB 0f5h
+1  1610	    02E6  CD				  DB 0cdh
+1  1611	    02E7  0204r				 DW  O_INT		   ; '(' INT
+1  1612	    02E9  CD				  DB 0cdh
+1  1613	    02EA  021Cr				 DW  COMMA_INT		   ; ',' INT
+1  1614	    02EC  CD				  DB 0cdh
+1  1615	    02ED  0000e				 DW  L6F5E		   ; match(',')
+1  1616	    02EF  C3				  DB 0c3h
+1  1617	    02F0  01FAr				 DW  STRING_C_GIOS	     ; STRING ')' GENGIOS
+1  1618
+1  1619	    02F2			 P_BSAVE:
+1  1620						  ; PROCEDURE BSave(Address1,Page1,Address2,Page2: INTEGER;
+1  1621						  ;		    FileName: Str63);
+1  1622	    02F2  3E 4C				  DB 3eh,76		       ; BSave entry
+1  1623	    02F4  F5				  DB 0f5h
+1  1624	    02F5  CD				  DB 0cdh
+1  1625	    02F6  0204r				 DW  O_INT		   ; '(' INT
+1  1626	    02F8  CD				  DB 0cdh
+1  1627	    02F9  0216r				 DW  COMMA_3_INT	   ; 3x	',' INT
+1  1628	    02FB  CD				  DB 0cdh
+1  1629	    02FC  0000e				 DW  L6F5E		   ; match(',')
+1  1630	    02FE  C3				  DB 0c3h
+1  1631	    02FF  01FAr				 DW  STRING_C_GIOS	     ; STRING ')' GENGIOS
+1  1632
+1  1633	    0301			 P_CHANGECOLOR:
+1  1634						  ; PROCEDURE ChangeColor(ColorNr,R,G,B: BYTE):
+1  1635	    0301  3E 09				  DB 3eh,9		       ; ChangeColor entry
+1  1636	    0303  C3				  DB 0c3h
+1  1637	    0304  024Br				 DW  O_4_INT_C_GIOS
+1  1638
+1  1639	    0306			 P_CHANGESCREEN:
+1  1640						  ; PROCEDURE ChangeScreen(Screen: INTEGER);
+1  1641	    0306  3E 0A				  DB 3eh,10		       ; ChangeScreen entry
+1  1642	    0308  F5				  DB 0f5h
+1  1643	    0309  CD				  DB 0cdh
+1  1644	    030A  0204r				 DW  O_INT		   ; '(' INT
+1  1645	    030C  C3				  DB 0c3h
+1  1646	    030D  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1647
+1  1648	    030F			 P_CIRCLE:
+1  1649						  ; PROCEDURE Circle(X,Y,Radius: INTEGER);
+1  1650	    030F  3E 15				  DB 3eh,21		       ; Circle	entry
+1  1651	    0311  C3				  DB 0c3h
+1  1652	    0312  0255r				 DW  O_3_INT_C_GIOS
+1  1653
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 30
+msx_asm\tur_glib.ASM
+
+
+
+1  1654	    0314			 P_CLEARMEM:
+1  1655						  ; PROCEDURE ClearMem;
+1  1656	    0314  3E 2A				  DB 3eh,42		       ; ClearMem entry
+1  1657	    0316  C3				  DB 0c3h
+1  1658	    0317  0002r				 DW  GENGIOS
+1  1659
+1  1660	    0319			 P_DATE:
+1  1661						  ; PROCEDURE Date(VAR Year: INTEGER; VAR Month,Day,WeekDay: BYTE);
+1  1662	    0319  3E 39				  DB 3eh,57		       ; Date entry (GetDate)
+1  1663
+1  1664	    031B  F5				  DB 0f5h
+1  1665	    031C  CD				  DB 0cdh
+1  1666	    031D  0000e				 DW  L6F66		   ; match('(')
+1  1667	    031F  CD				  DB 0cdh
+1  1668	    0320  0024r				 DW  PARSEINTVAR	   ; VAR INT
+1  1669	    0322  CD				  DB 0cdh
+1  1670	    0323  022Br				 DW  COMMA_V_BYTE	   ; ',' VAR BYTE
+1  1671
+1  1672	    0325			 V_2_BYTE_C_GIOS:
+1  1673	    0325  CD				  DB 0cdh
+1  1674	    0326  022Br				 DW  COMMA_V_BYTE	   ; ',' VAR BYTE
+1  1675	    0328  CD				  DB 0cdh
+1  1676	    0329  022Br				 DW  COMMA_V_BYTE	   ; ',' VAR BYTE
+1  1677	    032B  C3				  DB 0c3h
+1  1678	    032C  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1679
+1  1680	    032E			 P_DISPLAYPAGE:
+1  1681						  ; PROCEDURE DisplayPage(PageNr: BYTE);
+1  1682	    032E  3E 0D				  DB 3eh,13		       ; DisplayPage
+1  1683
+1  1684	    0330			 O_INT_C_GIOS:
+1  1685	    0330  F5				  DB 0f5h
+1  1686	    0331  CD				  DB 0cdh
+1  1687	    0332  0204r				 DW  O_INT		   ; '(' INT
+1  1688	    0334  C3				  DB 0c3h
+1  1689	    0335  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1690
+1  1691	    0337			 P_ELLIPSE:
+1  1692						  ; PROCEDURE Ellipse(X,Y,RX,RY: INTEGER);
+1  1693	    0337  3E 42				  DB 3eh,66		       ; Ellipse entry
+1  1694	    0339  C3				  DB 0c3h
+1  1695	    033A  024Br				 DW  O_4_INT_C_GIOS
+1  1696
+1  1697	    033C			 P_EXPAND:
+1  1698						  ; PROCEDURE Expand(DX,DY,Page: INTEGER; FileName: Str63);
+1  1699	    033C  3E 31				  DB 3eh,49		       ; Expand	entry
+1  1700
+1  1701	    033E			 O_3_INT_STRING_C_GIOS:
+1  1702	    033E  F5				  DB 0f5h
+1  1703	    033F  CD				  DB 0cdh
+1  1704	    0340  0204r				 DW  O_INT		   ; '(' INT
+1  1705	    0342  CD				  DB 0cdh
+1  1706	    0343  0219r				 DW  COMMA_2_INT	   ; 2x	',' INT
+1  1707	    0345  CD				  DB 0cdh
+1  1708	    0346  0000e				 DW  L6F5E		   ; match(',')
+1  1709					 ;	   JP STRING_C_GIOS	      ;	STRING ')' GENGIOS
+1  1710
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 31
+msx_asm\tur_glib.ASM
+
+
+
+1  1711	    0348  CD				  DB 0cdh
+1  1712	    0349  0000e				 DW  L5ED0		   ; parse string expression
+1  1713
+1  1714	    034B  CD				  DB 0cdh
+1  1715	    034C  0000e				 DW  L6F13		   ; match(','), if present
+1  1716	    034E  C2				  DB 0c2h
+1  1717	    034F  01FDr				 DW C_GIOS		 ; ')' GENGIOS if no ',' present
+1  1718
+1  1719						  ; PROCEDURE Expand(DX,DY,Page: INTEGER; FileName: Str63;
+1  1720						  ;		     StartPos: LONGINT); EXTERNAL $F9C8;
+1  1721	    0351  F1				  DB 0f1h
+1  1722	    0352  3E 48				  DB 3eh,72		       ; Expand	entry with StartPos
+1  1723	    0354  F5				  DB 0f5h
+1  1724
+1  1725	    0355  CD				  DB 0cdh
+1  1726	    0356  004Cr				 DW  PARSELONG
+1  1727	    0358  CD				  DB 0cdh
+1  1728	    0359  0000e				 DW  L6148		   ; code: push	LONG
+1  1729
+1  1730	    035B  C3				  DB 0c3h
+1  1731	    035C  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1732
+1  1733	    035E			 P_FASTBOX:
+1  1734						  ; PROCEDURE FastBox(X1,Y1,X2,Y2: INTEGER);
+1  1735	    035E  3E 12				  DB 3eh,18		       ; FastBox entry
+1  1736	    0360  C3				  DB 0c3h
+1  1737	    0361  024Br				 DW  O_4_INT_C_GIOS
+1  1738
+1  1739	    0363			 P_FASTCOPY:
+1  1740						  ; PROCEDURE FastCopy(X1,Y1,X2,Y2,DX,DY,DestPage: INTEGER);
+1  1741	    0363  3E 14				  DB 3eh,20		       ; FastCopy entry
+1  1742	    0365  C3				  DB 0c3h
+1  1743	    0366  0237r				 DW  O_7_INT_C_GIOS
+1  1744
+1  1745	    0368			 P_FILLBOX:
+1  1746						  ; PROCEDURE FillBox(X1,Y1,X2,Y2: INTEGER);
+1  1747	    0368  3E 11				  DB 3eh,17		       ; FillBox entry
+1  1748	    036A  C3				  DB 0c3h
+1  1749	    036B  024Br				 DW  O_4_INT_C_GIOS
+1  1750
+1  1751	    036D			 P_FILLSHAPE:
+1  1752						  ; PROCEDURE FillShape(X,Y,Color: INTEGER);
+1  1753	    036D  3E 36				  DB 3eh,54		       ; FillShape entry
+1  1754	    036F  C3				  DB 0c3h
+1  1755	    0370  0255r				 DW  O_3_INT_C_GIOS
+1  1756
+1  1757	    0372			 P_FILLSPRITE:
+1  1758						  ; PROCEDURE FillSprite(Plane,Color: BYTE);
+1  1759	    0372  3E 24				  DB 3eh,36		       ; FillSprite entry
+1  1760	    0374  C3				  DB 0c3h
+1  1761	    0375  025Fr				 DW  O_2_INT_C_GIOS
+1  1762
+1  1763	    0377			 P_GCOPY:
+1  1764						  ; PROCEDURE GCopy(X1,Y1,X2,Y2,DX,DY,DestPage:	INTEGER);
+1  1765	    0377  3E 13				  DB 3eh,19		       ; GCopy entry
+1  1766	    0379  C3				  DB 0c3h
+1  1767	    037A  0237r				 DW  O_7_INT_C_GIOS
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 32
+msx_asm\tur_glib.ASM
+
+
+
+1  1768
+1  1769	    037C			 P_GETDOSVERSION:
+1  1770						  ; PROCEDURE GetDosVersion(VAR	Kernel,System: INTEGER);
+1  1771	    037C  3E 47				  DB 3eh,71		       ; GetDosVersion entry
+1  1772	    037E  F5				  DB 0f5h
+1  1773	    037F  CD				  DB 0cdh
+1  1774	    0380  0000e				 DW  L6F66		   ; match('(')
+1  1775	    0382  CD				  DB 0cdh
+1  1776	    0383  0024r				 DW  PARSEINTVAR	   ; VAR INT
+1  1777	    0385  CD				  DB 0cdh
+1  1778	    0386  0225r				 DW  COMMA_V_INT	   ; ',' VAR INT
+1  1779	    0388  C3				  DB 0c3h
+1  1780	    0389  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1781
+1  1782	    038B			 P_LINE:
+1  1783						  ; PROCEDURE Line(X1,Y1,X2,Y2:	INTEGER);
+1  1784	    038B  3E 10				  DB 3eh,16		       ; Line entry
+1  1785	    038D  C3				  DB 0c3h
+1  1786	    038E  024Br				 DW  O_4_INT_C_GIOS
+1  1787
+1  1788	    0390			 P_LOADPICTURE:
+1  1789						  ; PROCEDURE LoadPicture(DX,DY: INTEGER; Page:	BYTE; FileName:	Str63);
+1  1790	    0390  3E 18				  DB 3eh,24		       ; LoadPicture entry
+1  1791	    0392  C3				  DB 0c3h
+1  1792	    0393  033Er				 DW  O_3_INT_STRING_C_GIOS
+1  1793
+1  1794	    0395			 P_LOADVRAM:
+1  1795						  ; PROCEDURE LoadVRAM(VRAMAddress: INTEGER; VRAMPage: BYTE;
+1  1796						  ;		       FileOffset: REAL; VRAMSize: REAL;
+1  1797						  ;		       FileName: Str63);
+1  1798	    0395  3E 5F				  DB 3eh,95		       ; LoadVRAM entry
+1  1799
+1  1800	    0397			 O_2_INT_2_REAL_STRING_C_GIOS:
+1  1801	    0397  F5				  DB 0f5h
+1  1802	    0398  CD				  DB 0cdh
+1  1803	    0399  0204r				 DW  O_INT		   ; '(' INT
+1  1804	    039B  CD				  DB 0cdh
+1  1805	    039C  021Cr				 DW  COMMA_INT		   ; ',' INT
+1  1806
+1  1807	    039E			 REAL_REAL_STRING_C_GIOS:
+1  1808	    039E  CD				  DB 0cdh
+1  1809	    039F  0231r				 DW  COMMA_REAL		   ; ',' REAL
+1  1810	    03A1  CD				  DB 0cdh
+1  1811	    03A2  0231r				 DW  COMMA_REAL		   ; ',' REAL
+1  1812	    03A4  CD				  DB 0cdh
+1  1813	    03A5  0000e				 DW  L6F5E		   ; match(',')
+1  1814	    03A7  C3				  DB 0c3h
+1  1815	    03A8  01FAr				 DW  STRING_C_GIOS	     ; STRING ')' GENGIOS
+1  1816
+1  1817	    03AA			 P_MEMREADFILE:
+1  1818						  ; PROCEDURE MemReadFile(Channel: INTEGER; Position, Length: REAL;
+1  1819						  ;			  FileName: Str63);
+1  1820	    03AA  3E 4A				  DB 3eh,74		       ; MemReadFile entry
+1  1821
+1  1822	    03AC			 O_INT_2_REAL_STRING_C_GIOS:
+1  1823	    03AC  F5				  DB 0f5h
+1  1824	    03AD  CD				  DB 0cdh
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 33
+msx_asm\tur_glib.ASM
+
+
+
+1  1825	    03AE  0204r				 DW  O_INT		   ; '(' INT
+1  1826	    03B0  C3				  DB 0c3h
+1  1827	    03B1  039Er				 DW  REAL_REAL_STRING_C_GIOS
+1  1828
+1  1829	    03B3			 P_MEMWRITEFILE:
+1  1830						  ; PROCEDURE MemWriteFile(Channel: INTEGER; Position, Length: REAL;
+1  1831						  ;			   FileName: Str63);
+1  1832	    03B3  3E 53				  DB 3eh,83		       ; MemWriteFile entry
+1  1833	    03B5  C3				  DB 0c3h
+1  1834	    03B6  03ACr				 DW  O_INT_2_REAL_STRING_C_GIOS
+1  1835
+1  1836	    03B8			 P_MEMAPPENDFILE:
+1  1837						  ; PROCEDURE MemAppendFile(Channel: INTEGER; Position,	Length:	REAL;
+1  1838						  ;			    FileName: Str63);
+1  1839	    03B8  3E 5E				  DB 3eh,94		       ; MemAppendFile entry
+1  1840	    03BA  C3				  DB 0c3h
+1  1841	    03BB  03ACr				 DW  O_INT_2_REAL_STRING_C_GIOS
+1  1842
+1  1843	    03BD			 P_MOVEVRAM:
+1  1844						  ; PROCEDURE MoveVRAM(SourceAddress,SourcePage,
+1  1845						  ;		       DestinationAddress,DestinationPage,
+1  1846						  ;		       Length: INTEGER);
+1  1847	    03BD  3E 52				  DB 3eh,82		       ; MoveVRAM
+1  1848	    03BF  C3				  DB 0c3h
+1  1849	    03C0  0241r				 DW  O_5_INT_C_GIOS
+1  1850
+1  1851	    03C2			 P_PAINT:
+1  1852						  ; PROCEDURE Paint(X,Y,Border:	INTEGER);
+1  1853	    03C2  3E 3F				  DB 3eh,63		       ; Paint entry (BASIC paint)
+1  1854	    03C4  C3				  DB 0c3h
+1  1855	    03C5  0255r				 DW  O_3_INT_C_GIOS
+1  1856
+1  1857	    03C7			 P_PSET:
+1  1858						  ; PROCEDURE PSet(X,Y:	INTEGER);
+1  1859	    03C7  3E 0F				  DB 3eh,15		       ; PSet entry
+1  1860	    03C9  C3				  DB 0c3h
+1  1861	    03CA  025Fr				 DW  O_2_INT_C_GIOS
+1  1862
+1  1863	    03CC			 P_PUTSPRITE:
+1  1864						  ; PROCEDURE PutSprite(X,Y,SpriteNum,Plane: BYTE);
+1  1865	    03CC  3E 23				  DB 3eh,35		       ; PutSprite entry
+1  1866	    03CE  C3				  DB 0c3h
+1  1867	    03CF  024Br				 DW  O_4_INT_C_GIOS
+1  1868
+1  1869	    03D1			 P_READMEM:
+1  1870						  ; PROCEDURE ReadMem(Channel,Destination,Length: INTEGER);
+1  1871	    03D1  3E 2C				  DB 3eh,44		       ; ReadMem entry
+1  1872	    03D3  C3				  DB 0c3h
+1  1873	    03D4  0255r				 DW  O_3_INT_C_GIOS
+1  1874
+1  1875	    03D6			 P_READSECTOR:
+1  1876						  ; PROCEDURE ReadSector(Drive:	BYTE; Sector, Address: INTEGER;
+1  1877						  ;			 SectorCount: BYTE);
+1  1878	    03D6  3E 3D				  DB 3eh,61		       ; ReadSector entry
+1  1879	    03D8  C3				  DB 0c3h
+1  1880	    03D9  024Br				 DW  O_4_INT_C_GIOS
+1  1881
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 34
+msx_asm\tur_glib.ASM
+
+
+
+1  1882	    03DB			 P_SAVEPICTURE:
+1  1883						  ; PROCEDURE SavePicture(X1,Y1,X2,Y2: INTEGER;
+1  1884						  ;			  Page:	BYTE; FileName:	Str63);
+1  1885	    03DB  3E 30				  DB 3eh,48		       ; SavePicture entry
+1  1886	    03DD  F5				  DB 0f5h
+1  1887	    03DE  CD				  DB 0cdh
+1  1888	    03DF  0204r				 DW  O_INT		   ; '(' INT
+1  1889	    03E1  CD				  DB 0cdh
+1  1890	    03E2  0213r				 DW  COMMA_4_INT	   ; 4x	',' INT
+1  1891	    03E4  CD				  DB 0cdh
+1  1892	    03E5  0000e				 DW  L6F5E		   ; match(',')
+1  1893	    03E7  C3				  DB 0c3h
+1  1894	    03E8  01FAr				 DW  STRING_C_GIOS	     ; STRING ')' GENGIOS
+1  1895
+1  1896					 ;P_SAVEVRAM:
+1  1897					 ;	   ; PROCEDURE SaveVRAM(VRAMAddress: INTEGER; VRAMPage:	BYTE;
+1  1898					 ;	   ;			FileOffset: REAL; VRAMSize: REAL;
+1  1899					 ;	   ;			FileName: Str63);
+1  1900					 ;	   LD A,96		      ;	LoadVRAM entry
+1  1901					 ;	   JP O_2_INT_2_REAL_STRING_C_GIOS
+1  1902
+1  1903	    03EA			 P_SCREEN:
+1  1904						  ; PROCEDURE Screen(Num: BYTE);
+1  1905	    03EA  3E 08				  DB 3eh,8		       ; Screen	entry
+1  1906	    03EC  C3				  DB 0c3h
+1  1907	    03ED  0330r				 DW  O_INT_C_GIOS
+1  1908
+1  1909	    03EF			 P_SCREENOFF:
+1  1910						  ; PROCEDURE ScreenOff;
+1  1911	    03EF  3E 1D				  DB 3eh,29		       ; ScreenOff entry
+1  1912	    03F1  C3				  DB 0c3h
+1  1913	    03F2  0002r				 DW  GENGIOS
+1  1914
+1  1915	    03F4			 P_SCREENON:
+1  1916						  ; PROCEDURE ScreenOn;
+1  1917	    03F4  3E 1C				  DB 3eh,28		       ; ScreenOn entry
+1  1918	    03F6  C3				  DB 0c3h
+1  1919	    03F7  0002r				 DW  GENGIOS
+1  1920
+1  1921	    03F9			 P_SETCHANNEL:
+1  1922						  ; PROCEDURE SetChannel(Channel: BYTE;	Position: REAL);
+1  1923	    03F9  3E 2D				  DB 3eh,45		       ; SetChannel entry
+1  1924	    03FB  F5				  DB 0f5h
+1  1925	    03FC  CD				  DB 0cdh
+1  1926	    03FD  0204r				 DW  O_INT		   ; '(' INT
+1  1927	    03FF  CD				  DB 0cdh
+1  1928	    0400  0231r				 DW  COMMA_REAL		   ; ',' REAL
+1  1929	    0402  C3				  DB 0c3h
+1  1930	    0403  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1931
+1  1932	    0405			 P_SOUND:
+1  1933						  ; PROCEDURE Sound(Register,Data: BYTE);
+1  1934	    0405  3E 33				  DB 3eh,51		       ; Sound entry (WritePSG)
+1  1935	    0407  C3				  DB 0c3h
+1  1936	    0408  025Fr				 DW  O_2_INT_C_GIOS
+1  1937
+1  1938	    040A			 P_SPRITEATTRIBUTEADDRESS:
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 35
+msx_asm\tur_glib.ASM
+
+
+
+1  1939						  ; PROCEDURE SpriteAttributeAddress(Address: LONGINT);
+1  1940	    040A  3E 27				  DB 3eh,39		       ; SpriteAttributeAdres entry
+1  1941
+1  1942	    040C			 O_LONG_C_GIOS:
+1  1943	    040C  F5				  DB 0f5h
+1  1944	    040D  CD				  DB 0cdh
+1  1945	    040E  0000e				 DW  L6F66		   ; match('(')
+1  1946	    0410  CD				  DB 0cdh
+1  1947	    0411  004Cr				 DW  PARSELONG
+1  1948	    0413  CD				  DB 0cdh
+1  1949	    0414  0000e				 DW  L6148		   ; code: push	LONG
+1  1950
+1  1951					 ;	   CALL	O_INT		      ;	'(' INT
+1  1952	    0416  C3				  DB 0c3h
+1  1953	    0417  01FDr				 DW  C_GIOS		     ; ')' GENGIOS
+1  1954
+1  1955	    0419			 P_SPRITECOLOR:
+1  1956						  ; PROCEDURE SpriteColor(Plane: BYTE; Address:	INTEGER);
+1  1957	    0419  3E 25				  DB 3eh,37		       ; SpriteColor entry
+1  1958	    041B  C3				  DB 0c3h
+1  1959	    041C  025Fr				 DW  O_2_INT_C_GIOS
+1  1960
+1  1961	    041E			 P_SPRITEPATTERN:
+1  1962						  ; PROCEDURE SpritePattern(SpriteNum: BYTE; Address: INTEGER);
+1  1963	    041E  3E 26				  DB 3eh,38		       ; SpritePattern entry
+1  1964	    0420  C3				  DB 0c3h
+1  1965	    0421  025Fr				 DW  O_2_INT_C_GIOS
+1  1966
+1  1967	    0423			 P_SPRITEPATTERNADDRESS:
+1  1968						  ; PROCEDURE SpritePatternAddress(Address: LONGINT);
+1  1969	    0423  3E 28				  DB 3eh,40		       ; SpritePatternAddress entry
+1  1970	    0425  C3				  DB 0c3h
+1  1971	    0426  040Cr				 DW  O_LONG_C_GIOS
+1  1972					 ;	   JP O_INT_C_GIOS
+1  1973
+1  1974	    0428			 P_SPRITESIZE:
+1  1975						  ; PROCEDURE SpriteSize(Size: BYTE);
+1  1976	    0428  3E 22				  DB 3eh,34		       ; SpriteSize entry
+1  1977	    042A  C3				  DB 0c3h
+1  1978	    042B  0330r				 DW  O_INT_C_GIOS
+1  1979
+1  1980	    042D			 P_SPRITESOFF:
+1  1981						  ; PROCEDURE SpritesOff;
+1  1982	    042D  3E 1F				  DB 3eh,31		       ; SpritesOff entry
+1  1983	    042F  C3				  DB 0c3h
+1  1984	    0430  0002r				 DW  GENGIOS
+1  1985
+1  1986	    0432			 P_SPRITESON:
+1  1987						  ; PROCEDURE SpritesOn;
+1  1988	    0432  3E 1E				  DB 3eh,30		       ; SpritesOn entry
+1  1989	    0434  C3				  DB 0c3h
+1  1990	    0435  0002r				 DW  GENGIOS
+1  1991
+1  1992	    0437			 P_TIME:
+1  1993						  ; PROCEDURE Time(VAR Hour,Minute,Second: BYTE);
+1  1994	    0437  3E 3A				  DB 3eh,58		       ; Time entry (GetTime)
+1  1995	    0439  F5				  DB 0f5h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 36
+msx_asm\tur_glib.ASM
+
+
+
+1  1996	    043A  CD				  DB 0cdh
+1  1997	    043B  0000e				 DW  L6F66		   ; match('(')
+1  1998	    043D  CD				  DB 0cdh
+1  1999	    043E  000Er				 DW  PARSEBYTEVAR	   ; VAR Byte
+1  2000	    0440  C3				  DB 0c3h
+1  2001	    0441  0325r				 DW  V_2_BYTE_C_GIOS	     ; ',' VAR Byte ','	VAR Byte ')'
+1  2002
+1  2003					 ;P_UNCRUNCH:
+1  2004					 ;	   ; PROCEDURE UnCrunch(DX,DY,Page,Address: INTEGER);
+1  2005					 ;	   LD A,33		      ;	UnCrunch entry
+1  2006					 ;	   JP O_4_INT_C_GIOS
+1  2007
+1  2008	    0443			 P_VPOKE:
+1  2009						  ; PROCEDURE VPoke(Address,Value: INTEGER);
+1  2010	    0443  3E 05				  DB 3eh,5		       ; VPoke entry
+1  2011	    0445  C3				  DB 0c3h
+1  2012	    0446  025Fr				 DW  O_2_INT_C_GIOS
+1  2013
+1  2014	    0448			 P_WAITVDP:
+1  2015						  ; PROCEDURE WaitVDP;
+1  2016	    0448  3E 32				  DB 3eh,50		       ; WaitVDP entry
+1  2017	    044A  C3				  DB 0c3h
+1  2018	    044B  0002r				 DW  GENGIOS
+1  2019
+1  2020	    044D			 P_WRITEMEM:
+1  2021						  ; PROCEDURE WriteMem(Channel,Source,Length: INTEGER);
+1  2022	    044D  3E 2B				  DB 3eh,43		       ; WriteMem entry
+1  2023	    044F  C3				  DB 0c3h
+1  2024	    0450  0255r				 DW  O_3_INT_C_GIOS
+1  2025
+1  2026	    0452			 P_WRITESECTOR:
+1  2027						  ; PROCEDURE WriteSector(Drive: BYTE; Sector,SourceAddress: INTEGER;
+1  2028						  ;			  SectorCount: BYTE);
+1  2029	    0452  3E 3E				  DB 3eh,62		       ; WriteSector entry
+1  2030	    0454  C3				  DB 0c3h
+1  2031	    0455  024Br				 DW  O_4_INT_C_GIOS
+1  2032
+1  2033	    0457			 P_WRITEVDP:
+1  2034						  ; PROCEDURE WriteVDP(Register,Data: BYTE);
+1  2035	    0457  3E 04				  DB 3eh,4		       ; WriteVDP entry
+1  2036	    0459  C3				  DB 0c3h
+1  2037	    045A  025Fr				 DW  O_2_INT_C_GIOS
+1  2038
+1  2039						  END
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 37
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "03/26/99"
+??FILENAME			  Text	 "tur_glib"
+??TIME				  Text	 "21:37:04"
+??VERSION			  Number 0314
+@32BIT				  Text	 0
+@CODE				  Text	 _TEXT
+@CODESIZE			  Text	 0
+@CPU				  Text	 1F1FH
+@CURSEG				  Text	 _TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 TUR_GLIB
+@INTERFACE			  Text	 00H
+@MODEL				  Text	 2
+@STACK				  Text	 @STACK
+@WORDSIZE			  Text	 4
+COMMA_2_INT			  Near	 _TEXT:0219
+COMMA_3_INT			  Near	 _TEXT:0216
+COMMA_4_INT			  Near	 _TEXT:0213
+COMMA_5_INT			  Near	 _TEXT:0210
+COMMA_6_INT			  Near	 _TEXT:020D
+COMMA_INT			  Near	 _TEXT:021C
+COMMA_REAL			  Near	 _TEXT:0231
+COMMA_V_BYTE			  Near	 _TEXT:022B
+COMMA_V_INT			  Near	 _TEXT:0225
+C_GIOS				  Near	 _TEXT:01FD
+DOS_BLEN			  Number 0004
+DOS_BUF				  Number 0051
+DOS_CHR				  Number 0001
+DOS_CUR				  Number 000C
+DOS_FCB				  Number 0010
+DOS_FLG				  Number 0000
+DOS_LEN				  Number 00D1
+DOS_NUM				  Number 0006
+DOS_PTR				  Number 0002
+DOS_REC				  Number 000A
+FCB_DRIVE			  Number 0000
+FCB_EXT				  Number 0009
+FCB_FILEPOS			  Number 0021
+FCB_FILESIZE			  Number 0010
+FCB_LEN				  Number 0024
+FCB_NAME			  Number 0001
+FCB_RECSIZE			  Number 000E
+FIB_BUF				  Number 0030
+FIB_CHR				  Number 0001
+FIB_CUR				  Number 0008
+FIB_F				  Number 0000
+FIB_FCB				  Number 000C
+FIB_LEN				  Number 00B0
+FIB_NUM				  Number 0004
+FIB_PTR				  Number 0002
+FIB_REC				  Number 0006
+FIL_HDR				  Number 0004
+F_FINDFIRST			  Near	 _TEXT:00AE
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 38
+Symbol Table
+
+
+
+F_FINDFIRST1			  Near	 _TEXT:00BA
+F_FINDNEXT			  Near	 _TEXT:00E0
+F_GETCHANNEL			  Near	 _TEXT:0125
+F_GETCLIPPING			  Near	 _TEXT:009E
+F_GETDRIVE			  Near	 _TEXT:00E9
+F_GETERROR			  Near	 _TEXT:00FD
+F_GETFKEY			  Near	 _TEXT:010A
+F_GETPAD			  Near	 _TEXT:010F
+F_GETPAGEID			  Near	 _TEXT:0132
+F_GETPDL			  Near	 _TEXT:011A
+F_POINT				  Near	 _TEXT:013D
+F_READPSG			  Near	 _TEXT:0157
+F_READSTATUS			  Near	 _TEXT:0162
+F_READVDP			  Near	 _TEXT:016D
+F_SEARCH			  Near	 _TEXT:0178
+F_SETDATE			  Near	 _TEXT:01A4
+F_SETMEM			  Near	 _TEXT:01C9
+F_SETTIME			  Near	 _TEXT:01D4
+F_SIMULATEDDISK			  Near	 _TEXT:00A3
+F_STICK				  Near	 _TEXT:01D9
+F_STRIG				  Near	 _TEXT:01E4
+F_TESTDRIVE			  Near	 _TEXT:00F0
+F_TSRPRESENT			  Near	 _TEXT:0090
+F_VPEEK				  Near	 _TEXT:01EF
+GENGIOS				  Near	 _TEXT:0002
+GENGIOS_BOOLEAN			  Near	 _TEXT:0000
+GENGIOS_CL_BOOLEAN		  Near	 _TEXT:00D8
+GENGIOS_CL_BOOLEAN1		  Near	 _TEXT:00D9
+GENGIOS_INTEGER			  Near	 _TEXT:0105
+GENGIOS_REAL			  Near	 _TEXT:012D
+L5960				  Word	 _TEXT:---- Extern
+L5CAD				  Word	 _TEXT:---- Extern
+L5E97				  Word	 _TEXT:---- Extern
+L5EB0				  Word	 _TEXT:---- Extern
+L5ED0				  Word	 _TEXT:---- Extern
+L5EE8				  Word	 _TEXT:---- Extern
+L6148				  Word	 _TEXT:---- Extern
+L65DE				  Word	 _TEXT:---- Extern
+L677F				  Word	 _TEXT:---- Extern
+L6F13				  Word	 _TEXT:---- Extern
+L6F5E				  Word	 _TEXT:---- Extern
+L6F66				  Word	 _TEXT:---- Extern
+L6F6E				  Word	 _TEXT:---- Extern
+L72E1				  Near	 _TEXT:---- Extern
+L7B5C				  Near	 _TEXT:---- Extern
+L7B62				  Near	 _TEXT:---- Extern
+MSX				  Near	 _TEXT:0000
+MSXDOS				  Number 0005
+OP_L_I				  Word	 _TEXT:---- Extern
+O_2_INT_2_REAL_STRING_C_GIOS	  Near	 _TEXT:0397
+O_2_INT_C_GIOS			  Near	 _TEXT:025F
+O_3_INT_C_GIOS			  Near	 _TEXT:0255
+O_3_INT_STRING_C_GIOS		  Near	 _TEXT:033E
+O_3_V_INT_C_GIOS		  Near	 _TEXT:0269
+O_4_INT_C_GIOS			  Near	 _TEXT:024B
+O_4_V_INT_C_GIOS		  Near	 _TEXT:0272
+O_4_V_INT_C_GIOS1		  Near	 _TEXT:027C
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 39
+Symbol Table
+
+
+
+O_5_INT_C_GIOS			  Near	 _TEXT:0241
+O_7_INT_C_GIOS			  Near	 _TEXT:0237
+O_CALHL				  Near	 _TEXT:---- Extern
+O_HL				  Near	 _TEXT:---- Extern
+O_INT				  Near	 _TEXT:0204
+O_INT_2_REAL_STRING_C_GIOS	  Near	 _TEXT:03AC
+O_INT_C_GIOS			  Near	 _TEXT:0330
+O_INT_INT_INT_C			  Near	 _TEXT:01A6
+O_LONG_C_GIOS			  Near	 _TEXT:040C
+O_PSHHL				  Near	 _TEXT:---- Extern
+PARSEBYTEERROR			  Near	 _TEXT:0020
+PARSEBYTEVAR			  Near	 _TEXT:000E
+PARSEINTERROR			  Near	 _TEXT:0036
+PARSEINTVAR			  Near	 _TEXT:0024
+PARSELONG			  Near	 _TEXT:004C
+PARSELONG1			  Near	 _TEXT:0064
+PARSELONG2			  Near	 _TEXT:0067
+PARSELONG3			  Near	 _TEXT:006A
+PARSEREAL			  Near	 _TEXT:006D
+PARSEREAL1			  Near	 _TEXT:0088
+PARSEREAL2			  Near	 _TEXT:008B
+PARSESTRVAR64			  Near	 _TEXT:003A
+PARSEVAR64			  Near	 _TEXT:0047
+PARSEVAR64_L			  Near	 _TEXT:003D
+P_BLOAD				  Near	 _TEXT:02E3
+P_BSAVE				  Near	 _TEXT:02F2
+P_CHANGECOLOR			  Near	 _TEXT:0301
+P_CHANGESCREEN			  Near	 _TEXT:0306
+P_CIRCLE			  Near	 _TEXT:030F
+P_CLEARMEM			  Near	 _TEXT:0314
+P_DATE				  Near	 _TEXT:0319
+P_DEFINEPICTURE			  Near	 _TEXT:028E
+P_DELETEFILE			  Near	 _TEXT:0285
+P_DISPLAYPAGE			  Near	 _TEXT:032E
+P_ELLIPSE			  Near	 _TEXT:0337
+P_EXPAND			  Near	 _TEXT:033C
+P_FASTBOX			  Near	 _TEXT:035E
+P_FASTCOPY			  Near	 _TEXT:0363
+P_FILLBOX			  Near	 _TEXT:0368
+P_FILLSHAPE			  Near	 _TEXT:036D
+P_FILLSPRITE			  Near	 _TEXT:0372
+P_GCOPY				  Near	 _TEXT:0377
+P_GETDOSVERSION			  Near	 _TEXT:037C
+P_GETVIEWPORT			  Near	 _TEXT:02CF
+P_LINE				  Near	 _TEXT:038B
+P_LOADPICTURE			  Near	 _TEXT:0390
+P_LOADVRAM			  Near	 _TEXT:0395
+P_MEMAPPENDFILE			  Near	 _TEXT:03B8
+P_MEMCOPY			  Near	 _TEXT:02D4
+P_MEMEXPAND			  Near	 _TEXT:02A4
+P_MEMLOADPICTURE		  Near	 _TEXT:02AA
+P_MEMREADFILE			  Near	 _TEXT:03AA
+P_MEMSAVEPICTURE		  Near	 _TEXT:02AF
+P_MEMTOVRAM			  Near	 _TEXT:02A9
+P_MEMWRITEFILE			  Near	 _TEXT:03B3
+P_MOVEVRAM			  Near	 _TEXT:03BD
+P_PAINT				  Near	 _TEXT:03C2
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 40
+Symbol Table
+
+
+
+P_PFILLSHAPE			  Near	 _TEXT:029A
+P_PPAINT			  Near	 _TEXT:029F
+P_PSET				  Near	 _TEXT:03C7
+P_PUTSPRITE			  Near	 _TEXT:03CC
+P_READMEM			  Near	 _TEXT:03D1
+P_READSECTOR			  Near	 _TEXT:03D6
+P_SAVEPICTURE			  Near	 _TEXT:03DB
+P_SCREEN			  Near	 _TEXT:03EA
+P_SCREENOFF			  Near	 _TEXT:03EF
+P_SCREENON			  Near	 _TEXT:03F4
+P_SETCHANNEL			  Near	 _TEXT:03F9
+P_SETCLIPPING			  Near	 _TEXT:02BB
+P_SETVIEWPORT			  Near	 _TEXT:02CA
+P_SOUND				  Near	 _TEXT:0405
+P_SPRITEATTRIBUTEADDRESS	  Near	 _TEXT:040A
+P_SPRITECOLOR			  Near	 _TEXT:0419
+P_SPRITEPATTERN			  Near	 _TEXT:041E
+P_SPRITEPATTERNADDRESS		  Near	 _TEXT:0423
+P_SPRITESIZE			  Near	 _TEXT:0428
+P_SPRITESOFF			  Near	 _TEXT:042D
+P_SPRITESON			  Near	 _TEXT:0432
+P_TIME				  Near	 _TEXT:0437
+P_VPOKE				  Near	 _TEXT:0443
+P_WAITVDP			  Near	 _TEXT:0448
+P_WRITEMEM			  Near	 _TEXT:044D
+P_WRITESECTOR			  Near	 _TEXT:0452
+P_WRITEVDP			  Near	 _TEXT:0457
+REAL_REAL_STRING_C_GIOS		  Near	 _TEXT:039E
+STRING_C_GIOS			  Near	 _TEXT:01FA
+TYPEMISMATCH			  Near	 _TEXT:0043
+V_2_BYTE_C_GIOS			  Near	 _TEXT:0325
+_AUXINPTR			  Number OFFSET	0177
+_AUXOUTPTR			  Number OFFSET	0174
+_BUFLEN				  Number OFFSET	018C
+_CBREAK				  Number OFFSET	0190
+_CONINPTR			  Number OFFSET	016B
+_CONOUTPTR			  Number OFFSET	016E
+_CONSTPTR			  Number OFFSET	0168
+_DOSERRORHANDLEROFF		  Number OFFSET	2887
+_DOSERRORHANDLERON		  Number OFFSET	2884
+_ERROREXIT			  Number OFFSET	286F
+_ERRORPTR			  Number OFFSET	018D
+_GETERROR_LIB			  Number OFFSET	2703
+_GIOSOK				  Number OFFSET	0581
+_GIOSVER			  Number OFFSET	0582
+_HEAPPTR			  Number OFFSET	0192
+_L00B8				  Number OFFSET	0180
+_L00BA				  Number OFFSET	0182
+_L00BE				  Number OFFSET	0186
+_L00C0				  Number OFFSET	0188
+_L021D				  Number OFFSET	02D0
+_L023E				  Number OFFSET	02F1
+_L0259				  Number OFFSET	030C
+_L0262				  Number OFFSET	0315
+_L026B				  Number OFFSET	031E
+_L0284				  Number OFFSET	0337
+_L0299				  Number OFFSET	034C
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 41
+Symbol Table
+
+
+
+_L030A				  Number OFFSET	03BD
+_L0310				  Number OFFSET	03C3
+_L0364				  Number OFFSET	0420
+_L04D4				  Number OFFSET	06C3
+_L0508				  Number OFFSET	06F4
+_L0522				  Number OFFSET	070E
+_L052C				  Number OFFSET	0717
+_L053A				  Number OFFSET	0725
+_L054D				  Number OFFSET	0738
+_L055D				  Number OFFSET	0748
+_L0581				  Number OFFSET	076C
+_L0591				  Number OFFSET	077C
+_L059B				  Number OFFSET	0786
+_L05D1				  Number OFFSET	07BC
+_L05E2				  Number OFFSET	07CD
+_L0601				  Number OFFSET	07EC
+_L0612				  Number OFFSET	07FD
+_L0623				  Number OFFSET	080E
+_L0638				  Number OFFSET	0823
+_L064C				  Number OFFSET	0837
+_L0656				  Number OFFSET	0841
+_L0666				  Number OFFSET	0851
+_L0676				  Number OFFSET	0861
+_L067F				  Number OFFSET	086A
+_L0688				  Number OFFSET	0889
+_L068D				  Number OFFSET	088F
+_L0692				  Number OFFSET	0895
+_L069B				  Number OFFSET	08A3
+_L06A0				  Number OFFSET	08A8
+_L06A5				  Number OFFSET	08AD
+_L06AE				  Number OFFSET	08BB
+_L06B3				  Number OFFSET	08C0
+_L06B8				  Number OFFSET	08C5
+_L06C2				  Number OFFSET	08D4
+_L06C7				  Number OFFSET	08D9
+_L06CC				  Number OFFSET	08DE
+_L06D6				  Number OFFSET	08ED
+_L06DB				  Number OFFSET	08F2
+_L06E0				  Number OFFSET	08F7
+_L06E9				  Number OFFSET	0905
+_L06EE				  Number OFFSET	090A
+_L06F3				  Number OFFSET	090F
+_L06F5				  Number OFFSET	0911
+_L070F				  Number OFFSET	092B
+_L073B				  Number OFFSET	0999
+_L0745				  Number OFFSET	09A3
+_L074E				  Number OFFSET	09B0
+_L0756				  Number OFFSET	09B8
+_L0780				  Number OFFSET	09E2
+_L0783				  Number OFFSET	09E5
+_L078B				  Number OFFSET	09ED
+_L083D				  Number OFFSET	0D66
+_L086B				  Number OFFSET	0D94
+_L08A3				  Number OFFSET	0DCC
+_L08B2				  Number OFFSET	0DDB
+_L08F3				  Number OFFSET	0E1C
+_L0920				  Number OFFSET	0E49
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 42
+Symbol Table
+
+
+
+_L0996				  Number OFFSET	0EBF
+_L09A2				  Number OFFSET	0ECB
+_L09E9				  Number OFFSET	0F12
+_L09F2				  Number OFFSET	0F1B
+_L09F7				  Number OFFSET	0F20
+_L09FA				  Number OFFSET	0F23
+_L09FF				  Number OFFSET	0F28
+_L0BFD				  Number OFFSET	1171
+_L0C34				  Number OFFSET	11A8
+_L0C46				  Number OFFSET	11BA
+_L0C7F				  Number OFFSET	11F3
+_L0C87				  Number OFFSET	11FB
+_L0D2B				  Number OFFSET	129F
+_L0DB6				  Number OFFSET	132A
+_L0E46				  Number OFFSET	13BA
+_L0FB4				  Number OFFSET	1528
+_L0FD0				  Number OFFSET	1544
+_L0FDE				  Number OFFSET	1552
+_L1008				  Number OFFSET	1581
+_L12DD				  Number OFFSET	18AA
+_L12E1				  Number OFFSET	18AE
+_L12FC				  Number OFFSET	18C9
+_L1300				  Number OFFSET	18CD
+_L1318				  Number OFFSET	18E5
+_L1326				  Number OFFSET	18F3
+_L1333				  Number OFFSET	1900
+_L134F				  Number OFFSET	191C
+_L136F				  Number OFFSET	193C
+_L1370				  Number OFFSET	193D
+_L13FE				  Number OFFSET	19D6
+_L13FF				  Number OFFSET	19D7
+_L1469				  Number OFFSET	1A45
+_L149B				  Number OFFSET	1A77
+_L14A9				  Number OFFSET	1A85
+_L14BA				  Number OFFSET	1A96
+_L14CB				  Number OFFSET	1AA7
+_L14CC				  Number OFFSET	1AAB
+_L1644				  Number OFFSET	1C67
+_L164D				  Number OFFSET	1C70
+_L164E				  Number OFFSET	1C74
+_L1671				  Number OFFSET	1C98
+_L1672				  Number OFFSET	1CBE
+_L168E				  Number OFFSET	1CDA
+_L16AB				  Number OFFSET	1CF7
+_L1722				  Number OFFSET	1D83
+_L1726				  Number OFFSET	1D87
+_L1779				  Number OFFSET	1DDA
+_L178B				  Number OFFSET	1E18
+_L17AA				  Number OFFSET	1E37
+_L17BA				  Number OFFSET	1E47
+_L17CD				  Number OFFSET	1E5A
+_L17D7				  Number OFFSET	1E64
+_L17DC				  Number OFFSET	1E69
+_L17E1				  Number OFFSET	1E6E
+_L17E6				  Number OFFSET	1E73
+_L1810				  Number OFFSET	1E9D
+_L1811				  Number OFFSET	1EA2
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 43
+Symbol Table
+
+
+
+_L187A				  Number OFFSET	1F40
+_L18A4				  Number OFFSET	1F4A
+_L18B6				  Number OFFSET	1F5E
+_L18DC				  Number OFFSET	1F80
+_L19A5				  Number OFFSET	1F8E
+_L19D5				  Number OFFSET	1FBA
+_L1A49				  Number OFFSET	2014
+_L1A55				  Number OFFSET	2028
+_L1A5D				  Number OFFSET	203F
+_L1A6F				  Number OFFSET	2052
+_L1A70				  Number OFFSET	2057
+_L1AB0				  Number OFFSET	20B8
+_L1ABA				  Number OFFSET	20C2
+_L1ABE				  Number OFFSET	20C6
+_L1AED				  Number OFFSET	2192
+_L1AF1				  Number OFFSET	2196
+_L1B6F				  Number OFFSET	21C4
+_L1B93				  Number OFFSET	2213
+_L1BA5				  Number OFFSET	224F
+_L1BEA				  Number OFFSET	227A
+_L1BEB				  Number OFFSET	227E
+_L1CDB				  Number OFFSET	23C6
+_L1CE5				  Number OFFSET	23D0
+_L1D7A				  Number OFFSET	2465
+_L1E3D				  Number OFFSET	2528
+_L1E44				  Number OFFSET	252F
+_L1EA3				  Number OFFSET	258E
+_L1EAB				  Number OFFSET	2596
+_L1EBC				  Number OFFSET	25A8
+_L1EBD				  Number OFFSET	25AC
+_L1EBE				  Number OFFSET	25B0
+_L1EF2				  Number OFFSET	25EC
+_L1EF3				  Number OFFSET	25F0
+_L1EF4				  Number OFFSET	25F4
+_L1F48				  Number OFFSET	2650
+_L1F4E				  Number OFFSET	2656
+_L1F64				  Number OFFSET	266C
+_L1F7D				  Number OFFSET	2685
+_L1F9B				  Number OFFSET	26A3
+_L1FDB				  Number OFFSET	26E3
+_L1FE4				  Number OFFSET	26EC
+_L1FEA				  Number OFFSET	26F2
+_L1FF1				  Number OFFSET	26F9
+_L201B				  Number OFFSET	272A
+_L20D4				  Number OFFSET	27FD
+_L20E2				  Number OFFSET	2E9B
+_LOADRUNOVERLAY			  Number OFFSET	2339
+_LOADRUNOVERLAYREC		  Number OFFSET	232C
+_LST				  Number OFFSET	0184
+_LSTOUTPTR			  Number OFFSET	0171
+_L_ABS				  Number OFFSET	0A61
+_L_ADD				  Number OFFSET	0A74
+_L_AND				  Number OFFSET	0A1E
+_L_DIV				  Number OFFSET	0B16
+_L_EQ				  Number OFFSET	0883
+_L_FOR_DOWNTO			  Number OFFSET	0851
+_L_FOR_TO			  Number OFFSET	0851
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 44
+Symbol Table
+
+
+
+_L_GT				  Number OFFSET	08E8
+_L_GTE				  Number OFFSET	08B6
+_L_LS				  Number OFFSET	0900
+_L_LSE				  Number OFFSET	08CF
+_L_MOD				  Number OFFSET	0B2C
+_L_MUL				  Number OFFSET	0A9A
+_L_NEG				  Number OFFSET	0A64
+_L_NEQ				  Number OFFSET	089E
+_L_NOT				  Number OFFSET	0A54
+_L_OR				  Number OFFSET	0A30
+_L_PRED				  Number OFFSET	0873
+_L_R				  Number OFFSET	15A0
+_L_SHL				  Number OFFSET	0BD5
+_L_SHR				  Number OFFSET	0BF1
+_L_SQR				  Number OFFSET	0A94
+_L_SUB				  Number OFFSET	0A7F
+_L_SUCC				  Number OFFSET	087C
+_L_XOR				  Number OFFSET	0A42
+_MEMMAN				  Number OFFSET	057E
+_MEMMNVER			  Number OFFSET	057F
+_OUTPUT				  Number OFFSET	018A
+_OVERLAYLOADPTR			  Number OFFSET	238E
+_OVERLAYREC1			  Number OFFSET	2301
+_PRT_LONG			  Number OFFSET	1DEC
+_RECURPTR			  Number OFFSET	0194
+_RENAMEFILE_LIB			  Number OFFSET	2225
+_RUNGIOS			  Number OFFSET	057B
+_R_L				  Number OFFSET	15C4
+_TSRPRESENT			  Number OFFSET	052E
+_USRINPTR			  Number OFFSET	017D
+_USROUTPTR			  Number OFFSET	017A
+
+Macro Name
+
+DC
+GLOBAL2
+GLOBALS
+OFF_HL
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0000 Word	  Public  DATA
+_TEXT				  16  045C Word	  Public  CODE
+

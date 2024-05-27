@@ -1,0 +1,6 @@
+tur.lib & 
++ ..\library\msx_obj\fileio.obj &
++ msx_obj\tur_comp.obj &
++ msx_obj\tur_slib.obj &
++ msx_obj\tur_glib.obj &
++ msx_obj\tur_end.obj

@@ -1,0 +1,1522 @@
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 1
+msx_asm\tur_end.ASM
+
+
+
+      1	    0000				  .model small
+      2	    0000				  .code
+      3						  .486 ; .8086
+      4
+      5						  include msx_gen\end.mc
+1     6
+1     7						  INCLUDE STDIO.INC
+2     8		  =0004			 FIL_HDR  EQU 4			     ; length of FILE header
+2     9
+2    10						  include ..\library\fileio.inc
+3    11
+3    12					 ; FILEIO.MAC global definitions file
+3    13
+3    14						  GLOBAL DOS2Present:NEAR
+3    15						  GLOBAL InitFileIO:NEAR
+3    16						  GLOBAL GetError:NEAR
+3    17						  GLOBAL SetErrorHandler:NEAR
+3    18						  GLOBAL ResErrorHandler:NEAR
+3    19
+3    20						  GLOBAL ParseName:NEAR
+3    21						  GLOBAL SetExtension:NEAR
+3    22
+3    23						  GLOBAL CreateFile:NEAR
+3    24						  GLOBAL OpenFile:NEAR
+3    25						  GLOBAL ReadFile:NEAR
+3    26						  GLOBAL WriteFile:NEAR
+3    27						  GLOBAL CloseFile:NEAR
+3    28						  GLOBAL FileSeek:NEAR
+3    29						  GLOBAL FilePos:NEAR
+3    30						  GLOBAL FileSize:NEAR
+3    31						  GLOBAL DeleteFile:NEAR     ; or subdirectory
+3    32						  GLOBAL RenameFile:NEAR     ; or subdirectory
+3    33						  GLOBAL GetCurrentDirectory:NEAR
+3    34
+3    35						  GLOBAL FatalError:NEAR     ; 0 = no fatal error, NonZero = fatal
+3    36						  GLOBAL ErrorNumber:NEAR    ; 0 = no error, NonZero = DOS 2 error code
+3    37
+3    38		  =0024			 FCB_LEN	   EQU 36	     ; length of an FCB
+3    39
+3    40		  =0000			 FCB_DRIVE	   EQU 0	     ; Drive Number
+3    41		  =0001			 FCB_NAME	   EQU 1	     ; Name
+3    42		  =0009			 FCB_EXT	   EQU 9	     ; Extension
+3    43		  =000E			 FCB_RECSIZE	   EQU 0EH	     ; Record Size (word)
+3    44		  =0010			 FCB_FILESIZE	   EQU 10H	     ; File Size (long)
+3    45		  =0021			 FCB_FILEPOS	   EQU 21H	     ; File Position (long)
+3    46
+3    47
+2    48
+2    49		  =0000			 FIB_F	  EQU 0			     ; Flags byte
+2    50		  =0001			 FIB_CHR  EQU 1			     ; Character buffer
+2    51		  =0002			 FIB_PTR  EQU 2			     ; Sector buffer pointer
+2    52		  =0004			 FIB_NUM  EQU 4			     ; Number of records
+2    53		  =0006			 FIB_REC  EQU 6			     ; Record length
+2    54		  =0008			 FIB_CUR  EQU 8			     ; Current record
+2    55		  =000C			 FIB_FCB  EQU 12		     ; First byte of FCB
+2    56		  =0030			 FIB_BUF  EQU 48		     ; First byte of sector buffer
+2    57
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 2
+msx_asm\tur_end.ASM
+
+
+
+2    58		  =00B0			 FIB_LEN  EQU FIB_BUF+128	     ; total length of a complete FIB
+2    59
+2    60		  =0000			 DOS_FLG  EQU 0			     ; Flags byte
+2    61		  =0001			 DOS_CHR  EQU 1			     ; Character buffer
+2    62		  =0002			 DOS_PTR  EQU 2			     ; Sector buffer pointer
+2    63		  =0004			 DOS_BLEN EQU 4			     ; Sector buffer length
+2    64		  =0006			 DOS_NUM  EQU 6			     ; Number of records
+2    65		  =000A			 DOS_REC  EQU 10		     ; Record length
+2    66		  =000C			 DOS_CUR  EQU 12		     ; Current record
+2    67		  =0010			 DOS_FCB  EQU 16		     ; First byte FCB/Handle structure
+2    68		  =0051			 DOS_BUF  EQU (16 + 65)		     ; First byte of sector buffer
+2    69
+2    70		  =00D1			 DOS_LEN  EQU (DOS_BUF + 128)
+2    71
+2    72						  include ..\library\macros.inc
+3    73					 OFF_HL	  MACRO	CURRENT,NEW
+3    74						  LOCAL	DIF
+3    75					 DIF	  EQU (NEW)-(CURRENT)
+3    76
+3    77					 IFDEF MSX
+3    78						  IFE DIF-1
+3    79						   DB 23h; INC HL
+3    80						  ELSE
+3    81						   IFE DIF-2
+3    82						    DB 23h; INC	HL
+3    83						    DB 23h; INC	HL
+3    84						   ELSE
+3    85						    IFE	DIF-3
+3    86						     DB	23h; INC HL
+3    87						     DB	23h; INC HL
+3    88						     DB	23h; INC HL
+3    89						    ELSE
+3    90						     IFE DIF+1
+3    91						      DB 2bh; DEC HL
+3    92						     ELSE
+3    93						      IFE DIF+2
+3    94						       DB 2bh; DEC HL
+3    95						       DB 2bh; DEC HL
+3    96						      ELSE
+3    97						       IFE DIF+3
+3    98							DB 2bh;	DEC HL
+3    99							DB 2bh;	DEC HL
+3   100							DB 2bh;	DEC HL
+3   101						       ELSE
+3   102							IFE DIF
+3   103							ELSE
+3   104							 DB 0D5H ; PUSH	DE
+3   105							 DB 11H
+3   106							 DW DIF
+3   107							 DB 19H	 ; ADD HL,DE
+3   108							 DB 0D1H ; POP DE
+3   109							ENDIF
+3   110						       ENDIF
+3   111						      ENDIF
+3   112						     ENDIF
+3   113						    ENDIF
+3   114						   ENDIF
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 3
+msx_asm\tur_end.ASM
+
+
+
+3   115						  ENDIF
+3   116					 ELSE
+3   117						  IFE DIF-1
+3   118						   INC bx
+3   119						  ELSE
+3   120						   IFE DIF-2
+3   121						    INC	bx
+3   122						    INC	bx
+3   123						   ELSE
+3   124						    IFE	DIF-3
+3   125						     INC bx
+3   126						     INC bx
+3   127						     INC bx
+3   128						    ELSE
+3   129						     IFE DIF+1
+3   130						      DEC bx
+3   131						     ELSE
+3   132						      IFE DIF+2
+3   133						       DEC bx
+3   134						       DEC bx
+3   135						      ELSE
+3   136						       IFE DIF+3
+3   137							DEC bx
+3   138							DEC bx
+3   139							DEC bx
+3   140						       ELSE
+3   141							IFE DIF
+3   142							ELSE
+3   143							 push dx
+3   144							 mov dx,DIF
+3   145							 ADD bx,dx
+3   146							 pop dx
+3   147							ENDIF
+3   148						       ENDIF
+3   149						      ENDIF
+3   150						     ENDIF
+3   151						    ENDIF
+3   152						   ENDIF
+3   153						  ENDIF
+3   154					 ENDIF
+3   155
+3   156						  ENDM
+3   157
+3   158					 dc	 macro string
+3   159
+3   160						 strsize sizestr <string>
+3   161						 pos = 0
+3   162
+3   163						 irpc parameter,string
+3   164							 pos = pos + 1
+3   165
+3   166							 if pos	EQ strsize - 1
+3   167							 db '&parameter' + 80h
+3   168							 endif
+3   169
+3   170							 if pos	GT 1
+3   171								 if pos	LT strsize -1
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 4
+msx_asm\tur_end.ASM
+
+
+
+3   172									 db '&parameter'
+3   173								 endif
+3   174							 endif
+3   175
+3   176						 endm
+3   177
+3   178						 endm
+3   179
+3   180
+2   181
+1   182
+1   183						  INCLUDE LIBDEFS.INC
+2   184
+2   185
+2   186					 GLOBAL2  MACRO	NAME
+2   187						  GLOBAL NAME :	NEAR
+2   188
+2   189						  IFDEF	MSX
+2   190						  IFDEF	RUNTIME
+2   191						  GLOBAL _&NAME	: NEAR
+2   192					 _&NAME:
+2   193						  ELSE
+2   194							   _&NAME EQU NAME
+2   195						  ENDIF
+2   196						  ELSE
+2   197							   _&NAME EQU NAME
+2   198						  ENDIF
+2   199
+2   200						  ENDM
+2   201
+2   202					 GLOBALS MACRO NAMES
+2   203
+2   204						  IRP NAME,<NAMES>
+2   205							   GLOBAL2 <NAME>
+2   206						  ENDM
+2   207
+2   208						  ENDM
+2   209
+2   210						  INCLUDE libconst.inc
+3   211		  =OFFSET 0177		 _AUXINPTR EQU offset 00177h
+3   212		  =OFFSET 0174		 _AUXOUTPTR EQU	offset 00174h
+3   213		  =OFFSET 018C		 _BUFLEN EQU offset 0018Ch
+3   214		  =OFFSET 0190		 _CBREAK EQU offset 00190h
+3   215		  =OFFSET 016B		 _CONINPTR EQU offset 0016Bh
+3   216		  =OFFSET 016E		 _CONOUTPTR EQU	offset 0016Eh
+3   217		  =OFFSET 0168		 _CONSTPTR EQU offset 00168h
+3   218		  =OFFSET 2887		 _DOSERRORHANDLEROFF EQU offset	02887h
+3   219		  =OFFSET 2884		 _DOSERRORHANDLERON EQU	offset 02884h
+3   220		  =OFFSET 286F		 _ERROREXIT EQU	offset 0286Fh
+3   221		  =OFFSET 018D		 _ERRORPTR EQU offset 0018Dh
+3   222		  =OFFSET 2703		 _GETERROR_LIB EQU offset 02703h
+3   223		  =OFFSET 0581		 _GIOSOK EQU offset 00581h
+3   224		  =OFFSET 0582		 _GIOSVER EQU offset 00582h
+3   225		  =OFFSET 0192		 _HEAPPTR EQU offset 00192h
+3   226		  =OFFSET 0180		 _L00B8	EQU offset 00180h
+3   227		  =OFFSET 0182		 _L00BA	EQU offset 00182h
+3   228		  =OFFSET 0186		 _L00BE	EQU offset 00186h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 5
+msx_asm\tur_end.ASM
+
+
+
+3   229		  =OFFSET 0188		 _L00C0	EQU offset 00188h
+3   230		  =OFFSET 02D0		 _L021D	EQU offset 002D0h
+3   231		  =OFFSET 02F1		 _L023E	EQU offset 002F1h
+3   232		  =OFFSET 030C		 _L0259	EQU offset 0030Ch
+3   233		  =OFFSET 0315		 _L0262	EQU offset 00315h
+3   234		  =OFFSET 031E		 _L026B	EQU offset 0031Eh
+3   235		  =OFFSET 0337		 _L0284	EQU offset 00337h
+3   236		  =OFFSET 034C		 _L0299	EQU offset 0034Ch
+3   237		  =OFFSET 03BD		 _L030A	EQU offset 003BDh
+3   238		  =OFFSET 03C3		 _L0310	EQU offset 003C3h
+3   239		  =OFFSET 0420		 _L0364	EQU offset 00420h
+3   240		  =OFFSET 06C3		 _L04D4	EQU offset 006C3h
+3   241		  =OFFSET 06F4		 _L0508	EQU offset 006F4h
+3   242		  =OFFSET 070E		 _L0522	EQU offset 0070Eh
+3   243		  =OFFSET 0717		 _L052C	EQU offset 00717h
+3   244		  =OFFSET 0725		 _L053A	EQU offset 00725h
+3   245		  =OFFSET 0738		 _L054D	EQU offset 00738h
+3   246		  =OFFSET 0748		 _L055D	EQU offset 00748h
+3   247		  =OFFSET 076C		 _L0581	EQU offset 0076Ch
+3   248		  =OFFSET 077C		 _L0591	EQU offset 0077Ch
+3   249		  =OFFSET 0786		 _L059B	EQU offset 00786h
+3   250		  =OFFSET 07BC		 _L05D1	EQU offset 007BCh
+3   251		  =OFFSET 07CD		 _L05E2	EQU offset 007CDh
+3   252		  =OFFSET 07EC		 _L0601	EQU offset 007ECh
+3   253		  =OFFSET 07FD		 _L0612	EQU offset 007FDh
+3   254		  =OFFSET 080E		 _L0623	EQU offset 0080Eh
+3   255		  =OFFSET 0823		 _L0638	EQU offset 00823h
+3   256		  =OFFSET 0837		 _L064C	EQU offset 00837h
+3   257		  =OFFSET 0841		 _L0656	EQU offset 00841h
+3   258		  =OFFSET 0851		 _L0666	EQU offset 00851h
+3   259		  =OFFSET 0861		 _L0676	EQU offset 00861h
+3   260		  =OFFSET 086A		 _L067F	EQU offset 0086Ah
+3   261		  =OFFSET 0889		 _L0688	EQU offset 00889h
+3   262		  =OFFSET 088F		 _L068D	EQU offset 0088Fh
+3   263		  =OFFSET 0895		 _L0692	EQU offset 00895h
+3   264		  =OFFSET 08A3		 _L069B	EQU offset 008A3h
+3   265		  =OFFSET 08A8		 _L06A0	EQU offset 008A8h
+3   266		  =OFFSET 08AD		 _L06A5	EQU offset 008ADh
+3   267		  =OFFSET 08BB		 _L06AE	EQU offset 008BBh
+3   268		  =OFFSET 08C0		 _L06B3	EQU offset 008C0h
+3   269		  =OFFSET 08C5		 _L06B8	EQU offset 008C5h
+3   270		  =OFFSET 08D4		 _L06C2	EQU offset 008D4h
+3   271		  =OFFSET 08D9		 _L06C7	EQU offset 008D9h
+3   272		  =OFFSET 08DE		 _L06CC	EQU offset 008DEh
+3   273		  =OFFSET 08ED		 _L06D6	EQU offset 008EDh
+3   274		  =OFFSET 08F2		 _L06DB	EQU offset 008F2h
+3   275		  =OFFSET 08F7		 _L06E0	EQU offset 008F7h
+3   276		  =OFFSET 0905		 _L06E9	EQU offset 00905h
+3   277		  =OFFSET 090A		 _L06EE	EQU offset 0090Ah
+3   278		  =OFFSET 090F		 _L06F3	EQU offset 0090Fh
+3   279		  =OFFSET 0911		 _L06F5	EQU offset 00911h
+3   280		  =OFFSET 092B		 _L070F	EQU offset 0092Bh
+3   281		  =OFFSET 0999		 _L073B	EQU offset 00999h
+3   282		  =OFFSET 09A3		 _L0745	EQU offset 009A3h
+3   283		  =OFFSET 09B0		 _L074E	EQU offset 009B0h
+3   284		  =OFFSET 09B8		 _L0756	EQU offset 009B8h
+3   285		  =OFFSET 09E2		 _L0780	EQU offset 009E2h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 6
+msx_asm\tur_end.ASM
+
+
+
+3   286		  =OFFSET 09E5		 _L0783	EQU offset 009E5h
+3   287		  =OFFSET 09ED		 _L078B	EQU offset 009EDh
+3   288		  =OFFSET 0D66		 _L083D	EQU offset 00D66h
+3   289		  =OFFSET 0D94		 _L086B	EQU offset 00D94h
+3   290		  =OFFSET 0DCC		 _L08A3	EQU offset 00DCCh
+3   291		  =OFFSET 0DDB		 _L08B2	EQU offset 00DDBh
+3   292		  =OFFSET 0E1C		 _L08F3	EQU offset 00E1Ch
+3   293		  =OFFSET 0E49		 _L0920	EQU offset 00E49h
+3   294		  =OFFSET 0EBF		 _L0996	EQU offset 00EBFh
+3   295		  =OFFSET 0ECB		 _L09A2	EQU offset 00ECBh
+3   296		  =OFFSET 0F12		 _L09E9	EQU offset 00F12h
+3   297		  =OFFSET 0F1B		 _L09F2	EQU offset 00F1Bh
+3   298		  =OFFSET 0F20		 _L09F7	EQU offset 00F20h
+3   299		  =OFFSET 0F23		 _L09FA	EQU offset 00F23h
+3   300		  =OFFSET 0F28		 _L09FF	EQU offset 00F28h
+3   301		  =OFFSET 1171		 _L0BFD	EQU offset 01171h
+3   302		  =OFFSET 11A8		 _L0C34	EQU offset 011A8h
+3   303		  =OFFSET 11BA		 _L0C46	EQU offset 011BAh
+3   304		  =OFFSET 11F3		 _L0C7F	EQU offset 011F3h
+3   305		  =OFFSET 11FB		 _L0C87	EQU offset 011FBh
+3   306		  =OFFSET 129F		 _L0D2B	EQU offset 0129Fh
+3   307		  =OFFSET 132A		 _L0DB6	EQU offset 0132Ah
+3   308		  =OFFSET 13BA		 _L0E46	EQU offset 013BAh
+3   309		  =OFFSET 1528		 _L0FB4	EQU offset 01528h
+3   310		  =OFFSET 1544		 _L0FD0	EQU offset 01544h
+3   311		  =OFFSET 1552		 _L0FDE	EQU offset 01552h
+3   312		  =OFFSET 1581		 _L1008	EQU offset 01581h
+3   313		  =OFFSET 18AA		 _L12DD	EQU offset 018AAh
+3   314		  =OFFSET 18AE		 _L12E1	EQU offset 018AEh
+3   315		  =OFFSET 18C9		 _L12FC	EQU offset 018C9h
+3   316		  =OFFSET 18CD		 _L1300	EQU offset 018CDh
+3   317		  =OFFSET 18E5		 _L1318	EQU offset 018E5h
+3   318		  =OFFSET 18F3		 _L1326	EQU offset 018F3h
+3   319		  =OFFSET 1900		 _L1333	EQU offset 01900h
+3   320		  =OFFSET 191C		 _L134F	EQU offset 0191Ch
+3   321		  =OFFSET 193C		 _L136F	EQU offset 0193Ch
+3   322		  =OFFSET 193D		 _L1370	EQU offset 0193Dh
+3   323		  =OFFSET 19D6		 _L13FE	EQU offset 019D6h
+3   324		  =OFFSET 19D7		 _L13FF	EQU offset 019D7h
+3   325		  =OFFSET 1A45		 _L1469	EQU offset 01A45h
+3   326		  =OFFSET 1A77		 _L149B	EQU offset 01A77h
+3   327		  =OFFSET 1A85		 _L14A9	EQU offset 01A85h
+3   328		  =OFFSET 1A96		 _L14BA	EQU offset 01A96h
+3   329		  =OFFSET 1AA7		 _L14CB	EQU offset 01AA7h
+3   330		  =OFFSET 1AAB		 _L14CC	EQU offset 01AABh
+3   331		  =OFFSET 1C67		 _L1644	EQU offset 01C67h
+3   332		  =OFFSET 1C70		 _L164D	EQU offset 01C70h
+3   333		  =OFFSET 1C74		 _L164E	EQU offset 01C74h
+3   334		  =OFFSET 1C98		 _L1671	EQU offset 01C98h
+3   335		  =OFFSET 1CBE		 _L1672	EQU offset 01CBEh
+3   336		  =OFFSET 1CDA		 _L168E	EQU offset 01CDAh
+3   337		  =OFFSET 1CF7		 _L16AB	EQU offset 01CF7h
+3   338		  =OFFSET 1D83		 _L1722	EQU offset 01D83h
+3   339		  =OFFSET 1D87		 _L1726	EQU offset 01D87h
+3   340		  =OFFSET 1DDA		 _L1779	EQU offset 01DDAh
+3   341		  =OFFSET 1E18		 _L178B	EQU offset 01E18h
+3   342		  =OFFSET 1E37		 _L17AA	EQU offset 01E37h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 7
+msx_asm\tur_end.ASM
+
+
+
+3   343		  =OFFSET 1E47		 _L17BA	EQU offset 01E47h
+3   344		  =OFFSET 1E5A		 _L17CD	EQU offset 01E5Ah
+3   345		  =OFFSET 1E64		 _L17D7	EQU offset 01E64h
+3   346		  =OFFSET 1E69		 _L17DC	EQU offset 01E69h
+3   347		  =OFFSET 1E6E		 _L17E1	EQU offset 01E6Eh
+3   348		  =OFFSET 1E73		 _L17E6	EQU offset 01E73h
+3   349		  =OFFSET 1E9D		 _L1810	EQU offset 01E9Dh
+3   350		  =OFFSET 1EA2		 _L1811	EQU offset 01EA2h
+3   351		  =OFFSET 1F40		 _L187A	EQU offset 01F40h
+3   352		  =OFFSET 1F4A		 _L18A4	EQU offset 01F4Ah
+3   353		  =OFFSET 1F5E		 _L18B6	EQU offset 01F5Eh
+3   354		  =OFFSET 1F80		 _L18DC	EQU offset 01F80h
+3   355		  =OFFSET 1F8E		 _L19A5	EQU offset 01F8Eh
+3   356		  =OFFSET 1FBA		 _L19D5	EQU offset 01FBAh
+3   357		  =OFFSET 2014		 _L1A49	EQU offset 02014h
+3   358		  =OFFSET 2028		 _L1A55	EQU offset 02028h
+3   359		  =OFFSET 203F		 _L1A5D	EQU offset 0203Fh
+3   360		  =OFFSET 2052		 _L1A6F	EQU offset 02052h
+3   361		  =OFFSET 2057		 _L1A70	EQU offset 02057h
+3   362		  =OFFSET 20B8		 _L1AB0	EQU offset 020B8h
+3   363		  =OFFSET 20C2		 _L1ABA	EQU offset 020C2h
+3   364		  =OFFSET 20C6		 _L1ABE	EQU offset 020C6h
+3   365		  =OFFSET 2192		 _L1AED	EQU offset 02192h
+3   366		  =OFFSET 2196		 _L1AF1	EQU offset 02196h
+3   367		  =OFFSET 21C4		 _L1B6F	EQU offset 021C4h
+3   368		  =OFFSET 2213		 _L1B93	EQU offset 02213h
+3   369		  =OFFSET 224F		 _L1BA5	EQU offset 0224Fh
+3   370		  =OFFSET 227A		 _L1BEA	EQU offset 0227Ah
+3   371		  =OFFSET 227E		 _L1BEB	EQU offset 0227Eh
+3   372		  =OFFSET 23C6		 _L1CDB	EQU offset 023C6h
+3   373		  =OFFSET 23D0		 _L1CE5	EQU offset 023D0h
+3   374		  =OFFSET 2465		 _L1D7A	EQU offset 02465h
+3   375		  =OFFSET 2528		 _L1E3D	EQU offset 02528h
+3   376		  =OFFSET 252F		 _L1E44	EQU offset 0252Fh
+3   377		  =OFFSET 258E		 _L1EA3	EQU offset 0258Eh
+3   378		  =OFFSET 2596		 _L1EAB	EQU offset 02596h
+3   379		  =OFFSET 25A8		 _L1EBC	EQU offset 025A8h
+3   380		  =OFFSET 25AC		 _L1EBD	EQU offset 025ACh
+3   381		  =OFFSET 25B0		 _L1EBE	EQU offset 025B0h
+3   382		  =OFFSET 25EC		 _L1EF2	EQU offset 025ECh
+3   383		  =OFFSET 25F0		 _L1EF3	EQU offset 025F0h
+3   384		  =OFFSET 25F4		 _L1EF4	EQU offset 025F4h
+3   385		  =OFFSET 2650		 _L1F48	EQU offset 02650h
+3   386		  =OFFSET 2656		 _L1F4E	EQU offset 02656h
+3   387		  =OFFSET 266C		 _L1F64	EQU offset 0266Ch
+3   388		  =OFFSET 2685		 _L1F7D	EQU offset 02685h
+3   389		  =OFFSET 26A3		 _L1F9B	EQU offset 026A3h
+3   390		  =OFFSET 26E3		 _L1FDB	EQU offset 026E3h
+3   391		  =OFFSET 26EC		 _L1FE4	EQU offset 026ECh
+3   392		  =OFFSET 26F2		 _L1FEA	EQU offset 026F2h
+3   393		  =OFFSET 26F9		 _L1FF1	EQU offset 026F9h
+3   394		  =OFFSET 272A		 _L201B	EQU offset 0272Ah
+3   395		  =OFFSET 27FD		 _L20D4	EQU offset 027FDh
+3   396		  =OFFSET 2E9B		 _L20E2	EQU offset 02E9Bh
+3   397		  =OFFSET 2339		 _LOADRUNOVERLAY EQU offset 02339h
+3   398		  =OFFSET 232C		 _LOADRUNOVERLAYREC EQU	offset 0232Ch
+3   399		  =OFFSET 0184		 _LST EQU offset 00184h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 8
+msx_asm\tur_end.ASM
+
+
+
+3   400		  =OFFSET 0171		 _LSTOUTPTR EQU	offset 00171h
+3   401		  =OFFSET 0A61		 _L_ABS	EQU offset 00A61h
+3   402		  =OFFSET 0A74		 _L_ADD	EQU offset 00A74h
+3   403		  =OFFSET 0A1E		 _L_AND	EQU offset 00A1Eh
+3   404		  =OFFSET 0B16		 _L_DIV	EQU offset 00B16h
+3   405		  =OFFSET 0883		 _L_EQ EQU offset 00883h
+3   406		  =OFFSET 0851		 _L_FOR_DOWNTO EQU offset 00851h
+3   407		  =OFFSET 0851		 _L_FOR_TO EQU offset 00851h
+3   408		  =OFFSET 08E8		 _L_GT EQU offset 008E8h
+3   409		  =OFFSET 08B6		 _L_GTE	EQU offset 008B6h
+3   410		  =OFFSET 0900		 _L_LS EQU offset 00900h
+3   411		  =OFFSET 08CF		 _L_LSE	EQU offset 008CFh
+3   412		  =OFFSET 0B2C		 _L_MOD	EQU offset 00B2Ch
+3   413		  =OFFSET 0A9A		 _L_MUL	EQU offset 00A9Ah
+3   414		  =OFFSET 0A64		 _L_NEG	EQU offset 00A64h
+3   415		  =OFFSET 089E		 _L_NEQ	EQU offset 0089Eh
+3   416		  =OFFSET 0A54		 _L_NOT	EQU offset 00A54h
+3   417		  =OFFSET 0A30		 _L_OR EQU offset 00A30h
+3   418		  =OFFSET 0873		 _L_PRED EQU offset 00873h
+3   419		  =OFFSET 15A0		 _L_R EQU offset 015A0h
+3   420		  =OFFSET 0BD5		 _L_SHL	EQU offset 00BD5h
+3   421		  =OFFSET 0BF1		 _L_SHR	EQU offset 00BF1h
+3   422		  =OFFSET 0A94		 _L_SQR	EQU offset 00A94h
+3   423		  =OFFSET 0A7F		 _L_SUB	EQU offset 00A7Fh
+3   424		  =OFFSET 087C		 _L_SUCC EQU offset 0087Ch
+3   425		  =OFFSET 0A42		 _L_XOR	EQU offset 00A42h
+3   426		  =OFFSET 057E		 _MEMMAN EQU offset 0057Eh
+3   427		  =OFFSET 057F		 _MEMMNVER EQU offset 0057Fh
+3   428		  =OFFSET 018A		 _OUTPUT EQU offset 0018Ah
+3   429		  =OFFSET 238E		 _OVERLAYLOADPTR EQU offset 0238Eh
+3   430		  =OFFSET 2301		 _OVERLAYREC1 EQU offset 02301h
+3   431		  =OFFSET 1DEC		 _PRT_LONG EQU offset 01DECh
+3   432		  =OFFSET 0194		 _RECURPTR EQU offset 00194h
+3   433		  =OFFSET 2225		 _RENAMEFILE_LIB EQU offset 02225h
+3   434		  =OFFSET 057B		 _RUNGIOS EQU offset 0057Bh
+3   435		  =OFFSET 15C4		 _R_L EQU offset 015C4h
+3   436		  =OFFSET 052E		 _TSRPRESENT EQU offset	0052Eh
+3   437		  =OFFSET 017D		 _USRINPTR EQU offset 0017Dh
+3   438		  =OFFSET 017A		 _USROUTPTR EQU	offset 0017Ah
+3   439		  =OFFSET 0168		 _CONSTPTR EQU offset 00168h
+3   440		  =OFFSET 016B		 _CONINPTR EQU offset 0016Bh
+3   441		  =OFFSET 016E		 _CONOUTPTR EQU	offset 0016Eh
+3   442		  =OFFSET 0171		 _LSTOUTPTR EQU	offset 00171h
+3   443		  =OFFSET 0174		 _AUXOUTPTR EQU	offset 00174h
+3   444		  =OFFSET 0177		 _AUXINPTR EQU offset 00177h
+3   445		  =OFFSET 017A		 _USROUTPTR EQU	offset 0017Ah
+3   446		  =OFFSET 017D		 _USRINPTR EQU offset 0017Dh
+3   447		  =OFFSET 0180		 _L00B8	EQU offset 00180h
+3   448		  =OFFSET 0182		 _L00BA	EQU offset 00182h
+3   449		  =OFFSET 0184		 _LST EQU offset 00184h
+3   450		  =OFFSET 0186		 _L00BE	EQU offset 00186h
+3   451		  =OFFSET 0188		 _L00C0	EQU offset 00188h
+3   452		  =OFFSET 018A		 _OUTPUT EQU offset 0018Ah
+3   453		  =OFFSET 018C		 _BUFLEN EQU offset 0018Ch
+3   454		  =OFFSET 018D		 _ERRORPTR EQU offset 0018Dh
+3   455		  =OFFSET 0190		 _CBREAK EQU offset 00190h
+3   456		  =OFFSET 0192		 _HEAPPTR EQU offset 00192h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 9
+msx_asm\tur_end.ASM
+
+
+
+3   457		  =OFFSET 0194		 _RECURPTR EQU offset 00194h
+3   458		  =OFFSET 02D0		 _L021D	EQU offset 002D0h
+3   459		  =OFFSET 02F1		 _L023E	EQU offset 002F1h
+3   460		  =OFFSET 030C		 _L0259	EQU offset 0030Ch
+3   461		  =OFFSET 0315		 _L0262	EQU offset 00315h
+3   462		  =OFFSET 031E		 _L026B	EQU offset 0031Eh
+3   463		  =OFFSET 0337		 _L0284	EQU offset 00337h
+3   464		  =OFFSET 034C		 _L0299	EQU offset 0034Ch
+3   465		  =OFFSET 03BD		 _L030A	EQU offset 003BDh
+3   466		  =OFFSET 03C3		 _L0310	EQU offset 003C3h
+3   467		  =OFFSET 0420		 _L0364	EQU offset 00420h
+3   468		  =OFFSET 052E		 _TSRPRESENT EQU offset	0052Eh
+3   469		  =OFFSET 057B		 _RUNGIOS EQU offset 0057Bh
+3   470		  =OFFSET 057E		 _MEMMAN EQU offset 0057Eh
+3   471		  =OFFSET 057F		 _MEMMNVER EQU offset 0057Fh
+3   472		  =OFFSET 0581		 _GIOSOK EQU offset 00581h
+3   473		  =OFFSET 0582		 _GIOSVER EQU offset 00582h
+3   474		  =OFFSET 06C3		 _L04D4	EQU offset 006C3h
+3   475		  =OFFSET 06F4		 _L0508	EQU offset 006F4h
+3   476		  =OFFSET 070E		 _L0522	EQU offset 0070Eh
+3   477		  =OFFSET 0717		 _L052C	EQU offset 00717h
+3   478		  =OFFSET 0725		 _L053A	EQU offset 00725h
+3   479		  =OFFSET 0738		 _L054D	EQU offset 00738h
+3   480		  =OFFSET 0748		 _L055D	EQU offset 00748h
+3   481		  =OFFSET 076C		 _L0581	EQU offset 0076Ch
+3   482		  =OFFSET 077C		 _L0591	EQU offset 0077Ch
+3   483		  =OFFSET 0786		 _L059B	EQU offset 00786h
+3   484		  =OFFSET 07BC		 _L05D1	EQU offset 007BCh
+3   485		  =OFFSET 07CD		 _L05E2	EQU offset 007CDh
+3   486		  =OFFSET 07EC		 _L0601	EQU offset 007ECh
+3   487		  =OFFSET 07FD		 _L0612	EQU offset 007FDh
+3   488		  =OFFSET 080E		 _L0623	EQU offset 0080Eh
+3   489		  =OFFSET 0823		 _L0638	EQU offset 00823h
+3   490		  =OFFSET 0837		 _L064C	EQU offset 00837h
+3   491		  =OFFSET 0841		 _L0656	EQU offset 00841h
+3   492		  =OFFSET 0851		 _L_FOR_TO EQU offset 00851h
+3   493		  =OFFSET 0851		 _L0666	EQU offset 00851h
+3   494		  =OFFSET 0851		 _L_FOR_DOWNTO EQU offset 00851h
+3   495		  =OFFSET 0861		 _L0676	EQU offset 00861h
+3   496		  =OFFSET 086A		 _L067F	EQU offset 0086Ah
+3   497		  =OFFSET 0873		 _L_PRED EQU offset 00873h
+3   498		  =OFFSET 087C		 _L_SUCC EQU offset 0087Ch
+3   499		  =OFFSET 0883		 _L_EQ EQU offset 00883h
+3   500		  =OFFSET 0889		 _L0688	EQU offset 00889h
+3   501		  =OFFSET 088F		 _L068D	EQU offset 0088Fh
+3   502		  =OFFSET 0895		 _L0692	EQU offset 00895h
+3   503		  =OFFSET 089E		 _L_NEQ	EQU offset 0089Eh
+3   504		  =OFFSET 08A3		 _L069B	EQU offset 008A3h
+3   505		  =OFFSET 08A8		 _L06A0	EQU offset 008A8h
+3   506		  =OFFSET 08AD		 _L06A5	EQU offset 008ADh
+3   507		  =OFFSET 08B6		 _L_GTE	EQU offset 008B6h
+3   508		  =OFFSET 08BB		 _L06AE	EQU offset 008BBh
+3   509		  =OFFSET 08C0		 _L06B3	EQU offset 008C0h
+3   510		  =OFFSET 08C5		 _L06B8	EQU offset 008C5h
+3   511		  =OFFSET 08CF		 _L_LSE	EQU offset 008CFh
+3   512		  =OFFSET 08D4		 _L06C2	EQU offset 008D4h
+3   513		  =OFFSET 08D9		 _L06C7	EQU offset 008D9h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 10
+msx_asm\tur_end.ASM
+
+
+
+3   514		  =OFFSET 08DE		 _L06CC	EQU offset 008DEh
+3   515		  =OFFSET 08E8		 _L_GT EQU offset 008E8h
+3   516		  =OFFSET 08ED		 _L06D6	EQU offset 008EDh
+3   517		  =OFFSET 08F2		 _L06DB	EQU offset 008F2h
+3   518		  =OFFSET 08F7		 _L06E0	EQU offset 008F7h
+3   519		  =OFFSET 0900		 _L_LS EQU offset 00900h
+3   520		  =OFFSET 0905		 _L06E9	EQU offset 00905h
+3   521		  =OFFSET 090A		 _L06EE	EQU offset 0090Ah
+3   522		  =OFFSET 090F		 _L06F3	EQU offset 0090Fh
+3   523		  =OFFSET 0911		 _L06F5	EQU offset 00911h
+3   524		  =OFFSET 092B		 _L070F	EQU offset 0092Bh
+3   525		  =OFFSET 0999		 _L073B	EQU offset 00999h
+3   526		  =OFFSET 09A3		 _L0745	EQU offset 009A3h
+3   527		  =OFFSET 09B0		 _L074E	EQU offset 009B0h
+3   528		  =OFFSET 09B8		 _L0756	EQU offset 009B8h
+3   529		  =OFFSET 09E2		 _L0780	EQU offset 009E2h
+3   530		  =OFFSET 09E5		 _L0783	EQU offset 009E5h
+3   531		  =OFFSET 09ED		 _L078B	EQU offset 009EDh
+3   532		  =OFFSET 0A1E		 _L_AND	EQU offset 00A1Eh
+3   533		  =OFFSET 0A30		 _L_OR EQU offset 00A30h
+3   534		  =OFFSET 0A42		 _L_XOR	EQU offset 00A42h
+3   535		  =OFFSET 0A54		 _L_NOT	EQU offset 00A54h
+3   536		  =OFFSET 0A61		 _L_ABS	EQU offset 00A61h
+3   537		  =OFFSET 0A64		 _L_NEG	EQU offset 00A64h
+3   538		  =OFFSET 0A74		 _L_ADD	EQU offset 00A74h
+3   539		  =OFFSET 0A7F		 _L_SUB	EQU offset 00A7Fh
+3   540		  =OFFSET 0A94		 _L_SQR	EQU offset 00A94h
+3   541		  =OFFSET 0A9A		 _L_MUL	EQU offset 00A9Ah
+3   542		  =OFFSET 0B16		 _L_DIV	EQU offset 00B16h
+3   543		  =OFFSET 0B2C		 _L_MOD	EQU offset 00B2Ch
+3   544		  =OFFSET 0BD5		 _L_SHL	EQU offset 00BD5h
+3   545		  =OFFSET 0BF1		 _L_SHR	EQU offset 00BF1h
+3   546		  =OFFSET 0D66		 _L083D	EQU offset 00D66h
+3   547		  =OFFSET 0D94		 _L086B	EQU offset 00D94h
+3   548		  =OFFSET 0DCC		 _L08A3	EQU offset 00DCCh
+3   549		  =OFFSET 0DDB		 _L08B2	EQU offset 00DDBh
+3   550		  =OFFSET 0E1C		 _L08F3	EQU offset 00E1Ch
+3   551		  =OFFSET 0E49		 _L0920	EQU offset 00E49h
+3   552		  =OFFSET 0EBF		 _L0996	EQU offset 00EBFh
+3   553		  =OFFSET 0ECB		 _L09A2	EQU offset 00ECBh
+3   554		  =OFFSET 0F12		 _L09E9	EQU offset 00F12h
+3   555		  =OFFSET 0F1B		 _L09F2	EQU offset 00F1Bh
+3   556		  =OFFSET 0F20		 _L09F7	EQU offset 00F20h
+3   557		  =OFFSET 0F23		 _L09FA	EQU offset 00F23h
+3   558		  =OFFSET 0F28		 _L09FF	EQU offset 00F28h
+3   559		  =OFFSET 1171		 _L0BFD	EQU offset 01171h
+3   560		  =OFFSET 11A8		 _L0C34	EQU offset 011A8h
+3   561		  =OFFSET 11BA		 _L0C46	EQU offset 011BAh
+3   562		  =OFFSET 11F3		 _L0C7F	EQU offset 011F3h
+3   563		  =OFFSET 11FB		 _L0C87	EQU offset 011FBh
+3   564		  =OFFSET 129F		 _L0D2B	EQU offset 0129Fh
+3   565		  =OFFSET 132A		 _L0DB6	EQU offset 0132Ah
+3   566		  =OFFSET 13BA		 _L0E46	EQU offset 013BAh
+3   567		  =OFFSET 1528		 _L0FB4	EQU offset 01528h
+3   568		  =OFFSET 1544		 _L0FD0	EQU offset 01544h
+3   569		  =OFFSET 1552		 _L0FDE	EQU offset 01552h
+3   570		  =OFFSET 1581		 _L1008	EQU offset 01581h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 11
+msx_asm\tur_end.ASM
+
+
+
+3   571		  =OFFSET 15A0		 _L_R EQU offset 015A0h
+3   572		  =OFFSET 15C4		 _R_L EQU offset 015C4h
+3   573		  =OFFSET 18AA		 _L12DD	EQU offset 018AAh
+3   574		  =OFFSET 18AE		 _L12E1	EQU offset 018AEh
+3   575		  =OFFSET 18C9		 _L12FC	EQU offset 018C9h
+3   576		  =OFFSET 18CD		 _L1300	EQU offset 018CDh
+3   577		  =OFFSET 18E5		 _L1318	EQU offset 018E5h
+3   578		  =OFFSET 18F3		 _L1326	EQU offset 018F3h
+3   579		  =OFFSET 1900		 _L1333	EQU offset 01900h
+3   580		  =OFFSET 191C		 _L134F	EQU offset 0191Ch
+3   581		  =OFFSET 193C		 _L136F	EQU offset 0193Ch
+3   582		  =OFFSET 193D		 _L1370	EQU offset 0193Dh
+3   583		  =OFFSET 19D6		 _L13FE	EQU offset 019D6h
+3   584		  =OFFSET 19D7		 _L13FF	EQU offset 019D7h
+3   585		  =OFFSET 1A45		 _L1469	EQU offset 01A45h
+3   586		  =OFFSET 1A77		 _L149B	EQU offset 01A77h
+3   587		  =OFFSET 1A85		 _L14A9	EQU offset 01A85h
+3   588		  =OFFSET 1A96		 _L14BA	EQU offset 01A96h
+3   589		  =OFFSET 1AA7		 _L14CB	EQU offset 01AA7h
+3   590		  =OFFSET 1AAB		 _L14CC	EQU offset 01AABh
+3   591		  =OFFSET 1C67		 _L1644	EQU offset 01C67h
+3   592		  =OFFSET 1C70		 _L164D	EQU offset 01C70h
+3   593		  =OFFSET 1C74		 _L164E	EQU offset 01C74h
+3   594		  =OFFSET 1C98		 _L1671	EQU offset 01C98h
+3   595		  =OFFSET 1CBE		 _L1672	EQU offset 01CBEh
+3   596		  =OFFSET 1CDA		 _L168E	EQU offset 01CDAh
+3   597		  =OFFSET 1CF7		 _L16AB	EQU offset 01CF7h
+3   598		  =OFFSET 1D83		 _L1722	EQU offset 01D83h
+3   599		  =OFFSET 1D87		 _L1726	EQU offset 01D87h
+3   600		  =OFFSET 1DDA		 _L1779	EQU offset 01DDAh
+3   601		  =OFFSET 1DEC		 _PRT_LONG EQU offset 01DECh
+3   602		  =OFFSET 1E18		 _L178B	EQU offset 01E18h
+3   603		  =OFFSET 1E37		 _L17AA	EQU offset 01E37h
+3   604		  =OFFSET 1E47		 _L17BA	EQU offset 01E47h
+3   605		  =OFFSET 1E5A		 _L17CD	EQU offset 01E5Ah
+3   606		  =OFFSET 1E64		 _L17D7	EQU offset 01E64h
+3   607		  =OFFSET 1E69		 _L17DC	EQU offset 01E69h
+3   608		  =OFFSET 1E6E		 _L17E1	EQU offset 01E6Eh
+3   609		  =OFFSET 1E73		 _L17E6	EQU offset 01E73h
+3   610		  =OFFSET 1E9D		 _L1810	EQU offset 01E9Dh
+3   611		  =OFFSET 1EA2		 _L1811	EQU offset 01EA2h
+3   612		  =OFFSET 1F40		 _L187A	EQU offset 01F40h
+3   613		  =OFFSET 1F4A		 _L18A4	EQU offset 01F4Ah
+3   614		  =OFFSET 1F5E		 _L18B6	EQU offset 01F5Eh
+3   615		  =OFFSET 1F80		 _L18DC	EQU offset 01F80h
+3   616		  =OFFSET 1F8E		 _L19A5	EQU offset 01F8Eh
+3   617		  =OFFSET 1FBA		 _L19D5	EQU offset 01FBAh
+3   618		  =OFFSET 2014		 _L1A49	EQU offset 02014h
+3   619		  =OFFSET 2028		 _L1A55	EQU offset 02028h
+3   620		  =OFFSET 203F		 _L1A5D	EQU offset 0203Fh
+3   621		  =OFFSET 2052		 _L1A6F	EQU offset 02052h
+3   622		  =OFFSET 2057		 _L1A70	EQU offset 02057h
+3   623		  =OFFSET 20B8		 _L1AB0	EQU offset 020B8h
+3   624		  =OFFSET 20C2		 _L1ABA	EQU offset 020C2h
+3   625		  =OFFSET 20C6		 _L1ABE	EQU offset 020C6h
+3   626		  =OFFSET 2192		 _L1AED	EQU offset 02192h
+3   627		  =OFFSET 2196		 _L1AF1	EQU offset 02196h
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 12
+msx_asm\tur_end.ASM
+
+
+
+3   628		  =OFFSET 21C4		 _L1B6F	EQU offset 021C4h
+3   629		  =OFFSET 2213		 _L1B93	EQU offset 02213h
+3   630		  =OFFSET 2225		 _RENAMEFILE_LIB EQU offset 02225h
+3   631		  =OFFSET 224F		 _L1BA5	EQU offset 0224Fh
+3   632		  =OFFSET 227A		 _L1BEA	EQU offset 0227Ah
+3   633		  =OFFSET 227E		 _L1BEB	EQU offset 0227Eh
+3   634		  =OFFSET 2301		 _OVERLAYREC1 EQU offset 02301h
+3   635		  =OFFSET 232C		 _LOADRUNOVERLAYREC EQU	offset 0232Ch
+3   636		  =OFFSET 2339		 _LOADRUNOVERLAY EQU offset 02339h
+3   637		  =OFFSET 238E		 _OVERLAYLOADPTR EQU offset 0238Eh
+3   638		  =OFFSET 23C6		 _L1CDB	EQU offset 023C6h
+3   639		  =OFFSET 23D0		 _L1CE5	EQU offset 023D0h
+3   640		  =OFFSET 2465		 _L1D7A	EQU offset 02465h
+3   641		  =OFFSET 2528		 _L1E3D	EQU offset 02528h
+3   642		  =OFFSET 252F		 _L1E44	EQU offset 0252Fh
+3   643		  =OFFSET 258E		 _L1EA3	EQU offset 0258Eh
+3   644		  =OFFSET 2596		 _L1EAB	EQU offset 02596h
+3   645		  =OFFSET 25A8		 _L1EBC	EQU offset 025A8h
+3   646		  =OFFSET 25AC		 _L1EBD	EQU offset 025ACh
+3   647		  =OFFSET 25B0		 _L1EBE	EQU offset 025B0h
+3   648		  =OFFSET 25EC		 _L1EF2	EQU offset 025ECh
+3   649		  =OFFSET 25F0		 _L1EF3	EQU offset 025F0h
+3   650		  =OFFSET 25F4		 _L1EF4	EQU offset 025F4h
+3   651		  =OFFSET 2650		 _L1F48	EQU offset 02650h
+3   652		  =OFFSET 2656		 _L1F4E	EQU offset 02656h
+3   653		  =OFFSET 266C		 _L1F64	EQU offset 0266Ch
+3   654		  =OFFSET 2685		 _L1F7D	EQU offset 02685h
+3   655		  =OFFSET 26A3		 _L1F9B	EQU offset 026A3h
+3   656		  =OFFSET 26E3		 _L1FDB	EQU offset 026E3h
+3   657		  =OFFSET 26EC		 _L1FE4	EQU offset 026ECh
+3   658		  =OFFSET 26F2		 _L1FEA	EQU offset 026F2h
+3   659		  =OFFSET 26F9		 _L1FF1	EQU offset 026F9h
+3   660		  =OFFSET 2703		 _GETERROR_LIB EQU offset 02703h
+3   661		  =OFFSET 272A		 _L201B	EQU offset 0272Ah
+3   662		  =OFFSET 27FD		 _L20D4	EQU offset 027FDh
+3   663		  =OFFSET 286F		 _ERROREXIT EQU	offset 0286Fh
+3   664		  =OFFSET 2884		 _DOSERRORHANDLERON EQU	offset 02884h
+3   665		  =OFFSET 2887		 _DOSERRORHANDLEROFF EQU offset	02887h
+3   666		  =OFFSET 2E9B		 _L20E2	EQU offset 02E9Bh
+3   667
+2   668						  GLOBAL L0004:NEAR	     ; def. init.mac
+2   669						  GLOBAL L0006:NEAR	     ; def. init.mac
+2   670						  GLOBAL L005C:NEAR	     ; def. init.mac
+2   671						  GLOBAL L005D:NEAR	     ; def. init.mac
+2   672						  GLOBAL L0065:NEAR	     ; def. init.mac
+2   673						  GLOBAL L0066:NEAR	     ; def. init.mac
+2   674						  GLOBAL L006C:NEAR	     ; def. init.mac
+2   675						  GLOBAL L0080:NEAR	     ; def. init.mac
+2   676						  GLOBAL L00CE:NEAR	     ; def. init.mac
+2   677						  GLOBAL L00E0:NEAR	     ; def. init.mac
+2   678						  GLOBAL L0100:NEAR	     ; def. init.mac
+2   679						  GLOBAL L0101:NEAR	     ; def. init.mac
+2   680						  GLOBAL L0168:NEAR	     ; def. init.mac
+2   681						  GLOBAL L0169:NEAR	     ; def. init.mac
+2   682						  GLOBAL L01AE:NEAR	     ; def. init.mac
+2   683						  GLOBAL L01B4:NEAR	     ; def. init.mac
+2   684						  GLOBAL L01BC:NEAR	     ; def. init.mac
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 13
+msx_asm\tur_end.ASM
+
+
+
+2   685						  GLOBAL L01D0:NEAR	     ; def. init.mac
+2   686						  GLOBAL L01E1:NEAR	     ; def. init.mac
+2   687						  GLOBAL L01E8:NEAR	     ; def. init.mac
+2   688						  GLOBAL L01FA:NEAR	     ; def. init.mac
+2   689						  GLOBAL L0200:NEAR	     ; def. init.mac
+2   690						  GLOBAL L023E:NEAR	     ; def. init.mac
+2   691						  GLOBAL L0259:NEAR	     ; def. init.mac
+2   692						  GLOBAL L0262:NEAR	     ; def. init.mac
+2   693						  GLOBAL L026B:NEAR	     ; def. init.mac
+2   694						  GLOBAL L0284:NEAR	     ; def. init.mac
+2   695						  GLOBAL L0299:NEAR	     ; def. init.mac
+2   696						  GLOBAL L02A2:NEAR	     ; def. init.mac
+2   697						  GLOBAL L030A:NEAR	     ; def. init.mac
+2   698						  GLOBAL L0310:NEAR	     ; def. init.mac
+2   699						  GLOBAL L0364:NEAR	     ; def. init.mac
+2   700						  GLOBAL L03C9:NEAR	     ; def. init.mac
+2   701						  GLOBAL L03E1:NEAR	     ; def. init.mac
+2   702						  GLOBAL L03EE:NEAR	     ; def. init.mac
+2   703						  GLOBAL L0406:NEAR	     ; def. init.mac
+2   704						  GLOBAL L04A6:NEAR	     ; def. init.mac
+2   705						  GLOBAL L04B4:NEAR	     ; def. init.mac
+2   706						  GLOBAL L04D2:NEAR	     ; def. init.mac
+2   707						  GLOBAL L04AF:NEAR	     ; def. init.mac
+2   708						  GLOBAL L0581:NEAR	     ; def. init.mac
+2   709						  GLOBAL L0591:NEAR	     ; def. init.mac
+2   710						  GLOBAL L059B:NEAR	     ; def. init.mac
+2   711						  GLOBAL L0612:NEAR	     ; def. init.mac
+2   712						  GLOBAL L0783:NEAR	     ; def. init.mac
+2   713						  GLOBAL L07F7:NEAR	     ; def. init.mac
+2   714						  GLOBAL L1008:NEAR	     ; def. init.mac
+2   715						  GLOBAL L11A3:NEAR	     ; def. init.mac
+2   716						  GLOBAL L149B:NEAR	     ; def. init.mac
+2   717						  GLOBAL L14E8:NEAR	     ; def. init.mac
+2   718						  GLOBAL L1726:NEAR	     ; def. init.mac
+2   719						  GLOBAL L20E2:NEAR	     ; def. init.mac
+2   720
+2   721						  GLOBAL CON1OUTPTR:NEAR     ; def. init.mac
+2   722						  GLOBAL CONSTPTR:NEAR	     ; def. init.mac
+2   723						  GLOBAL A2L:NEAR	     ; def. init.mac
+2   724						  GLOBAL L_NEG:NEAR	     ; def. init.mac
+2   725						  GLOBAL L_R:NEAR	     ; def. init.mac
+2   726						  GLOBAL PREFIX:NEAR	     ; def. init.mac
+2   727
+2   728						  GLOBAL DEF_TYPE:NEAR	     ; def. compiler.mac
+2   729						  GLOBAL L72E1:NEAR	     ; def. compiler.mac, no conditon error
+2   730						  GLOBAL L7B5C:NEAR	     ; def. compiler.mac
+2   731						  GLOBAL L7B62:NEAR	     ; def. compiler.mac
+2   732
+2   733						  GLOBAL L7BF5:NEAR	     ; def. end.mac
+2   734
+2   735						  GLOBAL O_BYTE:NEAR,O_CALHL:NEAR,O_CODE:NEAR,O_HL:NEAR
+2   736						  GLOBAL O_JPHL:NEAR,O_LDDE:NEAR,O_LDHL:NEAR,O_PSHHL:NEAR
+2   737
+2   738						  GLOBAL ParseByteVar:NEAR   ; def. glib.mac
+2   739						  GLOBAL ParseIntVar:NEAR    ; def. glib.mac
+2   740						  GLOBAL ParseIntError:NEAR  ; def. glib.mac
+2   741						  GLOBAL ParseStrVAR64:NEAR  ; def. glib.mac
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 14
+msx_asm\tur_end.ASM
+
+
+
+2   742						  GLOBAL ParseVAR64:NEAR     ; def. glib.mac
+2   743
+2   744						  GLOBAL TableIndex2:NEAR    ; def. compiler.mac
+2   745
+2   746						  ; GIOS Procedures
+2   747						  GLOBAL P_DELETEFILE:NEAR   ; def. glib.mac
+2   748						  GLOBAL P_DEFINEPICTURE:NEAR; def. glib.mac
+2   749						  GLOBAL P_PFILLSHAPE:NEAR   ; def. glib.mac
+2   750						  GLOBAL P_PPAINT:NEAR	     ; def. glib.mac
+2   751						  GLOBAL P_MEMEXPAND:NEAR    ; def. glib.mac
+2   752						  GLOBAL P_MEMTOVRAM:NEAR    ; def. glib.mac
+2   753						  GLOBAL P_MEMLOADPICTURE:NEAR;	def. glib.mac
+2   754						  GLOBAL P_MEMUNCRUNCH:NEAR  ; def. glib.mac
+2   755						  GLOBAL P_MEMSAVEPICTURE:NEAR;	def. glib.mac
+2   756						  GLOBAL P_SETCLIPPING:NEAR  ; def. glib.mac
+2   757						  GLOBAL P_SETVIEWPORT:NEAR  ; def. glib.mac
+2   758						  GLOBAL P_GETVIEWPORT:NEAR  ; def. glib.mac
+2   759						  GLOBAL P_MEMCOPY:NEAR	     ; def. glib.mac
+2   760						  GLOBAL P_BLOAD:NEAR	     ; def. glib.mac
+2   761						  GLOBAL P_BSAVE:NEAR	     ; def. glib.mac
+2   762						  GLOBAL P_CHANGECOLOR:NEAR  ; def. glib.mac
+2   763						  GLOBAL P_CHANGESCREEN:NEAR ; def. glib.mac
+2   764						  GLOBAL P_CIRCLE:NEAR	     ; def. glib.mac
+2   765						  GLOBAL P_CLEARMEM:NEAR     ; def. glib.mac
+2   766						  GLOBAL P_DATE:NEAR	     ; def. glib.mac
+2   767						  GLOBAL P_DISPLAYPAGE:NEAR  ; def. glib.mac
+2   768						  GLOBAL P_ELLIPSE:NEAR	     ; def. glib.mac
+2   769						  GLOBAL P_EXPAND:NEAR	     ; def. glib.mac
+2   770						  GLOBAL P_FASTBOX:NEAR	     ; def. glib.mac
+2   771						  GLOBAL P_FASTCOPY:NEAR     ; def. glib.mac
+2   772						  GLOBAL P_FILLBOX:NEAR	     ; def. glib.mac
+2   773						  GLOBAL P_FILLSHAPE:NEAR    ; def. glib.mac
+2   774						  GLOBAL P_FILLSPRITE:NEAR   ; def. glib.mac
+2   775						  GLOBAL P_GCOPY:NEAR	     ; def. glib.mac
+2   776						  GLOBAL P_GETDOSVERSION:NEAR; def. glib.mac
+2   777						  GLOBAL P_LINE:NEAR	     ; def. glib.mac
+2   778						  GLOBAL P_LOADPICTURE:NEAR  ; def. glib.mac
+2   779						  GLOBAL P_LOADVRAM:NEAR     ; def. glib.mac
+2   780						  GLOBAL P_MEMREADFILE:NEAR  ; def. glib.mac
+2   781						  GLOBAL P_MEMWRITEFILE:NEAR ; def. glib.mac
+2   782						  GLOBAL P_MEMAPPENDFILE:NEAR; def. glib.mac
+2   783						  GLOBAL P_MOVEVRAM:NEAR     ; def. glib.mac
+2   784						  GLOBAL P_PAINT:NEAR	     ; def. glib.mac
+2   785						  GLOBAL P_PSET:NEAR	     ; def. glib.mac
+2   786						  GLOBAL P_PUTSPRITE:NEAR    ; def. glib.mac
+2   787						  GLOBAL P_READMEM:NEAR	     ; def. glib.mac
+2   788						  GLOBAL P_READSECTOR:NEAR   ; def. glib.mac
+2   789						  GLOBAL P_SAVEPICTURE:NEAR  ; def. glib.mac
+2   790						  GLOBAL P_SAVEVRAM:NEAR     ; def. glib.mac
+2   791						  GLOBAL P_SCREEN:NEAR	     ; def. glib.mac
+2   792						  GLOBAL P_SCREENOFF:NEAR    ; def. glib.mac
+2   793						  GLOBAL P_SCREENON:NEAR     ; def. glib.mac
+2   794						  GLOBAL P_SETCHANNEL:NEAR   ; def. glib.mac
+2   795						  GLOBAL P_SOUND:NEAR	     ; def. glib.mac
+2   796						  GLOBAL P_SPRITEATTRIBUTEADDRESS:NEAR	; def. glib.mac
+2   797						  GLOBAL P_SPRITECOLOR:NEAR  ; def. glib.mac
+2   798						  GLOBAL P_SPRITEPATTERN:NEAR; def. glib.mac
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 15
+msx_asm\tur_end.ASM
+
+
+
+2   799						  GLOBAL P_SPRITEPATTERNADDRESS:NEAR	; def. glib.mac
+2   800						  GLOBAL P_SPRITESIZE:NEAR   ; def. glib.mac
+2   801						  GLOBAL P_SPRITESOFF:NEAR   ; def. glib.mac
+2   802						  GLOBAL P_SPRITESON:NEAR    ; def. glib.mac
+2   803						  GLOBAL P_TIME:NEAR	     ; def. glib.mac
+2   804						  GLOBAL P_UNCRUNCH:NEAR     ; def. glib.mac
+2   805						  GLOBAL P_VPOKE:NEAR	     ; def. glib.mac
+2   806						  GLOBAL P_WAITVDP:NEAR	     ; def. glib.mac
+2   807						  GLOBAL P_WRITEMEM:NEAR     ; def. glib.mac
+2   808						  GLOBAL P_WRITESECTOR:NEAR  ; def. glib.mac
+2   809						  GLOBAL P_WRITEVDP:NEAR     ; def. glib.mac
+2   810
+2   811						  ; GIOS Functions
+2   812						  GLOBAL F_TSRPRESENT:NEAR   ; def. glib.mac
+2   813						  GLOBAL F_GETCLIPPING:NEAR  ; def. glib.mac
+2   814						  GLOBAL F_SIMULATEDDISK:NEAR; def. glib.mac
+2   815						  GLOBAL F_FINDFIRST:NEAR    ; def. glib.mac
+2   816						  GLOBAL F_FINDNEXT:NEAR     ; def. glib.mac
+2   817						  GLOBAL F_GETDRIVE:NEAR     ; def. glib.mac
+2   818						  GLOBAL F_TESTDRIVE:NEAR    ; def. glib.mac
+2   819						  GLOBAL F_GETERROR:NEAR     ; def. glib.mac
+2   820						  GLOBAL F_GETFKEY:NEAR	     ; def. glib.mac
+2   821						  GLOBAL F_GETPAD:NEAR	     ; def. glib.mac
+2   822						  GLOBAL F_GETPDL:NEAR	     ; def. glib.mac
+2   823						  GLOBAL F_GETCHANNEL:NEAR   ; def. glib.mac
+2   824						  GLOBAL F_GETPAGEID:NEAR    ; def. glib.mac
+2   825						  GLOBAL F_POINT:NEAR	     ; def. glib.mac
+2   826						  GLOBAL F_READPSG:NEAR	     ; def. glib.mac
+2   827						  GLOBAL F_READSTATUS:NEAR   ; def. glib.mac
+2   828						  GLOBAL F_READVDP:NEAR	     ; def. glib.mac
+2   829						  GLOBAL F_SEARCH:NEAR	     ; def. glib.mac
+2   830						  GLOBAL F_SETDATE:NEAR	     ; def. glib.mac
+2   831						  GLOBAL F_SETMEM:NEAR	     ; def. glib.mac
+2   832						  GLOBAL F_SETTIME:NEAR	     ; def. glib.mac
+2   833						  GLOBAL F_STICK:NEAR	     ; def. glib.mac
+2   834						  GLOBAL F_STRIG:NEAR	     ; def. glib.mac
+2   835						  GLOBAL F_VPEEK:NEAR	     ; def. glib.mac
+2   836
+2   837
+1   838
+1   839						  PUBLIC TURBOERRORMESSAGES
+1   840					 ;	   PUBLIC L7BF5
+1   841
+1   842	    0000			 TURBOERRORMESSAGES:
+1   843	    0000  01 20	61 72 65 20 6E+		  DB  1	,' are not allowed',0DH,0AH
+    844		  6F 74	20 61 6C 6C 6F+
+    845		  77 65	64 0D 0A
+1   846	    0013  02 20	63 61 6E 20 6E+		 DB  2 ,' can not be',0DH,0AH
+    847		  6F 74	20 62 65 0D 0A
+1   848	    0021  03 20	63 6F 6E 73 74+		 DB  3 ,' constant',0DH,0AH
+    849		  61 6E	74 0D 0A
+1   850	    002D  04 20	64 6F 65 73 20+		 DB  4 ,' does not',0DH,0AH
+    851		  6E 6F	74 0D 0A
+1   852	    0039  05 20	65 78 70 72 65+		 DB  5 ,' expression',0dh,0ah
+    853		  73 73	69 6F 6E 0D 0A
+1   854	    0047  06 20	69 64 65 6E 74+		  DB  6	,' identifier',0dh,0ah
+    855		  69 66	69 65 72 0D 0A
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 16
+msx_asm\tur_end.ASM
+
+
+
+1   856	    0055  07 20	66 69 6C 65 0D+		  DB  7	,' file',0dh,0ah
+    857		  0A
+1   858	    005D  08 20	68 65 72 65 0D+		  DB  8	,' here',0dh,0ah
+    859		  0A
+1   860	    0065  0B 49	6E 74 65 67 65+		  DB 0bh,'Integer',0dh,0ah
+    861		  72 0D	0A
+1   862	    006F  0C 46	69 6C 65 0D 0A		  DB 0ch,'File',0dh,0ah
+1   863	    0076  0E 49	6C 6C 65 67 61+		  DB 0eh,'Illegal',0dh,0ah
+    864		  6C 0D	0A
+1   865	    0080  0F 20	6F 72 0D 0A		  DB 0fh,' or',0dh,0ah
+1   866	    0086  10 55	6E 64 65 66 69+		  DB 10h,'Undefined',0dh,0ah
+    867		  6E 65	64 0D 0A
+1   868	    0092  11 20	6D 61 74 63 68+		  DB 11h,' match',0dh,0ah
+    869		  0D 0A
+1   870	    009B  12 20	72 65 61 6C 0D+		  DB 12h,' real',0dh,0ah
+    871		  0A
+1   872	    00A3  13 53	74 72 69 6E 67+		  DB 13h,'String',0dh,0ah
+    873		  0D 0A
+1   874	    00AC  14 54	65 78 74 66 69+		  DB 14h,'Textfile',0dh,0ah
+    875		  6C 65	0D 0A
+1   876	    00B7  15 20	6F 75 74 20 6F+		  DB 15h,' out of range',0dh,0ah
+    877		  66 20	72 61 6E 67 65+
+    878		  0D 0A
+1   879	    00C7  16 20	76 61 72 69 61+		  DB 16h,' variable',0dh,0ah
+    880		  62 6C	65 0D 0A
+1   881	    00D3  17 20	6F 76 65 72 66+		  DB 17h,' overflow',0dh,0ah
+    882		  6C 6F	77 0D 0A
+1   883	    00DF  18 20	65 78 70 65 63+		  DB 18h,' expected',0dh,0ah
+    884		  74 65	64 0D 0A
+1   885	    00EB  19 20	74 79 70 65 0D+		  DB 19h,' type',0dh,0ah
+    886		  0A
+1   887	    00F3  1B 49	6E 76 61 6C 69+		  DB 1bh,'Invalid',0dh,0ah
+    888		  64 0D	0A
+1   889	    00FD  1D 20	70 6F 69 6E 74+		  DB 1dh,' pointer',0dh,0ah
+    890		  65 72	0D 0A
+1   891	    0108  1E 20	6C 6F 6E 67 69+		  DB 1eh,' longint',0dh,0ah
+    892		  6E 74	0D 0A
+1   893
+1   894	    0113  30 31	27 3B 27 18 0D+		  DB '01',27h,';',27h,18h,0dh,0ah
+    895		  0A
+1   896	    011B  30 32	27 3A 27 18 0D+		  DB '02',27h,':',27h,18h,0dh,0ah
+    897		  0A
+1   898	    0123  30 33	27 2C 27 18 0D+		  DB '03',27h,',',27h,18h,0dh,0ah
+    899		  0A
+1   900	    012B  30 34	27 28 27 18 0D+		  DB '04',27h,'(',27h,18h,0dh,0ah
+    901		  0A
+1   902	    0133  30 35	27 29 27 18 0D+		  DB '05',27h,')',27h,18h,0dh,0ah
+    903		  0A
+1   904	    013B  30 36	27 3D 27 18 0D+		  DB '06',27h,'=',27h,18h,0dh,0ah
+    905		  0A
+1   906	    0143  30 37	27 3A 3D 27 18+		  DB '07',27h,':=',27h,18h,0dh,0ah
+    907		  0D 0A
+1   908	    014C  30 38	27 5B 27 18 0D+		  DB '08',27h,'[',27h,18h,0dh,0ah
+    909		  0A
+1   910	    0154  30 39	27 5D 27 18 0D+		  DB '09',27h,']',27h,18h,0dh,0ah
+    911		  0A
+1   912	    015C  31 30	27 2E 27 18 0D+		  DB '10',27h,'.',27h,18h,0dh,0ah
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 17
+msx_asm\tur_end.ASM
+
+
+
+    913		  0A
+1   914	    0164  31 31	27 2E 2E 27 18+		  DB '11',27h,'..',27h,18h,0dh,0ah
+    915		  0D 0A
+1   916	    016D  31 32	42 45 47 49 4E+		  DB '12BEGIN',18h,0dh,0ah
+    917		  18 0D	0A
+1   918	    0177  31 33	44 4F 18 0D 0A		  DB '13DO',18h,0dh,0ah
+1   919	    017E  31 34	45 4E 44 18 0D+		  DB '14END',18h,0dh,0ah
+    920		  0A
+1   921	    0186  31 35	4F 46 18 0D 0A		  DB '15OF',18h,0dh,0ah
+1   922	    018D  31 36	50 52 4F 43 45+		  DB '16PROCEDURE or FUNCTION',18h,0dh,0ah
+    923		  44 55	52 45 20 6F 72+
+    924		  20 46	55 4E 43 54 49+
+    925		  4F 4E	18 0D 0A
+1   926	    01A7  31 37	54 48 45 4E 18+		  DB '17THEN',18h,0dh,0ah
+    927		  0D 0A
+1   928	    01B0  31 38	54 4F 0F 20 44+		  DB '18TO',0fh,' DOWNTO',18h,0dh,0ah
+    929		  4F 57	4E 54 4F 18 0D+
+    930		  0A
+1   931	    01BF  31 39	42 79 74 65 16+		  DB '19Byte',16h,18h,0dh,0ah
+    932		  18 0D	0A
+1   933	    01C9  32 30	42 6F 6F 6C 65+		  DB '20Boolean',05h,18h,0dh,0ah
+    934		  61 6E	05 18 0D 0A
+1   935	    01D6  32 31	0C 16 18 0D 0A		  DB '21',0ch,16h,18h,0dh,0ah
+1   936	    01DD  32 32	0B 03 18 0D 0A		  DB '22',0BH,03H,18h,0dh,0ah
+1   937	    01E4  32 33	0B 05 18 0D 0A		  DB '23',0bh,05h,18h,0dh,0ah
+1   938	    01EB  32 34	0B 16 18 0D 0A		  DB '24',0bh,16h,18h,0dh,0ah
+1   939	    01F2  32 35	0B 2C 12 0F 1E+		  DB '25',0bh,',',12h,0fh,1eh,03h,18h,0dh,0ah  ; changed 'longint'
+    940		  03 18	0D 0A
+1   941	    01FD  32 36	0B 2C 12 0F 1E+		  DB '26',0bh,',',12h,0fh,1eh,05h,18h,0dh,0ah  ; changed 'longint'
+    942		  05 18	0D 0A
+1   943	    0208  32 37	0B 2C 12 0F 1E+		  DB '27',0bh,',',12h,0fh,1eh,16h,18h,0dh,0ah  ; changed 'longint'
+    944		  16 18	0D 0A
+1   945	    0213  32 38	50 6F 69 6E 74+		  DB '28Pointer',16h,18h,0dh,0ah
+    946		  65 72	16 18 0D 0A
+1   947	    0220  32 39	52 65 63 6F 72+		  DB '29Record',16h,18h,0dh,0ah
+    948		  64 16	18 0D 0A
+1   949	    022C  33 30	53 69 6D 70 6C+		  DB '30Simple',19h,18h,0dh,0ah
+    950		  65 19	18 0D 0A
+1   951	    0238  33 31	53 69 6D 70 6C+		  DB '31Simple',05h,18h,0dh,0ah
+    952		  65 05	18 0D 0A
+1   953	    0244  33 32	13 03 18 0D 0A		  DB '32',13h,03h,18h,0dh,0ah
+1   954	    024B  33 33	13 05 18 0D 0A		  DB '33',13h,05h,18h,0dh,0ah
+1   955	    0252  33 34	13 16 18 0D 0A		  DB '34',13h,16h,18h,0dh,0ah
+1   956	    0259  33 35	14 18 0D 0A		  DB '35',14h,18h,0dh,0ah
+1   957	    025F  33 36	54 79 70 65 06+		  DB '36Type',06h,18h,0dh,0ah
+    958		  18 0D	0A
+1   959	    0269  33 37	55 6E 74 79 70+		  DB '37Untyped',07h,18h,0dh,0ah
+    960		  65 64	07 18 0D 0A
+1   961	    0276  34 30	10 20 6C 61 62+		  DB '40',10h,'	label',0dh,0ah
+    962		  65 6C	0D 0A
+1   963	    0281  34 31	55 6E 6B 6E 6F+		  DB '41Unknown',06h,0fh,' syntax error',0dh,0ah
+    964		  77 6E	06 0F 20 73 79+
+    965		  6E 74	61 78 20 65 72+
+    966		  72 6F	72 0D 0A
+1   967	    029B  34 32	10 1D 19 20 69+		  DB '42',10h,1dh,19h,'	in preceding',19h,' definitions',0dh,0ah
+    968		  6E 20	70 72 65 63 65+
+    969		  64 69	6E 67 19 20 64+
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 18
+msx_asm\tur_end.ASM
+
+
+
+    970		  65 66	69 6E 69 74 69+
+    971		  6F 6E	73 0D 0A
+1   972	    02BC  34 33	44 75 70 6C 69+		  DB '43Duplicate',06h,0fh,' label',0dh,0ah
+    973		  63 61	74 65 06 0F 20+
+    974		  6C 61	62 65 6C 0D 0A
+1   975	    02D1  34 34	54 79 70 65 20+		  DB '44Type mismatch',0dh,0ah
+    976		  6D 69	73 6D 61 74 63+
+    977		  68 0D	0A
+1   978	    02E2  34 35	03 15 0D 0A		  DB '45',03h,15h,0dh,0ah
+1   979	    02E8  34 36	03 20 61 6E 64+		  DB '46',03h,'	and CASE selector',19h,04h,11h,0dh,0ah
+    980		  20 43	41 53 45 20 73+
+    981		  65 6C	65 63 74 6F 72+
+    982		  19 04	11 0D 0A
+1   983	    0302  34 37	4F 70 65 72 61+		  DB '47Operand',19h,'(s)',04h,11h,' operator',0dh,0ah
+    984		  6E 64	19 28 73 29 04+
+    985		  11 20	6F 70 65 72 61+
+    986		  74 6F	72 0D 0A
+1   987	    031C  34 38	1B 20 72 65 73+		  DB '48',1bh,'	result',19h,0dh,0ah
+    988		  75 6C	74 19 0D 0A
+1   989	    0329  34 39	1B 20 13 20 6C+		  DB '49',1bh,'	',13h,'	length',0dh,0ah
+    990		  65 6E	67 74 68 0D 0A
+1   991	    0337  35 30	13 03 20 6C 65+		  DB '50',13h,03h,' length',04h,11h,19h,0dh,0ah
+    992		  6E 67	74 68 04 11 19+
+    993		  0D 0A
+1   994	    0347  35 31	1B 20 73 75 62+		  DB '51',1bh,'	subrange base',19h,0dh,0ah
+    995		  72 61	6E 67 65 20 62+
+    996		  61 73	65 19 0D 0A
+1   997	    035B  35 32	4C 6F 77 65 72+		  DB '52Lower bound > upper bound',0dh,0ah
+    998		  20 62	6F 75 6E 64 20+
+    999		  3E 20	75 70 70 65 72+
+   1000		  20 62	6F 75 6E 64 0D+
+   1001		  0A
+1  1002	    0378  35 33	52 65 73 65 72+		  DB '53Reserved word',0dh,0ah
+   1003		  76 65	64 20 77 6F 72+
+   1004		  64 0D	0A
+1  1005	    0389  35 34	0E 20 61 73 73+		  DB '54',0eh,'	assignment',0dh,0ah
+   1006		  69 67	6E 6D 65 6E 74+
+   1007		  0D 0A
+1  1008	    0399  35 35	13 03 20 65 78+		  DB '55',13h,03h,' exceeds line',0dh,0ah
+   1009		  63 65	65 64 73 20 6C+
+   1010		  69 6E	65 0D 0A
+1  1011	    03AC  35 36	45 72 72 6F 72+		  DB '56Error in integer',03h,0dh,0ah
+   1012		  20 69	6E 20 69 6E 74+
+   1013		  65 67	65 72 03 0D 0A
+1  1014	    03C1  35 37	45 72 72 6F 72+		  DB '57Error in',12h,03h,0dh,0ah
+   1015		  20 69	6E 12 03 0D 0A
+1  1016
+1  1017						 ; 'Illegal character in identifier'
+1  1018	    03CF  35 38	0E 20 63 68 61+		  DB '58',0eh,'	character in',06h,0dh,0ah
+   1019		  72 61	63 74 65 72 20+
+   1020		  69 6E	06 0D 0A
+1  1021
+1  1022	    03E2  36 30	03 73 01 08 0D+		  DB '60',03h,'s',01h,08h,0dh,0ah
+   1023		  0A
+1  1024
+1  1025						 ; Files and pointers are not allowed here
+1  1026	    03EA  36 31	0C 73 20 61 6E+		  DB '61',0ch,'s and',1dh,'s',01h,08h,0dh,0ah
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 19
+msx_asm\tur_end.ASM
+
+
+
+   1027		  64 1D	73 01 08 0D 0A
+1  1028
+1  1029	    03F8  36 32	53 74 72 75 63+		  DB '62Structured',16h,'s',01h,08h,0dh,0ah
+   1030		  74 75	72 65 64 16 73+
+   1031		  01 08	0D 0A
+1  1032	    040A  36 33	14 73 01 08 0D+		  DB '63',14h,'s',01h,08h,0dh,0ah
+   1033		  0A
+1  1034	    0412  36 34	14 73 20 61 6E+		  DB '64',14h,'s and untyped',07h,'s',01h,08h,0dh,0ah
+   1035		  64 20	75 6E 74 79 70+
+   1036		  65 64	07 73 01 08 0D+
+   1037		  0A
+1  1038	    0428  36 35	55 6E 74 79 70+		  DB '65Untyped',07h,'s',01h,08h,0dh,0ah
+   1039		  65 64	07 73 01 08 0D+
+   1040		  0A
+1  1041	    0437  36 36	49 2F 4F 01 0D+		  DB '66I/O',01h,0dh,0ah
+   1042		  0A
+1  1043	    043F  36 37	0C 73 20 6D 75+		  DB '67',0ch,'s must be',16h,'	parameters',0dh,0ah
+   1044		  73 74	20 62 65 16 20+
+   1045		  70 61	72 61 6D 65 74+
+   1046		  65 72	73 0D 0A
+1  1047	    0459  36 38	0C 20 63 6F 6D+		  DB '68',0ch,'	components',02h,07h,'s',0dh,0ah
+   1048		  70 6F	6E 65 6E 74 73+
+   1049		  02 07	73 0D 0A
+1  1050	    046C  36 39	1B 0F 64 65 72+		  DB '69',1bh,0fh,'dering of fields',0dh,0ah
+   1051		  69 6E	67 20 6F 66 20+
+   1052		  66 69	65 6C 64 73 0D+
+   1053		  0A
+1  1054	    0482  37 30	53 65 74 20 62+		  DB '70Set base',19h,15h,0dh,0ah
+   1055		  61 73	65 19 15 0D 0A
+1  1056	    0490  37 31	1B 20 47 4F 54+		  DB '71',1bh,'	GOTO',0dh,0ah
+   1057		  4F 0D	0A
+1  1058	    049A  37 32	4C 61 62 65 6C+		  DB '72Label not within current block',0dh,0ah
+   1059		  20 6E	6F 74 20 77 69+
+   1060		  74 68	69 6E 20 63 75+
+   1061		  72 72	65 6E 74 20 62+
+   1062		  6C 6F	63 6B 0D 0A
+1  1063	    04BC  37 33	10 20 46 4F 52+		  DB '73',10h,'	FORWARD	procedure(s)',0dh,0ah
+   1064		  57 41	52 44 20 70 72+
+   1065		  6F 63	65 64 75 72 65+
+   1066		  28 73	29 0D 0A
+1  1067	    04D6  37 34	49 4E 4C 49 4E+		  DB '74INLINE error',0dh,0ah
+   1068		  45 20	65 72 72 6F 72+
+   1069		  0D 0A
+1  1070	    04E6  37 35	0E 20 75 73 65+		  DB '75',0eh,'	use of ABSOLUTE',0dh,0ah
+   1071		  20 6F	66 20 41 42 53+
+   1072		  4F 4C	55 54 45 0D 0A
+1  1073	    04FB  37 36	4F 76 65 72 6C+		  DB '76Overlay	cannot be forwarded',0dh,0ah
+   1074		  61 79	20 63 61 6E 6E+
+   1075		  6F 74	20 62 65 20 66+
+   1076		  6F 72	77 61 72 64 65+
+   1077		  64 0D	0A
+1  1078	    051A  39 30	0C 20 6E 6F 74+		  DB '90',0ch,'	not found',0dh,0ah
+   1079		  20 66	6F 75 6E 64 0D+
+   1080		  0A
+1  1081	    0529  39 31	55 6E 65 78 70+		  DB '91Unexpected end of source',0dh,0ah
+   1082		  65 63	74 65 64 20 65+
+   1083		  6E 64	20 6F 66 20 73+
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 20
+msx_asm\tur_end.ASM
+
+
+
+   1084		  6F 75	72 63 65 0D 0A
+1  1085	    0545  39 36	4E 6F 20 6E 65+		  DB '96No nesting of include files',0dh,0ah
+   1086		  73 74	69 6E 67 20 6F+
+   1087		  66 20	69 6E 63 6C 75+
+   1088		  64 65	20 66 69 6C 65+
+   1089		  73 0D	0A
+1  1090	    0564  39 37	54 6F 6F 20 6D+		  DB '97Too many nested	WITH''s',0dh,0ah
+   1091		  61 6E	79 20 6E 65 73+
+   1092		  74 65	64 20 57 49 54+
+   1093		  48 27	73 0D 0A
+1  1094	    057E  39 38	4D 65 6D 6F 72+		  DB '98Memory',17h,0dh,0ah
+   1095		  79 17	0D 0A
+1  1096	    0589  39 39	43 6F 6D 70 69+		  DB '99Compiler',17h,0dh,0ah
+   1097		  6C 65	72 17 0D 0A
+1  1098
+1  1099	    0596  1A				  DB 1ah		     ; ctrl-z as end of	file marker
+1  1100
+1  1101	    0597			 L7BF5:
+1  1102						  END
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 21
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "03/26/99"
+??FILENAME			  Text	 "tur_end "
+??TIME				  Text	 "21:37:05"
+??VERSION			  Number 0314
+@32BIT				  Text	 0
+@CODE				  Text	 _TEXT
+@CODESIZE			  Text	 0
+@CPU				  Text	 1F1FH
+@CURSEG				  Text	 _TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 TUR_END
+@INTERFACE			  Text	 00H
+@MODEL				  Text	 2
+@STACK				  Text	 @STACK
+@WORDSIZE			  Text	 4
+DOS_BLEN			  Number 0004
+DOS_BUF				  Number 0051
+DOS_CHR				  Number 0001
+DOS_CUR				  Number 000C
+DOS_FCB				  Number 0010
+DOS_FLG				  Number 0000
+DOS_LEN				  Number 00D1
+DOS_NUM				  Number 0006
+DOS_PTR				  Number 0002
+DOS_REC				  Number 000A
+FCB_DRIVE			  Number 0000
+FCB_EXT				  Number 0009
+FCB_FILEPOS			  Number 0021
+FCB_FILESIZE			  Number 0010
+FCB_LEN				  Number 0024
+FCB_NAME			  Number 0001
+FCB_RECSIZE			  Number 000E
+FIB_BUF				  Number 0030
+FIB_CHR				  Number 0001
+FIB_CUR				  Number 0008
+FIB_F				  Number 0000
+FIB_FCB				  Number 000C
+FIB_LEN				  Number 00B0
+FIB_NUM				  Number 0004
+FIB_PTR				  Number 0002
+FIB_REC				  Number 0006
+FIL_HDR				  Number 0004
+L7BF5				  Near	 _TEXT:0597
+TURBOERRORMESSAGES		  Near	 _TEXT:0000
+_AUXINPTR			  Number OFFSET	0177
+_AUXOUTPTR			  Number OFFSET	0174
+_BUFLEN				  Number OFFSET	018C
+_CBREAK				  Number OFFSET	0190
+_CONINPTR			  Number OFFSET	016B
+_CONOUTPTR			  Number OFFSET	016E
+_CONSTPTR			  Number OFFSET	0168
+_DOSERRORHANDLEROFF		  Number OFFSET	2887
+_DOSERRORHANDLERON		  Number OFFSET	2884
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 22
+Symbol Table
+
+
+
+_ERROREXIT			  Number OFFSET	286F
+_ERRORPTR			  Number OFFSET	018D
+_GETERROR_LIB			  Number OFFSET	2703
+_GIOSOK				  Number OFFSET	0581
+_GIOSVER			  Number OFFSET	0582
+_HEAPPTR			  Number OFFSET	0192
+_L00B8				  Number OFFSET	0180
+_L00BA				  Number OFFSET	0182
+_L00BE				  Number OFFSET	0186
+_L00C0				  Number OFFSET	0188
+_L021D				  Number OFFSET	02D0
+_L023E				  Number OFFSET	02F1
+_L0259				  Number OFFSET	030C
+_L0262				  Number OFFSET	0315
+_L026B				  Number OFFSET	031E
+_L0284				  Number OFFSET	0337
+_L0299				  Number OFFSET	034C
+_L030A				  Number OFFSET	03BD
+_L0310				  Number OFFSET	03C3
+_L0364				  Number OFFSET	0420
+_L04D4				  Number OFFSET	06C3
+_L0508				  Number OFFSET	06F4
+_L0522				  Number OFFSET	070E
+_L052C				  Number OFFSET	0717
+_L053A				  Number OFFSET	0725
+_L054D				  Number OFFSET	0738
+_L055D				  Number OFFSET	0748
+_L0581				  Number OFFSET	076C
+_L0591				  Number OFFSET	077C
+_L059B				  Number OFFSET	0786
+_L05D1				  Number OFFSET	07BC
+_L05E2				  Number OFFSET	07CD
+_L0601				  Number OFFSET	07EC
+_L0612				  Number OFFSET	07FD
+_L0623				  Number OFFSET	080E
+_L0638				  Number OFFSET	0823
+_L064C				  Number OFFSET	0837
+_L0656				  Number OFFSET	0841
+_L0666				  Number OFFSET	0851
+_L0676				  Number OFFSET	0861
+_L067F				  Number OFFSET	086A
+_L0688				  Number OFFSET	0889
+_L068D				  Number OFFSET	088F
+_L0692				  Number OFFSET	0895
+_L069B				  Number OFFSET	08A3
+_L06A0				  Number OFFSET	08A8
+_L06A5				  Number OFFSET	08AD
+_L06AE				  Number OFFSET	08BB
+_L06B3				  Number OFFSET	08C0
+_L06B8				  Number OFFSET	08C5
+_L06C2				  Number OFFSET	08D4
+_L06C7				  Number OFFSET	08D9
+_L06CC				  Number OFFSET	08DE
+_L06D6				  Number OFFSET	08ED
+_L06DB				  Number OFFSET	08F2
+_L06E0				  Number OFFSET	08F7
+_L06E9				  Number OFFSET	0905
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 23
+Symbol Table
+
+
+
+_L06EE				  Number OFFSET	090A
+_L06F3				  Number OFFSET	090F
+_L06F5				  Number OFFSET	0911
+_L070F				  Number OFFSET	092B
+_L073B				  Number OFFSET	0999
+_L0745				  Number OFFSET	09A3
+_L074E				  Number OFFSET	09B0
+_L0756				  Number OFFSET	09B8
+_L0780				  Number OFFSET	09E2
+_L0783				  Number OFFSET	09E5
+_L078B				  Number OFFSET	09ED
+_L083D				  Number OFFSET	0D66
+_L086B				  Number OFFSET	0D94
+_L08A3				  Number OFFSET	0DCC
+_L08B2				  Number OFFSET	0DDB
+_L08F3				  Number OFFSET	0E1C
+_L0920				  Number OFFSET	0E49
+_L0996				  Number OFFSET	0EBF
+_L09A2				  Number OFFSET	0ECB
+_L09E9				  Number OFFSET	0F12
+_L09F2				  Number OFFSET	0F1B
+_L09F7				  Number OFFSET	0F20
+_L09FA				  Number OFFSET	0F23
+_L09FF				  Number OFFSET	0F28
+_L0BFD				  Number OFFSET	1171
+_L0C34				  Number OFFSET	11A8
+_L0C46				  Number OFFSET	11BA
+_L0C7F				  Number OFFSET	11F3
+_L0C87				  Number OFFSET	11FB
+_L0D2B				  Number OFFSET	129F
+_L0DB6				  Number OFFSET	132A
+_L0E46				  Number OFFSET	13BA
+_L0FB4				  Number OFFSET	1528
+_L0FD0				  Number OFFSET	1544
+_L0FDE				  Number OFFSET	1552
+_L1008				  Number OFFSET	1581
+_L12DD				  Number OFFSET	18AA
+_L12E1				  Number OFFSET	18AE
+_L12FC				  Number OFFSET	18C9
+_L1300				  Number OFFSET	18CD
+_L1318				  Number OFFSET	18E5
+_L1326				  Number OFFSET	18F3
+_L1333				  Number OFFSET	1900
+_L134F				  Number OFFSET	191C
+_L136F				  Number OFFSET	193C
+_L1370				  Number OFFSET	193D
+_L13FE				  Number OFFSET	19D6
+_L13FF				  Number OFFSET	19D7
+_L1469				  Number OFFSET	1A45
+_L149B				  Number OFFSET	1A77
+_L14A9				  Number OFFSET	1A85
+_L14BA				  Number OFFSET	1A96
+_L14CB				  Number OFFSET	1AA7
+_L14CC				  Number OFFSET	1AAB
+_L1644				  Number OFFSET	1C67
+_L164D				  Number OFFSET	1C70
+_L164E				  Number OFFSET	1C74
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 24
+Symbol Table
+
+
+
+_L1671				  Number OFFSET	1C98
+_L1672				  Number OFFSET	1CBE
+_L168E				  Number OFFSET	1CDA
+_L16AB				  Number OFFSET	1CF7
+_L1722				  Number OFFSET	1D83
+_L1726				  Number OFFSET	1D87
+_L1779				  Number OFFSET	1DDA
+_L178B				  Number OFFSET	1E18
+_L17AA				  Number OFFSET	1E37
+_L17BA				  Number OFFSET	1E47
+_L17CD				  Number OFFSET	1E5A
+_L17D7				  Number OFFSET	1E64
+_L17DC				  Number OFFSET	1E69
+_L17E1				  Number OFFSET	1E6E
+_L17E6				  Number OFFSET	1E73
+_L1810				  Number OFFSET	1E9D
+_L1811				  Number OFFSET	1EA2
+_L187A				  Number OFFSET	1F40
+_L18A4				  Number OFFSET	1F4A
+_L18B6				  Number OFFSET	1F5E
+_L18DC				  Number OFFSET	1F80
+_L19A5				  Number OFFSET	1F8E
+_L19D5				  Number OFFSET	1FBA
+_L1A49				  Number OFFSET	2014
+_L1A55				  Number OFFSET	2028
+_L1A5D				  Number OFFSET	203F
+_L1A6F				  Number OFFSET	2052
+_L1A70				  Number OFFSET	2057
+_L1AB0				  Number OFFSET	20B8
+_L1ABA				  Number OFFSET	20C2
+_L1ABE				  Number OFFSET	20C6
+_L1AED				  Number OFFSET	2192
+_L1AF1				  Number OFFSET	2196
+_L1B6F				  Number OFFSET	21C4
+_L1B93				  Number OFFSET	2213
+_L1BA5				  Number OFFSET	224F
+_L1BEA				  Number OFFSET	227A
+_L1BEB				  Number OFFSET	227E
+_L1CDB				  Number OFFSET	23C6
+_L1CE5				  Number OFFSET	23D0
+_L1D7A				  Number OFFSET	2465
+_L1E3D				  Number OFFSET	2528
+_L1E44				  Number OFFSET	252F
+_L1EA3				  Number OFFSET	258E
+_L1EAB				  Number OFFSET	2596
+_L1EBC				  Number OFFSET	25A8
+_L1EBD				  Number OFFSET	25AC
+_L1EBE				  Number OFFSET	25B0
+_L1EF2				  Number OFFSET	25EC
+_L1EF3				  Number OFFSET	25F0
+_L1EF4				  Number OFFSET	25F4
+_L1F48				  Number OFFSET	2650
+_L1F4E				  Number OFFSET	2656
+_L1F64				  Number OFFSET	266C
+_L1F7D				  Number OFFSET	2685
+_L1F9B				  Number OFFSET	26A3
+_L1FDB				  Number OFFSET	26E3
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 25
+Symbol Table
+
+
+
+_L1FE4				  Number OFFSET	26EC
+_L1FEA				  Number OFFSET	26F2
+_L1FF1				  Number OFFSET	26F9
+_L201B				  Number OFFSET	272A
+_L20D4				  Number OFFSET	27FD
+_L20E2				  Number OFFSET	2E9B
+_LOADRUNOVERLAY			  Number OFFSET	2339
+_LOADRUNOVERLAYREC		  Number OFFSET	232C
+_LST				  Number OFFSET	0184
+_LSTOUTPTR			  Number OFFSET	0171
+_L_ABS				  Number OFFSET	0A61
+_L_ADD				  Number OFFSET	0A74
+_L_AND				  Number OFFSET	0A1E
+_L_DIV				  Number OFFSET	0B16
+_L_EQ				  Number OFFSET	0883
+_L_FOR_DOWNTO			  Number OFFSET	0851
+_L_FOR_TO			  Number OFFSET	0851
+_L_GT				  Number OFFSET	08E8
+_L_GTE				  Number OFFSET	08B6
+_L_LS				  Number OFFSET	0900
+_L_LSE				  Number OFFSET	08CF
+_L_MOD				  Number OFFSET	0B2C
+_L_MUL				  Number OFFSET	0A9A
+_L_NEG				  Number OFFSET	0A64
+_L_NEQ				  Number OFFSET	089E
+_L_NOT				  Number OFFSET	0A54
+_L_OR				  Number OFFSET	0A30
+_L_PRED				  Number OFFSET	0873
+_L_R				  Number OFFSET	15A0
+_L_SHL				  Number OFFSET	0BD5
+_L_SHR				  Number OFFSET	0BF1
+_L_SQR				  Number OFFSET	0A94
+_L_SUB				  Number OFFSET	0A7F
+_L_SUCC				  Number OFFSET	087C
+_L_XOR				  Number OFFSET	0A42
+_MEMMAN				  Number OFFSET	057E
+_MEMMNVER			  Number OFFSET	057F
+_OUTPUT				  Number OFFSET	018A
+_OVERLAYLOADPTR			  Number OFFSET	238E
+_OVERLAYREC1			  Number OFFSET	2301
+_PRT_LONG			  Number OFFSET	1DEC
+_RECURPTR			  Number OFFSET	0194
+_RENAMEFILE_LIB			  Number OFFSET	2225
+_RUNGIOS			  Number OFFSET	057B
+_R_L				  Number OFFSET	15C4
+_TSRPRESENT			  Number OFFSET	052E
+_USRINPTR			  Number OFFSET	017D
+_USROUTPTR			  Number OFFSET	017A
+
+Macro Name
+
+DC
+GLOBAL2
+GLOBALS
+OFF_HL
+Turbo Assembler	 Version 3.2	    03/26/99 21:37:05	    Page 26
+Symbol Table
+
+
+
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0000 Word	  Public  DATA
+_TEXT				  16  0597 Word	  Public  CODE
+

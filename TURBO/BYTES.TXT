@@ -1,0 +1,177 @@
+Conversions of BYTES
+
+scalar types:	old: size: reg:     new: size: reg:
+- CHAR		0CH   1    HL	    0CH   1    A
+- BOOLEAN	0BH   1    HL	    0BH   1    A
+- BYTE		0AH   1    HL	    0DH   1    A
+- INTEGER	0AH   2    HL	    0AH   2    HL
+- LONGINT			    0EH   4    DE:HL
+- REAL		09H   6    BC:DE:HL 09H   6    BC:DE:HL
+
+CHAR:
+
+Char To Byte
+  -
+  
+Byte To Char
+  -  
+
+BOOLEAN:
+
+Boolean To Byte
+  -
+  
+Byte To Boolean
+  -
+
+INTEGER:
+
+Integer To Byte
+  LD A,L
+
+Byte To Integer
+  LD H,0
+  LD A,L
+
+LONGINT
+
+LongInt To Byte
+  LD A,L
+  
+Byte To LongInt
+  LD D,0
+  LD E,D
+  LD H,D
+  LD L,A
+  
+REAL
+
+Real To LongInt
+  CALL
+  
+LongInt To Real
+  CALL
+
+
+BYTE Operations and Comparisons:
+   store:            LD (adres),A
+   load:             LD A,(adres)
+   byte constant:    LD A,constante
+
+   bewaar op stack:  PUSH AF
+
+   + unary           result ::= + term1
+                     A = term1
+                     -
+
+   - unary           result ::= - term1
+                     A = term1
+                     NEG
+
+   not:              result ::= not term1
+                     A = term1
+                     CPL
+
+   multiply:         result ::= term1 * term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     A = A * H
+
+   division          result ::= term1 / term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     A = A / H
+
+   modulus:          result ::= term1 mod term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     A = A mod H
+
+   and:              result ::= term1 and term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     AND H
+
+   shl:              result ::= term1 shl term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     H shl A
+
+   shr:              result ::= term1 shr term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     H shr A
+
+   addition:         result ::= term1 + term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     ADD A,H
+
+   subtraction:      result ::= term1 - term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     SUB H
+
+   or:               result ::= term1 or term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     OR H
+
+   xor:              result ::= term1 xor term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     XOR H
+
+   operator =:       result ::= term1 = term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     CP H
+                     ; A = 1 if equal else A = 0
+
+   operator <>:      result ::= term1 <> term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     CP H
+                     ; A = 1 if not equal else A = 0
+
+   operator >=:      result ::= term1 >= term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     CALL _L
+                     ; A = 1 if greater or equal else A = 0
+
+   operator <=:      result ::= term1 <= term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     CALL _L
+                     ; A = 1 if less or equal else A = 0
+
+   operator >:       result ::= term1 > term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     CALL _L
+                     ; A = 1 if greater than else A = 0
+
+   operator <:       result ::= term1 < term2
+                     stack = term1
+                     A = term2
+                     POP HL                     ; H = term1
+                     CALL _L
+                     ; A = 1 if less than else A = 0
+
+

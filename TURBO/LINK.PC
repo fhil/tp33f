@@ -1,0 +1,6 @@
+tp3.lib &
++ ..\library\pc_obj\fileio.obj &
++ pc_obj\tp3_comp.obj &
++ pc_obj\tp3_slib.obj &
++ pc_obj\tp3_glib.obj &
++ pc_obj\tp3_end.obj

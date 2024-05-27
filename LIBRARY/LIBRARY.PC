@@ -1,0 +1,9 @@
+.PATH.obj=OBJ
+TFLAGS=/zi /m4 /dmakepc
+LFLAGS=/v /x;
+# /s /Tdc
+
+pc_obj\fileio.obj : fileio.mac fileio.inc macros.inc pcmacros.inc pcsim.inc
+                ..\2pc\z80 fileio.mac pc_asm\fileio.asm pc
+                ..\bin\tasmx pc_asm\fileio.asm , pc_obj\fileio.obj $(TFLAGS);
+

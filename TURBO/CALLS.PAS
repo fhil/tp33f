@@ -1,0 +1,101 @@
+type str63 = string[63];
+
+var InfoBlock: array[0..63] of BYTE;
+    Name: str63;
+    V1,V2,V3,V4: INTEGER;
+    B1,B2,B3: BYTE;
+
+    IntResult: INTEGER;
+    BoolResult: BOOLEAN;
+    RealResult: REAL;
+
+begin
+   BoolResult:=TsrPresent('adsf');
+   BoolResult:=GetClipping;
+   BoolResult:=SimulatedDisk(0);
+   BoolResult:=FindFirst(Name,InfoBlock,B1,Name);
+   BoolResult:=FindNext(InfoBlock,B1,Name);
+   IntResult:=GetDrive;
+   BoolResult:=TestDrive(0);
+   IntResult:=GetError;
+   IntResult:=GetFKey;
+   IntResult:=GetPad(0);
+   IntResult:=GetPdl(0);
+   RealResult:=GetChannel(0);
+   IntResult:=GetPageID(0);
+   IntResult:=Point(0,1);
+   IntResult:=ReadPSG(0);
+   IntResult:=ReadStatus(0);
+   IntResult:=ReadVDP(0);
+   IntResult:=Search(0,1,2,3);
+   BoolResult:=SetDate(0,1,2);
+   IntResult:=SetMem(0);
+   BoolResult:=SetTime(0,1,2);
+   IntResult:=Stick(0);
+   BoolResult:=Strig(0);
+   IntResult:=VPeek(0);
+
+   DeleteFile(Name);
+   DefinePicture(0,1,2,3,4,5,6);
+   PFillShape(0,1);
+   PPaint(0,1,2);
+   MemExpand(0,1,2,3);
+   { MemToVRAM(0,0,0); }
+   MemLoadPicture(0,1,2,3);
+   MemUnCrunch(0,1,2,3);        /* deze functie bestaat niet */
+   MemSavePicture(0,1,2,3,4,5);
+   SetClipping(TRUE);
+   SetViewPort(0,1,2,3);
+   GetViewPort(V1,V2,V3,V4);
+   MemCopy(0,1,0.0);
+   Bload(0,1,Name);
+   BSave(0,1,2,3,Name);
+   ChangeColor(0,1,2,3);
+   ChangeScreen(0);
+   Circle(0,1,2);
+   ClearMem;
+   Date(V1,B1,B2,B3);
+   DisplayPage(0);
+   Ellipse(0,1,2,3);
+   Expand(0,1,2,Name);
+   FastBox(0,1,2,3);
+   FastCopy(0,1,2,3,4,5,6);
+   FillBox(0,1,2,3);
+   FillShape(0,1,2);
+   FillSprite(0,1);
+   GCopy(0,1,2,3,4,5,6);
+   GetDosVersion(V1,V2);
+   Line(0,1,2,3);
+   LoadPicture(0,1,2,Name);
+   LoadVRAM(0,1,0.0,1.0,Name);
+   MemReadFile(0,0.0,1.0,Name);
+   MemWriteFile(0,0.0,1.0,Name);
+   MemAppendFile(0,0.0,1.0,Name);
+   MoveVRAM(0,1,2,3,4);
+   Paint(0,1,2);
+   Pset(0,1);
+   PutSprite(0,1,2,3);
+   ReadMem(0,1,2);
+   ReadSector(0,1,2,3);
+   SavePicture(0,1,2,3,4,Name);
+   SaveVRAM(0,1,0.0,1.0,Name);
+   Screen(0);
+   ScreenOff;
+   ScreenOn;
+   SetChannel(0,0.0);
+   Sound(0,0);
+   SpriteAttributeAddress(0);
+   SpriteColor(0,1);
+   SpritePattern(0,1);
+   SpritePatternAddress(0);
+   SpriteSize(0);
+   SpritesOff;
+   SpritesOn;
+   Time(B1,B2,B3);
+   UnCrunch(0,1,2,3);           /* deze functie bestaat niet */
+   Vpoke(0,1);
+   WaitVDP;
+   WriteMem(0,1,2);
+   WriteSector(0,1,2,3);
+   WriteVDP(0,1);
+end.

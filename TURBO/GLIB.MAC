@@ -1,0 +1,931 @@
+IFNDEF MAKEPC
+MSX:
+ENDIF
+
+IFDEF MSX
+MSXDOS   EQU 5
+ENDIF
+
+         INCLUDE stdio.inc
+
+         INCLUDE libdefs.inc
+
+         INCLUDE libconst.inc
+
+         EXTRN L5960                ; match(')') and gen. 'CALL HL'
+         EXTRN L5E97                ; parse integer expression
+         EXTRN L5EB0                ; parse boolean expression
+         EXTRN L5ED0                ; parse string expression
+         EXTRN L5EE8                ; parse expression, B = expresson type res.
+         EXTRN L65DE                ; parse '(', integer expression and ')'
+         EXTRN L5CAD                ; parse VAR string variable
+         EXTRN L6148                ; generates code to push a variable of
+                                    ; type given in B
+         EXTRN L677F                ; parse VAR parameter
+         EXTRN L6F13                ; match(','), if present
+         EXTRN L6F5E                ; match(',')
+         EXTRN L6F66                ; match('(')
+         EXTRN L6F6E                ; match(')')
+         EXTRN OP_L_I               ; generate code to convert HL to
+                                    ; LONGINT with sign extension
+         PUBLIC ParseLONG
+
+;         DB 'GIOS Library'
+
+GENGIOS_BOOLEAN:
+         ; generate GIOS CALL and return BOOLEAN type
+         ; in:    A = entry
+         LD B,0BH                   ; return BOOLEAN type
+
+GENGIOS:
+         LD H,A
+         LD L,3EH                   ; opcode: LD A,
+         CALL O_HL
+         LD HL,_RUNGIOS
+         JP O_CALHL
+
+ParseByteVAR:
+         ; parses a VAR byte variable, not a VAR integer variable !!
+         CALL L677F                 ; parse VAR parameter
+         CALL O_PSHHL
+         LD A,(L7B5C)
+         CP 0AH                     ; type = integer ?
+         JR NZ,ParseByteError       ; jump if not integer
+
+         LD A,(L7B62)               ; A = sizeof var parameter (BYTE/INTEGER)
+         DEC A
+         RET Z                      ; return if size = 1
+
+ParseByteError:
+         CALL L72E1                 ; no condition
+         DB 13H                     ; error 24: Byte variable expected
+
+ParseIntVAR:
+         ; parses a VAR integer variable, not a VAR byte variable !!
+         CALL L677F                 ; parse VAR parameter
+         CALL O_PSHHL
+         LD A,(L7B5C)
+         CP 0AH                     ; type = integer ?
+         JR NZ,ParseIntError        ; jump if not integer
+
+         LD A,(L7B62)               ; A = sizeof var parameter (BYTE/INTEGER)
+         DEC A
+         RET NZ                     ; return if size >= 2, can only be 2
+
+ParseIntError:
+         CALL L72E1                 ; no condition
+         DB 18H                     ; error 24: Integer variable expected
+
+ParseStrVAR64:
+         ; parses a VAR string variable of length 63 + 1
+         CALL L5CAD                 ; parse VAR string variable
+
+ParseVAR64_L:
+         LD A,(L7B62)
+         CP 63 + 1                  ; STRING[63] ?
+         RET Z
+
+TypeMismatch:
+         CALL L72E1                 ; NonZero --> error
+         DB 2CH                     ; error 44: Type mismatch
+
+ParseVAR64:
+         ; parse a VAR parameter of length 64
+         CALL L677F                 ; parse VAR parameter
+         JR ParseVAR64_L
+
+ParseLONG:
+         ; parse a LONGINT and REAL with conversion to a LONGINT
+         LD A,0EH                   ; default type = LONGINT
+         CALL L5EE8                 ; parse expression
+         LD A,B                     ; A = expression type
+
+         LD HL,_R_L                 ; REAL to LONGINT conversion
+         CP 09H
+         JR Z,ParseLONG1            ; jump to convert REAL to LONG
+
+         CP 0EH
+         JR Z,ParseLONG2            ; jump if LONGINT
+
+         CP 0AH
+         JR Z,ParseLONG3            ; jump to convert INTEGER to LONG
+                                    ; unsigned conversion
+
+         JP TypeMismatch
+
+ParseLONG1:
+         CALL O_CALHL               ; generate conversion CALL
+
+ParseLONG2:
+         LD B,0Eh
+         RET                        ; 33e
+;         JP L6148                   ; generate code to PUSH a LONGINT
+
+ParseLONG3:
+         JP OP_L_I                  ; 33e convert signed INTEGER TO LONGINT
+;         CALL OP_L_I                ; convert signed INTEGER to LONGINT
+;         JP L6148                   ; generate code to PUSH a LONGINT
+
+ParseREAL:
+         ; parse an INTEGER, LONGINT and REAL with conversions to a REAL
+         LD A,0FFH                  ; default type = smart
+         CALL L5EE8                 ; parse expression
+         LD A,B                     ; A = expression type
+
+         LD HL,_L_R                 ; LONGINT to REAL conversion
+         CP 0EH                     ; type = LONGINT ?
+         JR Z,ParseREAL1
+
+         LD HL,_L1008               ; INTEGER to REAL conversion
+         CP 0AH                     ; type = INTEGER ?
+         JR Z,ParseREAL1
+
+         CP 09H
+         JR Z,ParseREAL2            ; jump if no conversion needed
+
+         JP TypeMismatch
+
+ParseREAL1:
+         CALL O_CALHL               ; generate conversion CALL
+
+ParseREAL2:
+         LD B,9
+         JP L6148                   ; generate code to PUSH a REAL
+
+         ; --------------
+         ; GIOS Functions
+         ; --------------
+
+F_TSRPRESENT:
+         ; FUNCTION TsrPresent(Str: STRING): BOOLEAN;
+         CALL L6F66                 ; match('(')
+         CALL L5ED0                 ; parse string expression
+         LD HL,_TSRPRESENT          ; LIB entry
+         LD B,0BH                   ; return boolean type
+         JP L5960                   ; match(')'), CALL HL
+
+F_GETCLIPPING:
+         ; FUNCTION GetClipping: BOOLEAN;
+         LD A,56                    ; GetClipping entry
+         JP GENGIOS_BOOLEAN
+
+F_SIMULATEDDISK:
+         ; FUNCTION SimulatedDisk(disk: BYTE): BOOLEAN;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,85                    ; SimulatedDisk entry
+         JP GENGIOS_BOOLEAN         ; GIOS CALL and return BOOLEAN type
+
+F_FINDFIRST:
+         ; FUNCTION FindFirst(SearchPathAdres: STRING;
+         ;                    VAR InfoBlock: Type[64]; { 64 bytes length }
+         ;                    VAR Attributes: BYTE;
+         ;                    VAR Name: STR63): BOOLEAN;
+         CALL L6F66                 ; match('(')
+         CALL L5ED0                 ; parse string expression
+
+         CALL L6F5E                 ; match(',')
+         LD A,69
+         PUSH AF
+
+F_FINDFIRST1:
+         CALL ParseVAR64            ; parse VAR of 64 bytes length
+         CALL O_PSHHL               ; push address of InfoBlock
+
+         CALL L6F5E                 ; match(',')
+         CALL ParseByteVAR          ; parse VAR byte variable
+
+         CALL L6F5E                 ; match(',')
+
+         CALL L5CAD                 ; parse VAR string variable
+
+         LD A,(L7B62)
+         CP 12 + 1                  ; STRING[12] or greater ?
+         JP C,TypeMismatch          ; no, Type Mismatch
+
+         CALL O_PSHHL               ; push address of Name
+
+         POP AF
+
+GENGIOS_CL_BOOLEAN:
+         ; match(')'), generate GIOS CALL and return BOOLEAN type
+         ; in:    A = entry
+         PUSH AF
+
+GENGIOS_CL_BOOLEAN1:
+         CALL L6F6E                 ; match(')')
+         POP AF
+         JP GENGIOS_BOOLEAN
+
+F_FINDNEXT:
+         ; FUNCTION FindNext(VAR InfoBlok: Type[64];  { 64 bytes length }
+         ;                   VAR Attributes: BYTE;
+         ;                   VAR Name: STR63): BOOLEAN;
+         CALL L6F66                 ; match('(')
+
+         LD A,70                    ; FindNext entry
+         PUSH AF
+
+         JP F_FINDFIRST1
+
+F_GETDRIVE:
+         ; FUNCTION GetDrive: INTEGER;
+         LD A,80                    ; GetDrive entry
+         LD B,0AH                   ; return INTEGER type
+         JP GENGIOS
+
+F_TESTDRIVE:
+         ; FUNCTION TestDrive(Drive: INTEGER): BOOLEAN;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,81                    ; TestDrive entry
+         LD B,0BH                   ; return BOOLEAN type
+         JP GENGIOS_BOOLEAN
+
+F_GETERROR:
+         ; FUNCTION GetError: INTEGER;
+         LD HL,_GetError_LIB
+         LD B,0AH                   ; return INTEGER type
+         JP O_CALHL
+
+;         LD A,75                    ; GetError entry
+;
+GENGIOS_INTEGER:
+         LD B,0AH                   ; return INTEGER type
+         JP GENGIOS
+
+F_GETFKEY:
+         ; FUNCTION GetFKey: INTEGER;
+         LD A,46                    ; GetFKey entry
+         JP GENGIOS_INTEGER
+
+F_GETPAD:
+         ; FUNCTION GetPad(N: INTEGER): INTEGER;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,53                    ; GetPad entry
+         JP GENGIOS_INTEGER
+
+F_GETPDL:
+         ; FUNCTION GetPdl(N: INTEGER): INTEGER;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,12                    ; GetPdl entry
+         JP GENGIOS_INTEGER
+
+F_GETCHANNEL:
+         ; FUNCTION GetChannel(Channel: INTEGER): REAL;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,65                    ; GetChannel entry
+
+GENGIOS_REAL:
+         LD B,9
+         JP GENGIOS
+
+F_GETPAGEID:
+         ; FUNCTION GetPageID(Channel: INTEGER): INTEGER;
+         CALL L65DE                 ;  parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,64                    ; GetPageID entry
+         JP GENGIOS_INTEGER
+
+F_POINT:
+         ; FUNCTION Point(X: INTEGER; Y: BYTE): BYTE;
+         CALL L6F66                 ; match('(')
+         CALL L5E97                 ; parse integer expression
+         CALL O_PSHHL
+
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+         CALL O_PSHHL
+
+         CALL L6F6E                 ; match(')')
+         LD A,14                    ; Point entry
+         JP GENGIOS_INTEGER
+
+F_READPSG:
+         ; FUNCTION ReadPSG(Register: BYTE): BYTE;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,52                    ; ReadPSG entry
+         JP GENGIOS_INTEGER
+
+F_READSTATUS:
+         ; FUNCTION ReadStatus(Register: BYTE): BYTE;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,3                     ; ReadStatus entry
+         JP GENGIOS_INTEGER
+
+F_READVDP:
+         ; FUNCTION ReadVDP(Register: BYTE): BYTE;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,7                     ; ReadVDP entry
+         JP GENGIOS_INTEGER
+
+F_SEARCH:
+         ; FUNCTION Search(X,Y,Color,Condition: INTEGER): INTEGER;
+         CALL L6F66                 ; match('(')
+         CALL L5E97                 ; parse integer expression
+         CALL O_PSHHL               ; push X
+
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+         CALL O_PSHHL               ; push Y
+
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+         CALL O_PSHHL               ; push Color
+
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+         CALL O_PSHHL               ; push Condition
+
+         CALL L6F6E                 ; match(')')
+         LD A,47
+         JP GENGIOS_INTEGER
+
+F_SETDATE:
+         ; FUNCTION SetDate(Year: INTEGER; Month,Day: BYTE): BOOLEAN;
+         LD A,59
+
+O_INT_INT_INT_C:
+         PUSH AF
+         CALL L6F66                 ; match('(')
+         CALL L5E97                 ; parse integer expression
+         CALL O_PSHHL
+
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+         CALL O_PSHHL
+
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+         CALL O_PSHHL
+
+         CALL L6F6E                 ; match(')')
+
+         POP AF
+         JP GENGIOS_BOOLEAN
+
+F_SETMEM:
+         ; FUNCTION SetMem(Block: INTEGER): INTEGER;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,41                    ; ReadVDP entry
+         JP GENGIOS_INTEGER
+
+F_SETTIME:
+         ; FUNCTION SetTime(Hour,Minute,Second: BYTE): BOOLEAN;
+         LD A,60
+         JP O_INT_INT_INT_C         ; ( INT , INT , INT )
+
+F_STICK:
+         ; FUNCTION Stick(StickNum: BYTE): BYTE;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,25                    ; Stick entry
+         JP GENGIOS_INTEGER
+
+F_STRIG:
+         ; FUNCTION Strig(StrigNum: BYTE): BOOLEAN;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,32                    ; Strig entry
+         JP GENGIOS_BOOLEAN
+
+F_VPEEK:
+         ; FUNCTION VPeek(Address: INTEGER): BYTE;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+         CALL O_PSHHL
+         LD A,6                     ; VPeek entry
+         JP GENGIOS_INTEGER
+
+STRING_C_GIOS:
+         ; parses: STRING ')'
+         ; in:    GIOS entry number pushed at stack
+         CALL L5ED0                 ; parse string expression
+
+C_GIOS:  CALL L6F6E                 ; match(')')
+         POP AF
+         JP GENGIOS
+
+O_INT:   ; parses: '(' INTEGER
+         CALL L6F66                 ; match('(')
+         CALL L5E97                 ; parse integer expression
+         JP O_PSHHL
+
+COMMA_6_INT:
+         CALL COMMA_INT
+
+COMMA_5_INT:
+         CALL COMMA_INT
+
+COMMA_4_INT:
+         CALL COMMA_INT
+
+COMMA_3_INT:
+         CALL COMMA_INT
+
+COMMA_2_INT:
+         CALL COMMA_INT
+
+COMMA_INT:
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+         JP O_PSHHL
+
+COMMA_V_INT:
+         ; parses: ',' VAR INTEGER
+         CALL L6F5E                 ; match(',')
+         JP ParseIntVar
+
+COMMA_V_BYTE:
+         ; parses: ',' VAR BYTE
+         CALL L6F5E                 ; match(',')
+         JP ParseByteVar
+
+COMMA_REAL:
+         ; parses: ',' REAL
+         CALL L6F5E                 ; match(',')
+         JP ParseReal
+
+O_7_INT_C_GIOS:
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_6_INT           ; 6x ',' INT
+         JP C_GIOS                  ; ')' GENGIOS
+
+O_5_INT_C_GIOS:
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_4_INT           ; 3x ',' INT
+         JP C_GIOS                  ; ')' GENGIOS
+
+O_4_INT_C_GIOS:
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_3_INT           ; 3x ',' INT
+         JP C_GIOS                  ; ')' GENGIOS
+
+O_3_INT_C_GIOS:
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_2_INT           ; ',' INT ',' INT
+         JP C_GIOS                  ; ')' GENGIOS
+
+O_2_INT_C_GIOS:
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_INT             ; ',' INT
+         JP C_GIOS                  ; ')' GENGIOS
+
+O_3_V_INT_C_GIOS:
+         PUSH AF
+         CALL L6F66                 ; match('(')
+         CALL ParseIntVar           ; VAR INT
+         JR O_4_V_INT_C_GIOS1
+
+O_4_V_INT_C_GIOS:
+         PUSH AF
+         CALL L6F66                 ; match('(')
+         CALL ParseIntVar           ; VAR INT
+         CALL COMMA_V_INT           ; ',' VAR INT
+
+O_4_V_INT_C_GIOS1:
+         CALL COMMA_V_INT           ; ',' VAR_INT
+         CALL COMMA_V_INT           ; ',' VAR_INT
+         JP C_GIOS                  ; ')' GENGIOS
+
+         ; ---------------
+         ; GIOS Procedures
+         ; ---------------
+P_DELETEFILE:
+         ; PROCEDURE DeleteFile(FileName: Str63);
+         LD A,97                    ; DeleteFile entry
+         PUSH AF
+         CALL L6F66                 ; match('(')
+         JP STRING_C_GIOS           ; STRING ')' GENGIOS
+
+
+P_DEFINEPICTURE:
+         ; PROCEDURE DefinePicture(X1,Y1,X2,Y2,OX,OY,Page: INTEGER);
+         LD A,91                    ; DefinePicture entry
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_6_INT           ; 6 x ',' INT
+         JP C_GIOS
+
+P_PFILLSHAPE:
+         ; PROCEDURE PFillShape(X,Y: INTEGER);
+         LD A,92                    ; PFillShape entry
+         JP O_2_INT_C_GIOS
+
+P_PPAINT:
+         ; PROCEDURE PPaint(X,Y,Border: INTEGER);
+         LD A,93                    ; PPaint entry
+         JP O_3_INT_C_GIOS
+
+P_MEMEXPAND:
+         ; PROCEDURE MemExpand(DX: INTEGER; DY,Page,Channel: BYTE);
+         LD A,86                    ; MemExpand entry
+         JP O_4_INT_C_GIOS
+
+P_MEMTOVRAM:
+         ; PROCEDURE MemtoVRAM(Offset: INTEGER; Page,Channel: BYTE);
+         RET
+
+P_MEMLOADPICTURE:
+         ; PROCEDURE MemLoadPicture(X: INTEGER; Y,Page,Channel: BYTE);
+         LD A,88                    ; MemLoadPicture entry
+         JP O_4_INT_C_GIOS
+
+;P_MEMUNCRUNCH:
+;         ; PROCEDURE MemUnCrunch(X: INTEGER; Y,Page,Channel: BYTE);
+;         LD A,89                    ; MemUnCrunch entry
+;         JP O_4_INT_C_GIOS
+
+P_MEMSAVEPICTURE:
+         ; PROCEDURE MemSavePicture(X1,Y1,X2,Y2: INTEGER; Page,Channel: BYTE);
+         LD A,90                    ; MemSavePicture entry
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_5_INT           ; 5 x ',' INT
+         JP C_GIOS
+
+P_SETCLIPPING:
+         ; PROCEDURE SetClipping(Clipping: BOOLEAN);
+         LD A,55                    ; SetClipping entry
+         PUSH AF
+         CALL L6F66                 ; match('(')
+         CALL L5EB0                 ; parse boolean expression
+         CALL O_PSHHL
+         JP C_GIOS
+
+P_SETVIEWPORT:
+         ; PROCEDURE SetViewPort(X1,Y1,X2,Y2: INTEGER);
+         LD A,22                    ; SetViewPort entry
+         JP O_4_INT_C_GIOS
+
+P_GETVIEWPORT:
+         ; PROCEDURE GetViewPort(VAR X1,Y1,X2,Y2: INTEGER);
+         LD A,23                    ; GetViewPort entry
+         JP O_4_V_INT_C_GIOS
+
+P_MEMCOPY:
+         ; PROCEDURE MemCopy(Source,Destination: INTEGER; Length: REAL);
+         LD A,84                    ; MemCopy entry
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_INT             ; ',' INT
+         CALL COMMA_REAL            ; ',' REAL
+         JP C_GIOS
+
+P_BLOAD:
+         ; PROCEDURE BLoad(Offset: INTEGER; Page: BYTE; FileName: Str63);
+         LD A,73                    ; BLoad entry
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_INT             ; ',' INT
+         CALL L6F5E                 ; match(',')
+         JP STRING_C_GIOS           ; STRING ')' GENGIOS
+
+P_BSAVE:
+         ; PROCEDURE BSave(Address1,Page1,Address2,Page2: INTEGER;
+         ;                 FileName: Str63);
+         LD A,76                    ; BSave entry
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_3_INT           ; 3x ',' INT
+         CALL L6F5E                 ; match(',')
+         JP STRING_C_GIOS           ; STRING ')' GENGIOS
+
+P_CHANGECOLOR:
+         ; PROCEDURE ChangeColor(ColorNr,R,G,B: BYTE):
+         LD A,9                     ; ChangeColor entry
+         JP O_4_INT_C_GIOS
+
+P_CHANGESCREEN:
+         ; PROCEDURE ChangeScreen(Screen: INTEGER);
+         LD A,10                    ; ChangeScreen entry
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         JP C_GIOS                  ; ')' GENGIOS
+
+P_CIRCLE:
+         ; PROCEDURE Circle(X,Y,Radius: INTEGER);
+         LD A,21                    ; Circle entry
+         JP O_3_INT_C_GIOS
+
+P_CLEARMEM:
+         ; PROCEDURE ClearMem;
+         LD A,42                    ; ClearMem entry
+         JP GENGIOS
+
+P_DATE:
+         ; PROCEDURE Date(VAR Year: INTEGER; VAR Month,Day,WeekDay: BYTE);
+         LD A,57                    ; Date entry (GetDate)
+
+         PUSH AF
+         CALL L6F66                 ; match('(')
+         CALL ParseIntVar           ; VAR INT
+         CALL COMMA_V_BYTE          ; ',' VAR BYTE
+
+V_2_BYTE_C_GIOS:
+         CALL COMMA_V_BYTE          ; ',' VAR BYTE
+         CALL COMMA_V_BYTE          ; ',' VAR BYTE
+         JP C_GIOS                  ; ')' GENGIOS
+
+P_DISPLAYPAGE:
+         ; PROCEDURE DisplayPage(PageNr: BYTE);
+         LD A,13                    ; DisplayPage
+
+O_INT_C_GIOS:
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         JP C_GIOS                  ; ')' GENGIOS
+
+P_ELLIPSE:
+         ; PROCEDURE Ellipse(X,Y,RX,RY: INTEGER);
+         LD A,66                    ; Ellipse entry
+         JP O_4_INT_C_GIOS
+
+P_EXPAND:
+         ; PROCEDURE Expand(DX,DY,Page: INTEGER; FileName: Str63);
+         LD A,49                    ; Expand entry
+
+O_3_INT_STRING_C_GIOS:
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_2_INT           ; 2x ',' INT
+         CALL L6F5E                 ; match(',')
+;         JP STRING_C_GIOS           ; STRING ')' GENGIOS
+
+         CALL L5ED0                 ; parse string expression
+
+         CALL L6F13                 ; match(','), if present
+         JP NZ,C_GIOS               ; ')' GENGIOS if no ',' present
+
+         ; PROCEDURE Expand(DX,DY,Page: INTEGER; FileName: Str63;
+         ;                  StartPos: LONGINT); EXTERNAL $F9C8;
+         POP AF
+         LD A,72                    ; Expand entry with StartPos
+         PUSH AF
+
+         CALL ParseLONG
+         CALL L6148                 ; code: push LONG
+
+         JP C_GIOS                  ; ')' GENGIOS
+
+P_FASTBOX:
+         ; PROCEDURE FastBox(X1,Y1,X2,Y2: INTEGER);
+         LD A,18                    ; FastBox entry
+         JP O_4_INT_C_GIOS
+
+P_FASTCOPY:
+         ; PROCEDURE FastCopy(X1,Y1,X2,Y2,DX,DY,DestPage: INTEGER);
+         LD A,20                    ; FastCopy entry
+         JP O_7_INT_C_GIOS
+
+P_FILLBOX:
+         ; PROCEDURE FillBox(X1,Y1,X2,Y2: INTEGER);
+         LD A,17                    ; FillBox entry
+         JP O_4_INT_C_GIOS
+
+P_FILLSHAPE:
+         ; PROCEDURE FillShape(X,Y,Color: INTEGER);
+         LD A,54                    ; FillShape entry
+         JP O_3_INT_C_GIOS
+
+P_FILLSPRITE:
+         ; PROCEDURE FillSprite(Plane,Color: BYTE);
+         LD A,36                    ; FillSprite entry
+         JP O_2_INT_C_GIOS
+
+P_GCOPY:
+         ; PROCEDURE GCopy(X1,Y1,X2,Y2,DX,DY,DestPage: INTEGER);
+         LD A,19                    ; GCopy entry
+         JP O_7_INT_C_GIOS
+
+P_GETDOSVERSION:
+         ; PROCEDURE GetDosVersion(VAR Kernel,System: INTEGER);
+         LD A,71                    ; GetDosVersion entry
+         PUSH AF
+         CALL L6F66                 ; match('(')
+         CALL ParseIntVar           ; VAR INT
+         CALL COMMA_V_INT           ; ',' VAR INT
+         JP C_GIOS                  ; ')' GENGIOS
+
+P_LINE:
+         ; PROCEDURE Line(X1,Y1,X2,Y2: INTEGER);
+         LD A,16                    ; Line entry
+         JP O_4_INT_C_GIOS
+
+P_LOADPICTURE:
+         ; PROCEDURE LoadPicture(DX,DY: INTEGER; Page: BYTE; FileName: Str63);
+         LD A,24                    ; LoadPicture entry
+         JP O_3_INT_STRING_C_GIOS
+
+P_LOADVRAM:
+         ; PROCEDURE LoadVRAM(VRAMAddress: INTEGER; VRAMPage: BYTE;
+         ;                    FileOffset: REAL; VRAMSize: REAL;
+         ;                    FileName: Str63);
+         LD A,95                    ; LoadVRAM entry
+
+O_2_INT_2_REAL_STRING_C_GIOS:
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_INT             ; ',' INT
+
+REAL_REAL_STRING_C_GIOS:
+         CALL COMMA_REAL            ; ',' REAL
+         CALL COMMA_REAL            ; ',' REAL
+         CALL L6F5E                 ; match(',')
+         JP STRING_C_GIOS           ; STRING ')' GENGIOS
+
+P_MEMREADFILE:
+         ; PROCEDURE MemReadFile(Channel: INTEGER; Position, Length: REAL;
+         ;                       FileName: Str63);
+         LD A,74                    ; MemReadFile entry
+
+O_INT_2_REAL_STRING_C_GIOS:
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         JP REAL_REAL_STRING_C_GIOS
+
+P_MEMWRITEFILE:
+         ; PROCEDURE MemWriteFile(Channel: INTEGER; Position, Length: REAL;
+         ;                        FileName: Str63);
+         LD A,83                    ; MemWriteFile entry
+         JP O_INT_2_REAL_STRING_C_GIOS
+
+P_MEMAPPENDFILE:
+         ; PROCEDURE MemAppendFile(Channel: INTEGER; Position, Length: REAL;
+         ;                         FileName: Str63);
+         LD A,94                    ; MemAppendFile entry
+         JP O_INT_2_REAL_STRING_C_GIOS
+
+P_MOVEVRAM:
+         ; PROCEDURE MoveVRAM(SourceAddress,SourcePage,
+         ;                    DestinationAddress,DestinationPage,
+         ;                    Length: INTEGER);
+         LD A,82                    ; MoveVRAM
+         JP O_5_INT_C_GIOS
+
+P_PAINT:
+         ; PROCEDURE Paint(X,Y,Border: INTEGER);
+         LD A,63                    ; Paint entry (BASIC paint)
+         JP O_3_INT_C_GIOS
+
+P_PSET:
+         ; PROCEDURE PSet(X,Y: INTEGER);
+         LD A,15                    ; PSet entry
+         JP O_2_INT_C_GIOS
+
+P_PUTSPRITE:
+         ; PROCEDURE PutSprite(X,Y,SpriteNum,Plane: BYTE);
+         LD A,35                    ; PutSprite entry
+         JP O_4_INT_C_GIOS
+
+P_READMEM:
+         ; PROCEDURE ReadMem(Channel,Destination,Length: INTEGER);
+         LD A,44                    ; ReadMem entry
+         JP O_3_INT_C_GIOS
+
+P_READSECTOR:
+         ; PROCEDURE ReadSector(Drive: BYTE; Sector, Address: INTEGER;
+         ;                      SectorCount: BYTE);
+         LD A,61                    ; ReadSector entry
+         JP O_4_INT_C_GIOS
+
+P_SAVEPICTURE:
+         ; PROCEDURE SavePicture(X1,Y1,X2,Y2: INTEGER;
+         ;                       Page: BYTE; FileName: Str63);
+         LD A,48                    ; SavePicture entry
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_4_INT           ; 4x ',' INT
+         CALL L6F5E                 ; match(',')
+         JP STRING_C_GIOS           ; STRING ')' GENGIOS
+
+;P_SAVEVRAM:
+;         ; PROCEDURE SaveVRAM(VRAMAddress: INTEGER; VRAMPage: BYTE;
+;         ;                    FileOffset: REAL; VRAMSize: REAL;
+;         ;                    FileName: Str63);
+;         LD A,96                    ; LoadVRAM entry
+;         JP O_2_INT_2_REAL_STRING_C_GIOS
+
+P_SCREEN:
+         ; PROCEDURE Screen(Num: BYTE);
+         LD A,8                     ; Screen entry
+         JP O_INT_C_GIOS
+
+P_SCREENOFF:
+         ; PROCEDURE ScreenOff;
+         LD A,29                    ; ScreenOff entry
+         JP GENGIOS
+
+P_SCREENON:
+         ; PROCEDURE ScreenOn;
+         LD A,28                    ; ScreenOn entry
+         JP GENGIOS
+
+P_SETCHANNEL:
+         ; PROCEDURE SetChannel(Channel: BYTE; Position: REAL);
+         LD A,45                    ; SetChannel entry
+         PUSH AF
+         CALL O_INT                 ; '(' INT
+         CALL COMMA_REAL            ; ',' REAL
+         JP C_GIOS                  ; ')' GENGIOS
+
+P_SOUND:
+         ; PROCEDURE Sound(Register,Data: BYTE);
+         LD A,51                    ; Sound entry (WritePSG)
+         JP O_2_INT_C_GIOS
+
+P_SPRITEATTRIBUTEADDRESS:
+         ; PROCEDURE SpriteAttributeAddress(Address: LONGINT);
+         LD A,39                    ; SpriteAttributeAdres entry
+
+O_LONG_C_GIOS:
+         PUSH AF
+         CALL L6F66                 ; match('(')
+         CALL ParseLong
+         CALL L6148                 ; code: push LONG
+
+;         CALL O_INT                 ; '(' INT
+         JP C_GIOS                  ; ')' GENGIOS
+
+P_SPRITECOLOR:
+         ; PROCEDURE SpriteColor(Plane: BYTE; Address: INTEGER);
+         LD A,37                    ; SpriteColor entry
+         JP O_2_INT_C_GIOS
+
+P_SPRITEPATTERN:
+         ; PROCEDURE SpritePattern(SpriteNum: BYTE; Address: INTEGER);
+         LD A,38                    ; SpritePattern entry
+         JP O_2_INT_C_GIOS
+
+P_SPRITEPATTERNADDRESS:
+         ; PROCEDURE SpritePatternAddress(Address: LONGINT);
+         LD A,40                    ; SpritePatternAddress entry
+         JP O_LONG_C_GIOS
+;         JP O_INT_C_GIOS
+
+P_SPRITESIZE:
+         ; PROCEDURE SpriteSize(Size: BYTE);
+         LD A,34                    ; SpriteSize entry
+         JP O_INT_C_GIOS
+
+P_SPRITESOFF:
+         ; PROCEDURE SpritesOff;
+         LD A,31                    ; SpritesOff entry
+         JP GENGIOS
+
+P_SPRITESON:
+         ; PROCEDURE SpritesOn;
+         LD A,30                    ; SpritesOn entry
+         JP GENGIOS
+
+P_TIME:
+         ; PROCEDURE Time(VAR Hour,Minute,Second: BYTE);
+         LD A,58                    ; Time entry (GetTime)
+         PUSH AF
+         CALL L6F66                 ; match('(')
+         CALL ParseByteVar          ; VAR Byte
+         JP V_2_BYTE_C_GIOS         ; ',' VAR Byte ',' VAR Byte ')'
+
+;P_UNCRUNCH:
+;         ; PROCEDURE UnCrunch(DX,DY,Page,Address: INTEGER);
+;         LD A,33                    ; UnCrunch entry
+;         JP O_4_INT_C_GIOS
+
+P_VPOKE:
+         ; PROCEDURE VPoke(Address,Value: INTEGER);
+         LD A,5                     ; VPoke entry
+         JP O_2_INT_C_GIOS
+
+P_WAITVDP:
+         ; PROCEDURE WaitVDP;
+         LD A,50                    ; WaitVDP entry
+         JP GENGIOS
+
+P_WRITEMEM:
+         ; PROCEDURE WriteMem(Channel,Source,Length: INTEGER);
+         LD A,43                    ; WriteMem entry
+         JP O_3_INT_C_GIOS
+
+P_WRITESECTOR:
+         ; PROCEDURE WriteSector(Drive: BYTE; Sector,SourceAddress: INTEGER;
+         ;                       SectorCount: BYTE);
+         LD A,62                    ; WriteSector entry
+         JP O_4_INT_C_GIOS
+
+P_WRITEVDP:
+         ; PROCEDURE WriteVDP(Register,Data: BYTE);
+         LD A,4                     ; WriteVDP entry
+         JP O_2_INT_C_GIOS
+
+         END

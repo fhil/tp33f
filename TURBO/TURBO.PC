@@ -1,0 +1,34 @@
+.PATH.obj=PC_OBJ
+INCLUDE=..\library\pcmacros.inc ..\library\pcsim.inc libconst.inc stdio.inc libdefs.inc ..\library\fileio.inc ..\library\macros.inc
+TFLAGS=/zi /m4 /dmakepc
+LFLAGS=/x
+# /v;
+
+turbo           : tp3.exe
+
+tp3.exe         : tp3_init.obj ..\library\pc_obj\fileio.obj tp3_comp.obj \
+                  tp3_slib.obj tp3_glib.obj tp3_end.obj
+                del tp3.lib
+                ..\bin\tlib @link.pc
+                ..\bin\tlink pc_obj\tp3_init , tp3.exe , , tp3.lib $(LFLAGS)
+
+tp3_init.obj    : pc_asm\tp3_init.asm init.mac $(INCLUDE)
+                ..\2pc\z80 init.mac pc_gen\init.asm pc
+                ..\bin\tasmx pc_asm\tp3_init.asm , pc_obj\tp3_init $(TFLAGS);
+
+tp3_comp.obj    : pc_asm\tp3_comp.asm compiler.mac $(INCLUDE)
+                ..\2pc\z80 compiler.mac pc_gen\compiler.asm pc
+                ..\bin\tasmx pc_asm\tp3_comp.asm , pc_obj\tp3_comp $(TFLAGS);
+
+tp3_slib.obj    : pc_asm\tp3_slib.asm slib.mac $(INCLUDE)
+                ..\2pc\z80 slib.mac pc_gen\slib.asm pc
+                ..\bin\tasmx pc_asm\tp3_slib.asm , pc_obj\tp3_slib $(TFLAGS);
+
+tp3_glib.obj    : pc_asm\tp3_glib.asm glib.mac $(INCLUDE)
+                ..\2pc\z80 glib.mac pc_gen\glib.asm pc
+                ..\bin\tasmx pc_asm\tp3_glib.asm , pc_obj\tp3_glib $(TFLAGS);
+
+tp3_end.obj     : pc_asm\tp3_end.asm end.mac $(INCLUDE)
+                ..\2pc\z80 end.mac pc_gen\end.asm pc
+                ..\bin\tasmx pc_asm\tp3_end , pc_obj\tp3_end $(FLAGS);
+

@@ -1,0 +1,168 @@
+TURBO Pascal syntax:
+
+actual-parameter ::= expression | variable
+adding-operator ::= + | - | OR | XOR
+array-constant ::= ( structured-constant {, structured-constant } )
+array-type ::= ARRAY [ index-type {, index-type } ] OF component-type
+array-variable ::= variable
+assignment-statement ::= variable := expression |
+                         function-identifier ::= expression
+
+base-type ::= simple-type
+block ::= declaration-part statement-part
+case-element ::= case-list : statement
+case-label ::= constant
+case-label-list ::= case-label {, case-label }
+case-list ::= case-list-element {, case-list-element }
+case-list-element ::= constant | constant .. constant
+case-statement ::= CASE expression OF case-element {; case-element } END |
+                   CASE expression OF case-element {; case-element }
+                   OTHERWISE statement {; statement} END
+
+complemented-factor ::= signed-factor | NOT signed-factor
+component-type ::= type
+component-variable ::= indexed-variable | field-designator
+compound-statement ::= BEGIN statement {; statement } END
+conditional-statement ::= if-statement | case-statement
+
+constant ::= unsigned-number | sign unsigned-number | constant-identifier |
+             sign constant-identifier | string
+constant-definition-part ::= CONST constant-definition
+                             {; constant-definition };
+constant-definition ::= untyped-constant-definition |
+                        typed-constant-definition
+constant-identifier ::= identifier
+control-character ::= # unsigned-integer | ^ character
+control-variable ::= variable-identifier
+declaration-part ::= { declaration-section }
+declaration-section ::= label-declaration-part | constant-definition-part |
+                        type-definition-part | variable-declaration-part |
+                        procedure-and-function-declaration-part
+digit ::= 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+digit-sequence ::= digit { digit }
+empty ::=
+empty-statement ::= empty
+entire-variable ::= variable-identifier | typed-constant-identifier
+expression ::= simple-expression { relational-operator simple-expression }
+factor ::= variable | unsigned-constant | ( expression ) |
+           function-designator | set
+field-designator ::= record-variable . field-identifier
+field-identifier ::= identifier
+field-list ::= fixed-part | fixed-part ; variant-part | variant-part
+file-identifier ::= identifier
+file-identifier-list ::= empty | ( file-identifier {, file-identifier }
+file-type ::= FILE OF type
+final-value ::= expression
+fixed-part ::= record-section {; record-section }
+for-list ::= initial-value TO final-value | initial-value DOWNTO final-value
+for-statement ::= FOR control-variable := for-list DO statement
+formal-parameter-section ::= parameter-group | VAR parameter-group
+function-declaration ::= function-heading block ;
+function-designator ::= function-identifier | function-identifier
+                        ( actual-parameter {, actual-parameter } )
+function-heading ::= FUNCTION identifier : result-type ; |
+                     FUNCTION identifier ( formal-parameter-section
+                     {, formal-parameter-section } ) : result-type ;
+function-identifier ::= identifier ;
+goto-statement ::= GOTO label
+hexdigit ::= digit | A | B | C | D | E | F
+hexdigit-sequence ::= hexdigit { hexdigit }
+identifier ::= letter { letter-or-digit }
+identifier-list ::= identifier {, identifier }
+if-statement ::= IF expression THEN statement { ELSE statement }
+index-type ::= simple-type
+indexed-variable ::= array-variable [ expression {, expression} ]
+initial-value ::= expression
+inline-list-element ::= unsigned-integer | constant-identifier |
+                        variable-identifier | location-counter-reference
+inline-statement ::= INLINE inline-list-element {, inline-list-element }
+label ::= letter-or-digit { letter-or-digit }
+label-declaration-part ::= LABEL label {, label } ;
+letter ::= A | B | C | D | E | F | G | H | I | J | K | L | M |
+           N | O | P | Q | R | S | T | U | V | W | X | Y | Z |
+           a | b | c | d | e | f | g | h | i | j | k | l | m |
+           n | o | p | q | r | s | t | u | v | w | x | y | z | _
+letter-or-digit ::= letter | digit
+location-counter-reference ::= * | * sign constant
+multiplying-operator ::= * | / | DIV | MOD | AND | SHL | SHR
+parameter-group ::= identifier-list : type-identifier
+pointer-type ::= ^ type-identifier
+pointer-variable ::= variable
+procedure-and-function-declaration-part ::=
+                                    { procedure-or-function-declaration }
+procedure-declaration :: = procedure-heading block ;
+procedure-heading ::= PROCEDURE identifier ; | PROCEDURE identifier
+                      ( formal-parameter-section
+                      {, formal-parameter-section } ) ;
+procedure-or-function-declaration ::= procedure-declaration |
+                                      function-declaration
+procedure-statement ::= procedure-identifier | procedure-identifier
+                        ( actual-parameter {, actual-parameter } )
+program-heading ::= empty | PROGRAM program-identifier file-identifier-list
+program ::= program-heading block .
+program-identifier ::=  identifier
+record-constant ::= ( record-constant-element {; record-constant-element } )
+record-constant-element ::= field-identifier : structured-constant
+record-section ::= empty | field-identifier {, field-identifier } : type
+record-type ::= RECORD field-list END
+record-variable ::= variable
+record-variable-list ::= record-variable {, record-variable }
+referenced-variable ::= pointer-variable ^
+relational-operator ::= = | <> | <= | >= | < | > | IN
+repeat-statement ::= REPEAT statement {; statement } UNTIL expression
+repetitive-statement ::= while-statement | repeat-statement | for-statement
+result-type ::= type-identifier
+scalar-type ::= ( identifier {, identifier } )
+scale-factor ::= digit-sequence | sign digit-sequence
+set ::= [ { set-element } ]
+set-constant ::= [ { set-constant-element } ]
+set-constant-element ::= constant | constant .. constant
+set-element ::= expression | expression .. expression
+set-type ::= SET OF base-type
+sign ::= + | -
+signed-factor ::= factor | sign factor
+simple-expression ::= term { adding-operator term }
+simple-statement ::= assignment-statement | procedure statement |
+                     goto-statement | inline-statement | empty-statement
+simple-type ::= scalar-type | subrange-type | type-identifier
+statement ::= simple-statement | structured-statement
+statement-part ::= compound-statement
+string ::= { string-element }
+string-element ::= text-string | control-character
+string-type ::= STRING [ constant ]
+structured-constant ::= constant | array-constant | record-constant |
+                        set-constant
+structured-constant-definition ::= identifier : type = structured-constant
+structured-statement ::= compound-statement | conditional-statement |
+                         repetitive-statement | with-statement
+structured-type ::= unpacked-structured-type |
+                    PACKED unpacked-structured-type
+subrange-type ::= constant .. constant
+tag-field ::= empty | field-identifier :
+term ::= complemented-factor { multiplying-operator complemented factor }
+text-string ::= ' { character } '
+type-definition ::= identifier = type
+type-definition-part ::= TYPE type-definition { ; type-definition } ;
+type-identifier ::= identifier
+type ::= simple-type | structured-type | pointer-type
+typed-constant-identifier ::= identifier
+unpacked-structured-type ::= string-type | array-type | record-type |
+                             set-type | file-type
+unsigned-constant ::= unsigned-number | string | constant-identifier | NIL
+unsigned-integer ::= digit-sequence | $ hexdigit-sequence
+unsigned-number ::= unsigned-integer | unsigned-real
+unsigned-real ::= digit-sequence . digit-sequence |
+                  digit-sequence . digit-sequence E scale-factor |
+                  digit-sequence E scale-factor
+untyped-constant-definition ::= identifier = constant
+variable ::= entire-variable | compound-variable | referenced-variable
+variable-declaration ::= identifier-list : type |
+                         identifier-list : type ABSOLUTE constant
+variable-declaration-part ::= VAR variable-declaration
+                              {; variable-declaration } ;
+variable-identifier ::= identifier
+variant ::= empty | case-label list : ( field-list )
+variant-part ::= CASE tag-field type-identifier OF variant {; variant }
+while-statement ::= WHILE expression DO statement
+with-statement ::= WITH record-variable-list DO statement
+

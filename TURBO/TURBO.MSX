@@ -1,0 +1,80 @@
+.NOSWAP
+
+TFLAGS=/m4 /l
+LFLAGS=/s /Tdc
+
+system=msx # or pc
+
+z80=..\2pc\z80 $(mac).mac $(system)_gen\$(mac).mc $(system)
+tasmx=..\bin\tasmx $(system)_asm\$(name).asm , $(system)_obj\$(name).obj $(TFLAGS)
+
+fileio_h=..\library\fileio.inc
+fileio_o=..\library\$(system)_obj\fileio.obj
+
+.PATH.obj=$(system)_obj
+.PATH.asm=$(system)_asm
+
+
+turbo           : runtime.com turbo.com
+
+
+
+# RUNTIME library
+# ---------------
+
+rtl_include=stdio.inc libdefs.inc $(fileio_h)
+rtl_objs=msx_obj\rtl_rtl.obj ..\library\msx_obj\fileio.obj msx_obj\rtl_end.obj
+# rtl_rtl_o=msx_obj\rtl_rtl.obj
+# rtl_end_o=msx_obj\rtl_end.obj
+
+runtime.com     : $(rtl_objs) $(rtl_include)
+
+                ..\bin\tlink $(rtl_objs) , runtime.com , , $(LFLAGS)
+
+msx_obj\rtl_rtl.obj : msx_asm\rtl_rtl.asm runtime.mac stdio.inc libdefs.inc
+
+                ..\2pc\z80 runtime.mac msx_gen\runtime.mc msx
+                ..\bin\tasmx msx_asm\rtl_rtl , msx_obj\rtl_rtl.obj $(TFLAGS);
+
+msx_obj\rtl_end.obj : msx_asm\rtl_end.asm
+
+                ..\bin\tasmx msx_asm\rtl_end , msx_obj\rtl_end.obj $(TFLAGS);
+
+# TURBO pascal
+# ------------
+
+INCLUDE=stdio.inc libdefs.inc libconst.inc $(fileio_h)
+
+# COMPILER
+turbo.com       : tur_init.obj ..\library\$(system)_obj\fileio.obj tur_comp.obj \
+                  tur_slib.obj tur_glib.obj tur_end.obj
+        @del tur.lib
+        ..\bin\tlib @link.$(system)
+        ..\bin\tlink $(system)_obj\tur_init , turbo.com , , tur.lib $(LFLAGS)
+        @copy turbo.com/b + runtime.com/b turbo1.com
+        @del turbo.com
+        @ren turbo1.com turbo.com
+
+libconst.inc    : runtime.com
+        extern runtime.map libconst.inc
+
+tur_init.obj    : $(system)_asm\tur_init.asm init.mac $(INCLUDE)
+                ..\2pc\z80 init.mac $(system)_gen\init.mc msx
+                ..\bin\tasmx msx_asm\tur_init , msx_obj\tur_init $(TFLAGS);
+
+tur_comp.obj    : $(system)_asm\tur_comp.asm compiler.mac $(INCLUDE)
+                ..\2pc\z80 compiler.mac $(system)_gen\compiler.mc msx
+                ..\bin\tasmx $(system)_asm\tur_comp , $(system)_obj\tur_comp $(TFLAGS);
+
+tur_slib.obj    : $(system)_asm\tur_slib.asm slib.mac $(INCLUDE)
+                ..\2pc\z80 slib.mac $(system)_gen\slib.mc $(system)
+                ..\bin\tasmx $(system)_asm\tur_slib , $(system)_obj\tur_slib $(TFLAGS);
+
+tur_glib.obj    : $(system)_asm\tur_glib.asm glib.mac $(INCLUDE)
+                ..\2pc\z80 glib.mac $(system)_gen\glib.mc $(system)
+                ..\bin\tasmx $(system)_asm\tur_glib , $(system)_obj\tur_glib $(TFLAGS);
+
+tur_end.obj     : $(system)_asm\tur_end.asm  end.mac  $(INCLUDE)
+                ..\2pc\z80 end.mac $(system)_gen\end.mc msx
+                ..\bin\tasmx $(system)_asm\tur_end ,  $(system)_obj\tur_end  $(TFLAGS);
+

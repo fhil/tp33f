@@ -1,0 +1,9683 @@
+; ^QW: find current word
+; ^QS: find current word without first letter (for names that start with an
+;      underscore)
+
+; - define the symbol 'MSX' to compile the msx compiler
+;   otherwise the PC version will be generated
+
+; - define the symbol 'USELIB' to compile all library routines
+; - define the symbol 'NEWEXT' to use the new external routine
+
+MessagesForTilburg:
+
+NeededMemManVersion        EQU 0204h
+NeededGIOSVersion          EQU 0222h
+
+RUNTIME:
+;NEWEXT:
+FASTREAL:
+
+IFNDEF MAKEPC
+MSX:
+ENDIF
+
+IFDEF MSX
+MSXDOS	EQU 5
+USELIB:
+ENDIF
+
+         PUBLIC CON1OUTPTR
+
+         PUBLIC L005C,L005D
+	PUBLIC L0065,L0066,L006C,L0080,L00CE
+	PUBLIC L00E0,L00F4,L0100,L0101,L0168
+	PUBLIC L0168,L0169,L01AE,L01E1
+	PUBLIC L01B4,L01BC,L01FA,L0200,L021D
+	PUBLIC L023E,L0259,L0262,L026B
+	PUBLIC L0284,L0299,L02A2,L0310,L03C9
+	PUBLIC L03E1,L03EE,L0406,L04A6,L04B4,L04D2,L04AF
+	PUBLIC L0591,L059B,L0612,L0783
+	PUBLIC L07F7,L1008,L11A3,L14E8,L1726
+
+	PUBLIC A2L
+
+	; defined in COMPILER.MAC
+	EXTRN L278E
+
+	INCLUDE stdio.inc
+
+	INCLUDE libdefs.inc
+
+	ORG 100H
+
+L0100:
+
+IFDEF MAKEPC
+	LD (L0006),SP
+;!       jmp word ptr L0101
+
+ELSE
+
+         DB 0C3H
+ENDIF
+
+L0101:   DW L20E2
+
+MagicNumber:                        ; must be at 103H
+         DB 12H,34H,56H,78H
+TurboPascalVersion:
+         DB 03H,03H,'a',04H         ; must be at 107H
+
+         DW L016B                   ; must be at 10BH
+         DW 0                       ; reserved 10DH
+         DW 0                       ; reserved 10FH
+         DW 0                       ; reserved 111H
+         DW 0
+         DW 0
+         DW 0
+         DW 0
+         DW 0
+         DW 0
+         DW 0
+         DW 0
+         DW 0
+
+;PREFIX:  DB 'TURBO '                ; for 'TURBO.MSG' or 'TURBO.OVR'
+
+;L0000:   DB 0
+;L0001:   DW 0
+
+;L0004:   DB 0                        ; current drive ?
+
+;L0005:   DB 0
+
+IFDEF MAKEPC
+L0006:   DW 0
+ENDIF    ; MAKEPC
+
+L0038:	DB 0
+L0039:	DW 0
+
+         ; L005C points to an area of 64 bytes because of the use
+         ; as a file handle or FCB for the new routines
+L005C:   DB 0                       ; start of FCB
+
+L005D:	DS 8			; name
+
+L0065:	DB 0			; FCB extension, first letter
+L0066:	DS 2			; second and third letter
+
+L0068:	DB 0			; 0CH
+	DB 0			; 0DH
+	DB 0			; 0EH
+	DB 0			; 0FH
+L006C:	DS 4			; 10H-13H
+L0070:	DS 4			; 14H-17H
+L0074:	DS 8			; 18H-1FH
+L007C:	DB 0			; 20H
+L007D:	DW 0			; 21H-22H
+	DW 0			; 23H-24H
+
+         DS 64 - 37
+
+IFDEF MSX
+L0080	EQU 0080H
+ELSE
+         ; L0080 already defined in RUNTIME.ASM
+;L0080	 EQU $-1
+ENDIF
+
+	GLOBALS CONSTPTR
+CONSTPTR:; FUNCTION KeyPressed: BOOLEAN;
+IFDEF MSX
+	DB 0C3H
+ELSE
+;!	jmp word ptr CONSTPTR_1
+ENDIF
+CONSTPTR_1:DW L0316
+
+	GLOBALS CONINPTR
+CONINPTR:			; console input routine
+IFDEF MSX
+	DB 0C3H
+ELSE
+;!	jmp word ptr CONINPTR_1
+ENDIF
+CONINPTR_1:DW L0320
+
+	GLOBALS CONOUTPTR
+CONOUTPTR:			; console output routine
+IFDEF MSX
+	DB 0C3H
+ELSE
+;!	jmp word ptr CON1OUTPTR
+ENDIF
+CON1OUTPTR:DW L0339
+
+	GLOBALS LSTOUTPTR
+LSTOUTPTR:
+         JP L032F                   ; jump opcode at 00A9H
+				; LSTOUTPTR at absolute 00AAH
+
+	GLOBALS AUXOUTPTR
+AUXOUTPTR:
+	JP L0334 		; jump opcode at 00ACH
+				; AUXOUTPTR at absolute 00ADH
+
+	GLOBALS AUXINPTR
+AUXINPTR:
+	JP L032A 		; jump opcode at 00AFH
+				; AUXINPTR  at absolute 00B0H
+
+	GLOBALS USROUTPTR
+USROUTPTR:
+	JP L0339 		; jump opcode at 00B2H
+				; USROUTPTR at absolute 00B3H
+
+	GLOBALS USRINPTR
+USRINPTR:
+	JP L0320 		; jump opcode at 00B5H
+				; USRINPTR  at absolute 00B6H
+
+
+
+
+         ; the order of the next 6 words must not be changed
+
+	GLOBALS L00B8
+L00B8:   DW 0                       ; CON, TRM, 00B8
+
+	GLOBALS L00BA
+L00BA:	DW 0			; KBD,	   00BA
+
+	GLOBALS LST
+LST:	DW 0			; LST,	   00BC, absolute 00BCH
+
+	GLOBALS L00BE
+L00BE:	DW 0			; AUX,	   00BE
+
+	GLOBALS L00C0
+L00C0:	DW 0			; USR,	   00C0
+
+	GLOBALS OUTPUT
+OUTPUT:	DW 0			; OUTPUT,   00C2, absolute 00C2H
+
+
+
+
+	GLOBALS BUFLEN
+BUFLEN:	DB 0;			; BUFLEN    at absolute 00D1H
+
+	GLOBALS ERRORPTR
+ERRORPTR:
+IFDEF MSX
+	DB 0C3H
+ELSE
+;!	jmp word ptr ERRORPTR_1
+ENDIF
+ERRORPTR_1:DW 0
+
+	GLOBALS CBREAK
+CBREAK:DW 0			; CBREAK    at absolute 00DDH
+
+	GLOBALS HEAPPTR
+HEAPPTR:DW 0			; HEAPPTR   at absolute 00C4H
+
+	GLOBALS RECURPTR
+RECURPTR:DW 0			; RECURPTR  at absolute 00C6H
+
+L00C8:	DW 0			; 32 bit Seed number
+         DB 0
+L00CB:   DB 0                       ; waarde van R register
+
+L00CC:   DW 0                       ; start of pascal source code
+L00CE:	DW 0
+ErrorStack:DW 0                     ;
+
+ErrorExitOK EQU $-1                 ; high byte of stack pointer is always
+                                    ; NZ if filled in
+
+L00D0:   DB 0                       ; IORESULT value
+
+L00D2:   DW 0                       ; address to temp buffer of 256 bytes
+
+L00D4:   DW 0
+L00D6:	DW 0
+L00D8:	DB 0
+L00DC:   DB 0                       ; current Overlay Drive
+L00DE:	DW 0
+L00E0:	DB 0
+
+L00E2:	DW 0			; current device pointer
+                                    ; (FIB pointer)
+
+L00E4:	DW 0
+L00E6:	DW 0
+L00E8:	DW 0
+L00E9    EQU L00E8+1
+L00EA:	DW 0
+L00EC:	DB 0
+L00ED:	DW 0			; old device pointer
+
+OverlayLoadOnly:
+         DB 0
+OverlayInfoAddress:
+         DW 0
+OverlayPos:
+         DW 0
+         DW 0
+OverlayDataLen:
+         DW 0
+
+	; tabel van 16 bytes, soort buffer
+L00F0:	DW 0
+L00F2:	DW 0
+L00F4:	DW 0			; MemAvail
+L00F6:	DW 0			; MaxAvail
+L00F8:	DW 0
+	DS 8
+
+;	 DW 0ABCDH		 ; Magic
+;	 DB 0CDH,0ABH
+;	 DB 'Copyright (C) 1994 MSX Computer Club Enschede',0
+
+L0124:	DW 4			; Operating frequency of CPU (1-12 MHz)
+
+L0126:	DB 0A1H,'B',0
+
+	DS 42			; patch area of 42 bytes
+
+L0153:	; TermTypStr
+	DB 3,'msx'                 ; STRING
+	DS L0153+21-$
+
+L0168:	DB 80			; ScreenWidth
+L0169:	DB 24			; ScreenHeight
+
+	DB 0			; Why ?
+
+L016B:	; InitialStr, 16 bytes
+	DB 3,1BH,'x5',1DH
+	DS L016B+16-$		; fill rest
+
+L017B:	; ResetStr, 16 bytes
+	DS L017B+16-$		; fill rest
+
+L018B:	; CursorStr, 16 bytes
+	DB 4,1BH,'Y',0,0
+	DS L018B+16-$		; fill rest
+
+L019B:	DB 1			; 0 = ASCII, 1 = Binary Address
+L019C:	DB 32			; ColumnOffset
+L019D:	DB 32			; LineOffset
+L019E:	DB 4			; XPosition in CursorStr
+L019F:	DB 3			; YPosition in CursorStr
+L01A0:	DW 0			; Delay after cursor address (0 - 255 ms)
+
+L01A2:	; ClearScrStr, 6 bytes
+	DB 1,0CH 		; length = 1
+	DS L01A2+6-$		; fill rest
+
+L01A8:	; HomeStr, 6 bytes
+	DB 0			; length = 0
+	DS L01A8+6-$
+
+L01AE:	; InsLineStr, 6 bytes
+	DB 2,1BH,'L'
+	DS L01AE+6-$
+
+L01B4:	; DelLineStr, 6 bytes
+	DB 2,1BH,'M'
+	DS L01B4+6-$
+
+L01BA:	DW 0			; DelayLine
+
+L01BC:	; EraToEolStr
+	DB 2,1BH,'K'
+	DS L01BC+6-$
+
+L01C2:	; HLStartStr		; Start of highlighting
+	DB 0
+	DS L01C2+6-$
+
+L01C8:	; HLEndStr		; End of highlighting
+	DB 0
+	DS L01C8+6-$
+
+L01CE:	DW 0			; DelayHL, delay after
+				; EraToEol and HighLight
+
+L01D0:   LD A,(HL)
+	OR A
+	SCF
+	RET Z
+L01D4:	INC HL
+	PUSH AF
+	PUSH HL
+	LD A,(HL)
+	CALL L01E8
+	POP HL
+	POP AF
+	DEC A
+	RET Z
+	JR L01D4
+
+L01E1:   CALL L0200                 ; print CR,LF
+	DB 0DH,0AH,0
+	RET
+
+L01E8:   LD L,A
+	PUSH HL
+	CALL CONOUTPTR
+	RET
+
+L01EE:	; print character A with/without highlighting
+	CP 080H
+	CALL C,L026B		; LowVideo
+	CALL NC,L0284		; HighVideo
+	AND 07FH
+	JR L01E8
+
+L01FA:   ; print ASCIIZ-string with highlighting
+	PUSH HL
+	LD HL,L01EE
+	JR L0204
+
+L0200:	; print ASCIIZ-string without highlighting
+	PUSH HL
+	LD HL,L01E8
+L0204:	LD (L0213),HL
+	POP HL
+	EX (SP),HL
+L0209:	PUSH AF
+	PUSH BC
+L020B:	PUSH DE
+
+L020C:	LD A,(HL)
+	INC HL
+	OR A
+	JR Z,L0218
+	PUSH HL
+L0212:	CALL J0213		; call address, address is change able
+	POP HL
+	JR L020C
+
+L0218:	POP DE
+	POP BC
+	POP AF
+	EX (SP),HL		; continue after string data
+	RET
+
+J0213:
+IFDEF MSX
+	DB 0C3H
+ELSE
+;!	jmp word ptr L0213
+ENDIF
+L0213:	DW L04D2
+
+	GLOBALS L021D
+L021D:	; LIB, delay
+	; in:	HL = time to wait
+	LD A,L			; delay
+	OR H
+	RET Z
+	LD A,(L0124)		; A = frequency
+	ADD A,A
+	ADD A,A
+	ADD A,A
+L0226:	EX (SP),HL
+	EX (SP),HL
+	EX (SP),HL
+	EX (SP),HL
+	PUSH BC
+	LD BC,1234
+	POP BC
+	DEC A
+	JR NZ,L0226
+	DEC HL
+	JR L021D 		; Delay
+
+L0235:	CALL L01D0
+	RET C
+	LD HL,(L01CE)		; HL = DelayHL, delay highlighting
+	JR L021D 		; Delay
+
+	GLOBALS L023E
+L023E:	; PROCEDURE ClrSCr;
+	PUSH AF
+	PUSH BC
+	PUSH DE
+	PUSH HL
+
+	LD HL,L01A8		; HL = HomeStr
+	CALL L0235
+	LD HL,L01A2		; HL = ClearScrStr
+
+L024B:	CALL L01D0
+	LD HL,(L01BA)		; HL = DelayLine
+	CALL NC,L021D		; Delay
+
+	POP HL
+	POP DE
+	POP BC
+	POP AF
+	RET
+
+	GLOBALS L0259
+L0259:	; PROCEDURE DelLine
+	PUSH AF
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	LD HL,L01B4		; DelLineStr
+	JR L024B
+
+	GLOBALS L0262
+L0262:	; PROCEDURE InsLine;
+	PUSH AF
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	LD HL,L01AE		; InsLineStr
+	JR L024B
+
+	GLOBALS L026B
+L026B:	; PROCEDURE LowVideo;
+	PUSH AF
+	LD A,(L00E0)
+	OR A
+	JR Z,L0282
+
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	XOR A
+	LD (L00E0),A
+	LD HL,L01C8		; HLEndStr
+
+L027C:	CALL L0235
+
+	POP HL
+	POP DE
+	POP BC
+L0282:	POP AF
+	RET
+
+	GLOBALS L0284
+L0284:	; PROCEDURE NormVideo;
+	PUSH AF
+	LD A,(L00E0)
+	CP 0FFH
+	JR Z,L0282
+
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	LD A,0FFH
+	LD (L00E0),A
+	LD HL,L01C2		; HLStartStr
+	JR L027C
+
+	GLOBALS L0299
+L0299:	; PROCEDURE ClrEol;
+	PUSH AF
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	LD HL,L01BC		; EraToEolStr
+	JR L027C
+
+L02A2:	; in:	L = X, 0..79
+	;	H = Y, 0..23
+	PUSH AF
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	PUSH HL
+	LD HL,L018B
+	LD DE,L00F0
+	LD BC,0010H
+	LDIR
+	POP DE
+	LD A,(L019E)
+	LD C,A
+	LD A,(L019C)
+	ADD A,D
+	PUSH DE
+	CALL L02DC
+	POP DE
+	LD A,(L019F)
+	LD C,A
+	LD A,(L019D)
+	ADD A,E
+	CALL L02DC
+         LD HL,L00F0
+         CALL L01D0
+
+	LD HL,(L01A0)		; DelayCursor
+	CALL L021D		; Delay
+	POP HL
+	POP DE
+	POP BC
+	POP AF
+	RET
+
+L02DC:	LD HL,L00F0
+	LD B,0
+	ADD HL,BC
+	EX DE,HL
+	LD HL,L019B
+	INC (HL)
+	DEC (HL)
+	JR Z,L02EC
+	LD (DE),A
+	RET
+
+L02EC:	DEC DE
+	DEC DE
+	LD HL,TAB110100+3
+	LD B,3
+
+L02F3:	DEC HL
+
+	LD C,'0'-1
+L02F6:	INC C
+	SUB (HL)
+	JR NC,L02F6
+
+	ADD A,(HL)
+	PUSH AF
+	LD A,C
+	CP '0'
+L02FF:	JR Z,L0302
+
+	LD (DE),A
+L0302:	INC DE
+	POP AF
+	DJNZ L02F3
+	RET
+
+TAB110100:
+	DB 1,10,100
+
+IFDEF MSX
+	GLOBALS L030A
+L030A:	; PROCEDURE CrtInit;
+	LD HL,L016B		; InitialStr
+	JP L0235
+ENDIF
+
+	GLOBALS L0310
+L0310:	; PROCEDURE CrtExit;
+	LD HL,L017B		; ResetStr
+	JP L0235
+
+L0316:   ; tests if there is a character in the input buffer
+	; and places it in a temporary buffer to read it the next time
+	; in:	-
+	; out:	HL = false = 0, if no character present
+	;	HL = true = 1, if a character was present
+IFDEF MSX
+	; MSX version, FAST
+	LD HL,(0F3FAH)
+	LD A,(0F3F8H)
+	SUB L
+	LD A,1			; assume there are characters present
+	JR NZ,L0316_OK		; jump if characters present
+
+	DEC A			; FALSE if not
+L0316_OK:
+
+ELSE
+	; PC version, slow CPM call
+	LD DE,3
+	CALL L035F
+	AND 1
+ENDIF
+	JR L0326
+
+L0320:	; in:	-
+	; out:	HL = character read from keyboard
+	;	H = always zero
+IFNDEF MSX
+	LD DE,2*3		; Console Input
+ELSE
+         LD C,8                     ; standard input without echo
+                                    ; this is not CPM compatible !!!
+
+L0321:
+         CALL MSXDOS
+         ; L = A = character read from keyboard
+         JR L0326
+ENDIF    ; MSX
+
+
+L0323:   CALL L035F
+
+L0326:	LD L,A
+	LD H,0
+	RET
+
+L032A:
+IFNDEF MSX
+         LD DE,6*3                  ; Reader Input
+	JR L0323
+ELSE
+         LD C,3                     ; Reader Input, Auxiliary Input
+         JR L0321
+ENDIF    ; MSX
+
+
+L032F:   ; List Output, Printer Output
+IFNDEF MSX
+         LD DE,4*3
+	JR L033C
+ELSE
+         LD D,5
+         JR L033C
+ENDIF    ; MSX
+
+
+L0334:   ; Puncher Output, Auxiliary Output
+IFNDEF MSX
+         LD DE,5*3
+	JR L033C
+ELSE
+         LD D,4
+         JR L033C
+ENDIF    ; MSX
+
+L0339:   ; Console Output
+IFNDEF MSX
+         LD DE,3*3                  ; Console Output
+ELSE
+         LD D,2                     ; Console Output
+ENDIF    ; MSX
+
+L033C:	POP HL			; pop return address
+	POP BC			; C = character to print
+	PUSH HL			; push return address
+
+	LD A,(CBREAK)
+	OR A
+	JR Z,L035D_1		; jump if no break allowed
+
+	PUSH DE
+	PUSH BC
+	CALL CONSTPTR
+	LD A,H
+	OR L
+	JR Z,L035D		; jump if no character present
+
+         CALL L03E1                 ; A = character from console
+	CP 013H
+	JR NZ,L035D
+
+	CALL L03E1		; A = character from console
+	CP 3
+         JP Z,L20D4                 ; jump to Program Abort if ^C pressed
+
+L035D:	POP BC
+	POP DE
+
+L035D_1:
+IFDEF MSX
+         LD E,C                     ; E = character to print
+         LD C,D                     ; DOS function
+         JP MSXDOS
+ENDIF    ; MSX
+
+L035F:
+IFDEF MSX
+	LD HL,(0001H)
+	ADD HL,DE
+	JP (HL)
+ELSE
+	JP DOSIO 		; ----
+ENDIF    ; MSX
+
+         GLOBALS L0364
+L0364:   ; InitCharIO
+         LD (L00D2),HL              ; LIB, set temp buffer address
+	LD A,B
+	LD (CBREAK),A
+;	 LD A,C
+;	 OR A
+;	 JR Z,L037A
+
+IFDEF MSX ; patch
+	LD A,0C3H		; install CBREAK handler at RST 0008H !
+	LD (0008H),A	        ; LD (L0038),A
+	LD HL,L1FFB
+	LD (0009H),HL	        ; LD (L0039),HL
+ENDIF	; MSX
+
+L037A:
+IFDEF MSX
+	LD HL,L03A5
+	LD DE,CONSTPTR
+	LD BC,L03A5_L
+	LDIR
+ENDIF    ; MSX
+
+	LD HL,L03BD
+	LD DE,L00B8
+	LD BC,000CH
+	LDIR			; flag bits of I/O routines
+
+	XOR A
+	LD L,A
+	LD H,A
+	LD (L00D0),A		; reset IORESULT value
+	LD (L00D4),HL
+	LD (L00D6),HL
+	LD A,07EH
+	LD (BUFLEN),A
+	LD (L00E0),A
+
+         CALL InitFileIO            ; Set DOS2Present variable
+
+         LD A,(DOS2Present)
+         OR A
+         CALL NZ,CheckRedirection
+
+         LD (RedirectionFlag),A     ; 0 if DOS 1
+                                    ; NonZero if DOS 2 and redirection active
+
+IFDEF MSX
+	JP IGIOS
+ELSE
+	RET
+ENDIF	; MSX
+
+IFDEF MSX
+RedirectionFlag:
+         DB 0                       ; 0 = no input redirection
+                                    ; 255 = input redirection
+
+CheckRedirection:
+         ; in:    -
+         ; out:   A = 0 if no redirection
+         ;        A = 255 if redirection present
+         LD A,0                     ; Get State
+         LD C,70H                   ; Get/Set Redirection State
+         CALL MSXDOS
+         LD A,0                     ; assume no input redirection
+         BIT 0,B
+         RET Z                      ; return if no input redirection
+
+         DEC A                      ; A = 255
+         RET
+ENDIF    ; MSX
+
+IFDEF MSX
+IGIOS:   ; checks if GIOS-TSR is present
+
+	XOR A
+	LD (GIOSOK),A
+	LD L,A
+	LD H,A
+	LD (MEMMNVER),HL		; reset MemMan version
+	LD (GIOSVER),HL		; reset GIOSVersion
+
+         LD A,0AAH                  ; runtime: MemMan not present
+         LD (L201D),A
+
+         LD HL,L201C
+         LD (RUNGIOS+1),HL          ; default r.error
+
+	CALL CHKMMAN
+	LD (MEMMAN),A		; 1 = MemMan present
+				; 0 = MemMan not present
+	RET Z			; quit if not present
+
+         LD A,0ABH                  ; runtime: Wrong MemMan version
+         LD (L201D),A
+
+	LD B,7			; MemMan version
+	LD DE,4DH*256+50
+	PUSH DE
+	CALL 0FFCAH		; get MemMan version
+	LD (MEMMNVER),HL		; save MemManVersion #H.L
+
+         LD DE,NeededMemManVersion  ; minimum version
+         OR A
+         SBC HL,DE                  ; current >= NeededMemManVersion ?
+
+	LD B,8			; address of XTsrCall
+	POP DE
+
+         RET C                      ; return if Wrong MemMan version
+
+         LD A,0ACH                  ; runtime: GIOS-tsr not present
+         LD (L201D),A
+
+	CALL 0FFCAH		; get address of XTsrCall
+	LD (TSRCALL1),HL
+
+	LD HL,GIOSTSRNAME
+         CALL CHECKTSR
+	RET Z			; quit if GIOS TSR not present
+
+         LD A,0ADH                  ; runtime: GIOS not present
+         LD (L201D),A
+
+         ; BC = TsrID
+
+;         PUSH BC                    ; save TsrID
+;
+;         LD A,1                     ; WriteIndex
+;         LD HL,4                    ; Set address of ErrorNumber
+;         LD DE,ErrorNumber          ; ErrorNumber address
+;
+;         CALL TSRCALL
+;
+;         POP BC                     ; restore TsrID
+
+
+         PUSH BC                    ; save TsrID
+
+	XOR A			; ReadIndex
+	LD HL,0			; GetVersion
+
+         CALL TSRCALL
+	LD (GIOSVER),DE
+
+	POP BC			; restore TsrID
+
+
+         LD A,D
+	OR E
+	RET Z			; quit if COM-file not loaded
+                                    ; runtime: GIOS not present
+
+         LD A,0AEH                  ; runtime: Wrong GIOS version
+         LD (L201D),A
+
+         LD HL,NeededGIOSVersion
+         EX DE,HL
+         OR A
+         SBC HL,DE                  ; current - NeededGIOSVersion
+         RET C                      ; quit if current < NeededGIOSVersion
+
+         LD A,1
+	LD (GIOSOK),A		; 1 = GIOS Present, if TSR and COM-file
+				;		  loaded
+
+	XOR A			; ReadIndex
+	LD HL,1			; Get RunGIOS
+	CALL TSRCALL
+         LD (RUNGIOS+1),DE
+
+         LD HL,ErrorNumber
+         PUSH HL                    ; address of ErrorNumber
+         LD HL,0
+         PUSH HL                    ; Dummy
+         PUSH HL                    ; Dummy
+
+         LD A,1                     ; GIOSInit ( AddressErrorNumber, 0, 0)
+         CALL RUNGIOS               ; call because return address must
+                                    ; be pushed before entering GIOS
+
+         RET
+
+TSRCALL: ; in:	BC = TsrID
+	PUSH BC
+	POP IX			; IX = TsrID
+	DB 0C3H
+TSRCALL1:DW 0
+
+CHECKMEMMAN:
+         ; caution: the second address popped from the stack must be the
+         ;          address to return to when pascal continues
+         LD A,(L201D)
+         CP 0ACH
+         RET NC                     ; continue if error = MemMan not present or
+                                    ;             error = wrong MemMan version
+
+         POP HL                     ; remove call address to checkmemman
+         JP L2027
+
+CHECKTSR:
+	; in:	HL = name of TSR
+	; out:	BC = TsrID code
+	;	A = 1, present
+	;	A = 0, not present
+	LD DE,4DH*256+62
+	CALL 0FFCAH
+	CCF
+	LD A,0
+	ADC A,A
+	RET
+
+TSRNAME: DB '            '
+
+	GLOBALS TSRPRESENT
+TSRPRESENT:
+	; in:	string with tsr-name pushed on stack
+         CALL CHECKMEMMAN           ; check if memman is present
+
+	POP IX			; IX = return address
+
+	LD HL,0
+	LD B,L
+	ADD HL,SP		; HL = SP
+	LD C,(HL)		; BC = length of string
+
+	INC HL
+
+	PUSH HL
+	ADD HL,BC		; HL + length of string
+	EX (SP),HL		; push new stack pointer
+				; HL = start of first data byte
+
+	LD A,C
+	CP 12 + 1
+	LD A,12			; assume 12 spaces
+	JR C,TSRPRESENT1		; jump if length <= 12
+
+	LD C,A			; maximum length of 12
+
+TSRPRESENT1:
+	SUB C			; minus number of characters
+
+	LD DE,TSRNAME
+
+	INC C
+	DEC C
+	JR Z,TSRPRESENT2		; jump if string = empty
+
+	LDIR			; copy string
+
+TSRPRESENT2:
+	EX DE,HL
+
+TSRPRESENT3:
+	OR A
+	JR Z,TSRPRESENT4
+
+	LD (HL),' '
+	INC HL
+	DEC A
+	JR TSRPRESENT3
+
+TSRPRESENT4:
+	POP HL
+	LD SP,HL 		; pop string from stack
+
+	PUSH IX			; restore return address
+
+	LD HL,TSRNAME
+	CALL CHECKTSR
+	LD L,A			; return boolean
+	LD H,0
+	RET
+
+
+CHKMMAN: ; in:	-
+	; out:	A = 1, MemMan present, Z-flag = 0
+	;	A = 0, not present, Z-flag = 1
+	LD A,65H
+	LD DE,4DH*256+30
+	CALL 0FFCAH
+	LD DE,4DH*256+30
+	CALL 0FFCAH
+	ADD A,1
+	LD A,0
+	ADC A,A
+	RET
+
+ENDIF	; MSX
+
+	GLOBALS RUNGIOS
+RUNGIOS: DB 0C3H
+         DW L201C                   ; default r.error GIOS not present
+
+	GLOBALS MEMMAN
+MEMMAN:	DB 0			; 1 = MemMan present, 0 = not present
+
+	GLOBALS MEMMNVER
+MEMMNVER:DW 0			; version: H.L
+
+	GLOBALS GIOSOK
+GIOSOK:	DB 0			; 1 = GIOS present,   0 = not present
+
+	GLOBALS GIOSVER
+GIOSVER: DW 0			; version: H.L, hexadecimal
+GIOSTSRNAME:
+	DB 'FH GIOS 2.1 '
+
+L03A5:	JP L0316 		; keypressed
+	JP L0320 		; read character from console
+	JP L0339 		; write character to console
+	JP L032F
+	JP L0334
+	JP L032A
+	JP L0339 		; write character to console
+	JP L0320 		; read character from console
+L03A5_L EQU $ - L03A5
+
+L03BD:	DW 0C1H			; Con / Trm	, read and write
+	DW 82H			; Kbd		, read
+	DW 43H			; Lst		, write
+	DW 0C4H			; Aux		, read and write
+	DW 0C5H			; Usr		, read and write
+	DW 0C1H			; Input / Output	, read and write
+
+L03C9:	; in:	A = character to print
+	; out:	-
+	; changes: -
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	PUSH IX
+	PUSH IY
+	PUSH AF
+	LD L,A
+	LD H,0
+	PUSH HL
+	CALL CONOUTPTR
+	POP AF
+
+L03D9:	POP IY
+	POP IX
+	POP HL
+	POP DE
+	POP BC
+	RET
+
+L03E1:	; in:	-
+	; out:	A = character read from console
+	; changes: F
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	PUSH IX
+	PUSH IY
+L03E8:   CALL CONINPTR
+	LD A,L
+	JR L03D9 		; same end as 'print character'
+
+	; -----------------------------------------------------------
+
+L03EE:   ; parses a filename at DE with wildcards to FCB at L005C
+	LD C,0FFH		; with wildcards
+	JR L03FE
+
+L03F2:   ; parses a string whose address is in L00D2 to FCB at L005C
+	; with no wildcards, skips leading spaces in string
+	LD C,0			; don't allow wildcards
+	LD DE,(L00D2)
+L03F8:   INC DE
+	LD A,(DE)
+	CP ' '
+	JR Z,L03F8		; skip leading spaces
+
+L03FE:	LD HL,L0065		; HL = start address for extension
+	LD B,3			; 3 characters
+	CALL L047B
+
+L0406:	; parses a complete filename at address in DE to FCB at L005C
+	; in:	DE = source address for filename
+	;	 C = 0, no wildcards
+	LD A,(DE)
+	CALL L04A6		; upcase
+	CP 'A'
+	JR C,L0420		; jump if < 'A'
+	CP 'Q'
+	JR NC,L0420		; jump if >= 'Q'
+	LD B,A			; save first character in B
+	INC DE
+	LD A,(DE)
+	CP ':'                     ; next character is ':' ?
+	JR NZ,L041F		; no, don't start with a drive specification
+	LD A,B			; A = drive letter
+	SUB 040H 		; 1 = 'A:', 2 = 'B:' etc..
+	INC DE			; to character after ':'
+	JR L0421
+
+L041F:	DEC DE			; back to first character
+
+L0420:	XOR A			; default drive
+L0421:	LD HL,L005C
+	LD (HL),A		; set drive specification
+	INC HL
+
+	INC C			; C = 0 if no wildcards are allowed
+	DEC C
+	JR Z,L0443		; jump to skip wildcards
+
+	LD A,(DE)
+	CALL L0482
+	JR NZ,L0443
+	CP '?'
+	JR Z,L0443
+	CP '*'
+	JR Z,L0443
+	CP '.'
+	JR Z,L0443
+	LD B,11
+	CALL L0477
+	JR L0453
+
+L0443:	LD B,8
+	CALL L045E
+	LD A,(DE)
+	CP '.'                     ; followed by an extension ?
+	JR NZ,L0453		; no, skip parsing of an extension
+
+	INC DE			; to first character of extension
+	LD B,3
+	CALL L045E		; parse extension
+
+L0453:	LD HL,L005C+12		; clear rest of the FCB
+         LD B,FCB_LEN-11            ; 33e, -12
+L0458:	LD (HL),0
+	INC HL
+	DJNZ L0458
+	RET
+
+L045E:	LD A,(DE)
+	INC C			; skip wildcard check if not allowed
+	DEC C
+	JR Z,L046B
+
+	CP '?'
+	JR Z,L0470		; fill as if normal letter
+	CP '*'
+	JR Z,L0476		; fill rest with '?'-wildcards
+
+L046B:	CALL L0482
+	JR Z,L047B		; jump if abnormal character found, end of
+				; string found, fill rest with spaces
+
+L0470:	LD (HL),A
+	INC HL
+	INC DE
+	DJNZ L045E
+	RET
+
+L0476:	INC DE
+
+L0477:	; fill rest with '?'-wildcards
+	LD A,'?'
+	JR L047D
+
+L047B:	; fill rest with spaces
+	LD A,' '
+
+L047D:	LD (HL),A
+	INC HL
+	DJNZ L047D
+	RET
+
+L0482:	CALL L04A6		; upcase A
+	CP ' '                     ; < ' ' ?
+	JR C,L0496
+
+	PUSH HL
+	PUSH BC
+	LD HL,L0498		; HL = address of data to scan
+	LD BC,L04911		; BC = length of data to scan
+	CPIR
+	POP BC
+	POP HL
+	RET			; return Z-flag = '1' if A found in data
+
+L0496:	CP A			; return with Z-flag corresponding to A
+	RET
+
+L0498:	; SepTable
+	DB ' .,;:=?*[]<>{}'
+L04911	EQU $-L0498
+
+	; -----------------------------------------------------------
+
+L04A6:	; in:	A = character
+	; out:	A = upcased, if A >= 'a' and A <= 'z'
+	CP 'a'
+	RET C
+	CP 'z'+1
+	RET NC
+	SUB 'a'-'A'
+	RET
+
+L04AF:	LD A,H
+	CALL L04B4
+	LD A,L
+
+L04B4:	PUSH AF
+	RRA
+	RRA
+	RRA
+	RRA
+	CALL L04BD
+	POP AF
+L04BD:	AND 00FH
+	CP 10
+	JR C,L04BE
+	ADD A,7
+L04BE:	ADD A,'0'
+	JP L03C9 		; print digit
+
+L04C8:	; converts integer HL to an unsigned byte A
+	; in:	HL
+	; out:	A = 0 and carry set, if HL < 0
+	;	A = L and carry reset, if HL < 256
+	;	otherwise A = 255
+	XOR A
+	SCF			; assume HL is negative
+	BIT 7,H
+	RET NZ			; return with carry set if negative
+
+	LD A,H
+	OR A
+	LD A,L
+	RET Z			; return if HL < 256
+
+L04D2:	LD A,(L04D2_D)		; code area
+	RET
+
+L04D2_D: DB 0			; data area
+
+
+IFDEF USELIB
+
+	GLOBALS L04D4
+L04D4:   ; the return address of this routine is the start address
+         ; of the pascal code !!
+         DI
+         LD (L00D8),A
+	PUSH BC
+         CALL L1EAF
+	POP BC
+IFDEF MSX
+	LD HL,(0006H)		; HL = top of memory
+ELSE
+	LD HL,(L0006)		; HL = top of memory
+ENDIF
+	OR A
+	SBC HL,BC		; < top of memory ?
+         JP C,L20A8                 ; jump if out of memory
+
+	EX DE,HL
+	POP DE
+	LD SP,HL
+         EI
+	LD BC,-1024
+	ADD HL,BC
+	LD (RECURPTR),HL
+
+	XOR A
+;         LD L,A
+;         LD H,A
+;         LD (L00CE),HL
+         LD (L00DC),A               ; reset Overlay Drive
+	LD A,0C3H
+         LD (ERRORPTR),A
+         LD HL,L20DE
+	LD (ERRORPTR_1),HL
+	EX DE,HL
+         LD (L00CC),HL              ; set start address of pascal code
+	JP (HL)
+
+	GLOBALS L0508
+L0508:	; heap alloc
+	; in:	HL = source of data to put on heap
+	;	BC = length of data to allocate
+	PUSH HL
+	LD HL,(RECURPTR)
+	OR A
+	SBC HL,BC		; decrease with BC bytes
+	LD (RECURPTR),HL
+	LD DE,(HEAPPTR)
+	OR A
+	SBC HL,DE
+	ADD HL,DE
+	EX DE,HL
+	POP HL
+	JP C,L1D75
+	LDIR
+	RET
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L0522
+L0522:	; heap de-alloc
+	LD HL,(RECURPTR)
+	LDIR
+	LD (RECURPTR),HL
+; 33e         EXX                        ; restore registers
+	RET
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L052C
+L052C:	; LIB
+	; get REAL HLDEBC from address HL
+	; in:	HL = address of REAL, variable
+	; out:	HLDEBC = REAL stored at that address
+	LD E,(HL)		; get HL part
+	INC HL
+	LD D,(HL)
+	INC HL
+	PUSH DE			; save HL part
+	LD E,(HL)		; get DE part
+	INC HL
+	LD D,(HL)
+	INC HL
+	LD C,(HL)		; get BC part
+	INC HL
+	LD B,(HL)
+	POP HL			; restore HL part
+	RET
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L053A
+L053A:	; PushString
+	POP IX			; LIB
+	EX DE,HL
+	LD A,(DE)
+	LD C,A
+	LD B,0
+	CPL
+	LD L,A
+	LD H,0FFH
+	ADD HL,SP
+	LD SP,HL
+	EX DE,HL
+	INC BC
+	LDIR
+	JP (IX)
+
+	GLOBALS L054D
+L054D:	; PushConstantString
+	; string follows call to this function
+	POP DE
+	LD A,(DE)
+	LD C,A
+	LD B,0
+	CPL
+	LD L,A
+	LD H,0FFH
+	ADD HL,SP
+	LD SP,HL
+	EX DE,HL
+	INC BC
+	LDIR
+	JP (HL)
+
+	GLOBALS L055D
+L055D:	; push a SET on to the stack
+	; in:	HL = address of SET to push on the stack
+	;	B = offset within SET
+	;	C = length of SET
+	POP IX
+	EX DE,HL
+	LD HL,-32
+	ADD HL,SP
+	LD SP,HL 		; reserve 32 bytes for a SET
+	EX DE,HL 		; HL = source address of SET
+				; DE = start of reserved SET
+	PUSH BC
+
+	; clear first unused bytes
+	INC B
+	DEC B
+	JR Z,L0570		; jump if no unused bytes
+
+	XOR A
+
+L056C:	LD (DE),A
+	INC DE
+	DJNZ L056C
+	; B = 0
+L0570:
+	LDIR			; copy used bytes to reserved SET
+	POP BC			; B = offset
+				; C = length
+
+	LD A,020H		; A = 32 - offset - length
+	SUB B
+	SUB C
+	JR Z,L057F		; jump if no last unused bytes
+
+	; clear last unused bytes
+	LD B,A
+	XOR A
+L057B:	LD (DE),A
+	INC DE
+	DJNZ L057B
+L057F:	JP (IX)			; jump to return address
+
+ENDIF	; USELIB
+
+	GLOBALS L0581
+L0581:	; LIB
+	; push new empty SET on stack
+	; in:	-
+	; out:	a new SET pushed on to the stack
+	POP IX			; LIB
+	LD HL,-32
+	ADD HL,SP
+	LD SP,HL 		; reserve 32 bytes
+
+	; clear the SET with zeroes
+	LD B,020H
+	XOR A
+L058B:	LD (HL),A
+	INC HL
+	DJNZ L058B
+
+	JP (IX)
+
+	GLOBALS L0591
+L0591:	; add element HL to SET at stack
+	;
+	POP IX
+	LD B,L			; B = element to add
+	CALL L05BA
+
+L0597:	OR (HL)
+	LD (HL),A
+
+L0599:	JP (IX)
+
+	GLOBALS L059B
+L059B:
+	POP IX			; LIB
+	POP DE
+	LD A,L
+	SUB E
+	JR C,L0599
+	INC A
+	LD C,A
+	LD B,E
+	CALL L05BA
+	LD E,A
+	LD B,C
+	XOR A
+L05AB:	OR E
+	SLA E
+	JR NC,L05B6
+	OR (HL)
+	LD (HL),A
+	INC HL
+	XOR A
+	LD E,1
+L05B6:	DJNZ L05AB
+	JR L0597
+
+L05BA:	LD A,B
+	AND 0F8H 		; calculate byte offset
+	RRCA
+	RRCA
+	RRCA
+	ADD A,2			; add 2 for return address
+	LD L,A
+	LD H,0
+	ADD HL,SP
+	LD A,B
+	AND 7
+	INC A
+	LD B,A
+	XOR A
+	SCF
+L05CD:	RLA
+	DJNZ L05CD
+	RET
+
+
+IFDEF USELIB
+
+	GLOBALS L05D1
+L05D1:	; LIB
+	; puts REAL HL'DE'BC' at address HL
+	; compare with 'A:=ln(2)' where HL = address of A and HL'DE'BC'
+	; is the result of ln(2)
+	; in:	HL, HL',DE',BC'
+	; out:	HL + 5
+	PUSH HL			; destination address on stack
+	EXX			; REAL in HLDEBC
+	EX DE,HL
+	EX (SP),HL
+	LD (HL),E		; save HL first
+	INC HL
+	LD (HL),D
+	INC HL
+	POP DE
+	LD (HL),E		; save DE
+	INC HL
+	LD (HL),D
+	INC HL
+	LD (HL),C		; save BC
+	INC HL
+	LD (HL),B
+	RET
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+	GLOBALS L05E2
+L05E2:	; pop pushed STRING
+	; copy pushed <string> to address HL, truncate to maximum length of B
+	; in:	<string> pushed at stack
+	;	HL = destination address for string
+	;	 B = maximum length of string to copy
+	; out:	DE = first byte after destination string
+	; changes: AF,BC,DE,HL,IX
+	POP IX			; IX = return address
+
+	LD A,B			; A = maximum length of string
+	EX DE,HL 		; DE = destination address
+
+	LD HL,0
+	LD B,H			; B = 0
+	ADD HL,SP		; HL = SP
+	LD C,(HL)		; BC = length byte of string
+	PUSH HL			; save start of string
+	ADD HL,BC		; HL = address of last string character
+
+L05EE:	INC HL			; HL = address just after string
+                                    ; stack pointer to return
+
+	EX (SP),HL		; HL = start of string
+				; address just after string at stack
+				; new stack pointer pushed at stack
+
+	CP C			; maximum length - string length
+				; string length > maximum length ?
+	JR C,L05F4		; yes, jump if true (ignore rest of string)
+
+	; maximum length <= string length
+	LD A,C			; truncate string length to maximum
+
+L05F4:	LD (DE),A		; set length of destination string
+	INC DE			; DE = first databyte of destination string
+	INC HL			; HL = first databyte of string
+	OR A
+	JR Z,L05FD		; quit if length = 0
+
+	LD C,A			; C = length of truncated string
+	LDIR			; copy string data
+
+L05FD:	POP HL			; address just after string
+	LD SP,HL 		; remove string from stack
+
+	JP (IX)			; jump to return address
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L0601
+L0601:	; pop pushed STRING
+	; copy pushed <string> to address HL, truncate to maximum length of B
+	; in:	<string> pushed first on stack
+	;	<destination> pushed as second on stack
+	POP IX
+	LD A,B
+	LD HL,0
+	LD B,H			; B = 0
+	ADD HL,SP
+	LD C,(HL)		; BC = length of start
+	PUSH HL			; save start of string
+	ADD HL,BC
+	INC HL
+	LD E,(HL)		; DE = destination address of string
+	INC HL
+	LD D,(HL)		; HL = highest byte of pushed parameters
+	JR L05EE
+
+ENDIF	; USELIB
+
+
+	GLOBALS L0612
+L0612:	; pop pushed set to the address in HL
+	; in:	HL = destination address of SET
+	;	C = bytes to copy from SET
+	;	B = offset within SET
+	POP IX			; LIB
+	EX DE,HL
+	LD L,B			; HL = offset within SET
+	LD H,0
+	LD B,H			; BC = length
+	ADD HL,SP
+	LDIR			; copy set to given address
+
+	LD HL,0020H
+
+L061F:	ADD HL,SP
+	LD SP,HL
+	JP (IX)
+
+
+IFDEF USELIB
+
+	GLOBALS L0623
+L0623:	; pop pushed set to the pushed address
+	; PROCEDURE CopySet(VAR Set1: set; Set2: set);
+	;
+	; in:	<SET> first pushed parameter
+	;	<ADDRESS> second pushed parameter
+	;	C = bytes to copy from SET
+	;	B = offset within SET
+	POP IX
+	LD HL,0020H		; HL = length of a SET
+	ADD HL,SP
+	LD E,(HL)		; DE = address where to put SET
+	INC HL			;
+	LD D,(HL)		;
+
+	LD L,B			; HL = offset within SET
+	LD H,0
+	LD B,H			; BC = length
+	ADD HL,SP		; HL = SP + offset
+
+	LDIR
+	LD HL,0022H		; remove SET and address
+	JR L061F
+
+	GLOBALS L0638
+L0638:	; push ARRAY OF CHAR as string
+	; in:	HL = source-address
+	;	B  = length, > 0
+	; out:	<length> pushed first (byte)
+	;	<data> pushed next
+	POP IX			; LIB
+	EX DE,HL 		; DE = source-address
+	LD A,B
+	CPL
+	LD L,A			; HL = -length
+	LD H,0FFH
+	ADD HL,SP		; HL = SP - length
+	LD SP,HL 		; SP = SP - length    make space in stack
+	LD (HL),B		; put length on top
+	INC HL			; HL = destination address of data
+	LD C,B			; BC = length of data
+	LD B,0
+	EX DE,HL 		; HL = source-address
+				; DE = destination address
+	LDIR
+	JP (IX)
+
+	GLOBALS L064C
+L064C:	; Index Check
+	OR A			; if DE > HL then r.error 90H else RET
+	SBC HL,DE
+	ADD HL,DE
+	RET C
+	LD A,090H		; r.error 90H: Index out of range
+	JP L2027 		; Run-Time error
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L0656
+L0656:   ; Subrange Check
+	; in:	HL = value to check if its >= DE and < DE+BC
+	;	DE = base
+	;	BC = length
+	; out:	HL,DE,BC unchanged
+	OR A
+	SBC HL,DE		; subtract base
+	OR A
+	SBC HL,BC		; subtract length
+	JR NC,L0661		; jump if result >= length
+
+	ADD HL,BC		; undo subtracting
+	ADD HL,DE
+	RET
+
+L0661:	LD A,091H		; r.error 91H: Scalar or subrange out of range
+	JP L2027 		; Run-time error
+
+ENDIF	; USELIB
+
+
+         GLOBALS L_FOR_TO
+L_FOR_TO:
+         ; FOR xx := start TO end
+         ; in:    DE:HL = end
+         ;        (sp+2):(sp) = start
+         ; out:   DE:HL = length
+         ;        Carry set if start > end
+         ;POP IX                     ; IX = return address
+
+
+         GLOBALS L_FOR_DOWNTO
+L_FOR_DOWNTO:
+         ; FOR xx := start TO end
+         ; in:    DE:HL = end
+         ;        (sp+2):(sp) = start
+         ; out:   DE:HL = length
+         ;        Carry set if start > end
+
+IFDEF USELIB
+
+	GLOBALS L0666
+L0666:   ; FOR xx := start TO end
+	; in:	HL = end
+	;	DE = start
+         ; out:   DE = length
+	OR A			; LIB
+         SBC HL,DE                  ; end - start
+         EX DE,HL                   ; DE = length
+L066A:
+
+;!	pushf
+         INC DE                     ; end - start + 1
+;!	popf
+IFDEF MSX
+	JP PE,L0671
+ELSE
+;!	jo near ptr L0671 	; jump if overflow, PE
+ENDIF
+
+	RET P
+	JR L0672
+
+L0671:	RET M
+
+L0672:	LD DE,0000
+	RET
+
+	GLOBALS L0676
+L0676:	; FOR xx := start DOWNTO end
+	; in:	HL = end
+	;	DE = start
+	PUSH DE			; LIB
+	EX DE,HL
+	OR A
+         SBC HL,DE                  ; start - end
+	EX DE,HL
+	POP HL
+	JR L066A
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L067F
+L067F:	; X = Y ? : Integer, Byte, Boolean or Char
+	; in:	X = DE, Previous
+	;	Y = HL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	OR A
+	SBC HL,DE
+
+L0682:	; Equal
+	LD HL,1
+	RET Z
+	DEC HL
+	RET
+
+         GLOBALS L_PRED
+L_PRED:  ; in:    DE:HL
+         ; out:   DE:HL
+         ; changes: BC
+
+         LD BC,1
+         OR A
+         SBC HL,BC                  ; low-word - 1
+         RET NC                     ; return if >= 0
+
+         DEC DE                     ; high-word - 1
+         RET
+
+         GLOBALS L_SUCC
+L_SUCC:  ; in:    DE:HL
+         ; out:   DE:HL
+         ; changes: BC
+
+         LD BC,1
+         ADD HL,BC                  ; low-word + 1
+         RET NC                     ; return if <= 0ffffh
+
+         INC DE                     ; high-word + 1
+         RET
+
+	GLOBALS L_EQ
+L_EQ:	; X = Y ? : Longint
+	; in:	X at stack, Previous
+	;	Y in DEHL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L_CMP		; Compare longints
+         JP L0682
+
+	GLOBALS L0688
+L0688:	; X = Y ? : Real
+	; in:	X = BCDEHL , Previous
+	;	Y = BCDEHL', Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L0BDF		; Compare REALS
+         JP L0682                   ; Equal
+
+	GLOBALS L068D
+L068D:	; X = Y ? : String
+	; in:	X = pushed first , Previous
+	;	Y = pushed second, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L09B0		; Compare STRINGS
+         JP L0682                   ; Equal
+
+	GLOBALS L0692
+L0692:	; X <> Y ? : Integer, Byte, Boolean or Char
+	; in:	X = DE, Previous
+	;	Y = HL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	OR A
+	SBC HL,DE
+
+L0695:	; Not Equal
+	LD HL,1
+	RET NZ
+	DEC HL
+	RET
+
+	GLOBALS L_NEQ
+L_NEQ:	; X <> Y ? : Longint
+	; in:	X at stack, Previous
+	;	Y in DEHL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L_CMP		; Compare longints
+	JR L0695 		; Not Equal
+
+	GLOBALS L069B
+L069B:	; X <> Y ? : Real
+	; in:	X = BCDEHL , Previous
+	;	Y = BCDEHL', Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L0BDF		; Compare REALS
+	JR L0695 		; Not Equal
+
+	GLOBALS L06A0
+L06A0:	; X <> Y ? : String
+	; in:	X = pushed first , Previous
+	;	Y = pushed second, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L09B0		; Compare STRINGS
+	JR L0695 		; Not Equal
+
+
+	GLOBALS L06A5
+L06A5:	; X >= Y ? : Integer, Byte, Boolean or Char
+	; in:	X = DE, Previous
+	;	Y = HL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L0772		; Compare signed Integers
+
+L06A8:	; Greater or Equal
+	LD HL,1
+	RET NC
+	DEC HL
+	RET
+
+	GLOBALS L_GTE
+L_GTE:	; X >= Y ? : Longint
+	; in:	X at stack, Previous
+	;	Y in DEHL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L_CMP		; Compare longints
+	JR L06A8 		; Greater or Equal
+
+	GLOBALS L06AE
+L06AE:	; X >= Y ? : Real
+	; in:	X = BCDEHL , Previous
+	;	Y = BCDEHL', Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L0BDF		; Compare REALS
+	JR L06A8 		; Greater or Equal
+
+	GLOBALS L06B3
+L06B3:	; X >= Y ? : String
+	; in:	X = pushed first , Previous
+	;	Y = pushed second, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L09B0		; Compare STRINGS
+	JR L06A8 		; Greater or Equal
+
+	GLOBALS L06B8
+L06B8:	; X <= Y ? : Integer, Byte, Boolean or Char
+	; in:	X = DE, Previous
+	;	Y = HL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L0772		; Compare signed Integers
+
+L06BB:	; Less or Equal
+	LD HL,1
+	RET Z
+	RET C
+	DEC HL
+	RET
+
+	GLOBALS L_LSE
+L_LSE:	 ; X <= Y ? : Longint
+	; in:	X at stack, Previous
+	;	Y in DEHL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L_CMP		; Compare longints
+	JR L06BB 		; Less or Equal
+
+	GLOBALS L06C2
+L06C2:	; X <= Y ? : Real
+	; in:	X = BCDEHL , Previous
+	;	Y = BCDEHL', Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L0BDF		; Compare REALS
+	JR L06BB 		; Less or Equal
+
+	GLOBALS L06C7
+L06C7:	; X <= Y ? : String
+	; in:	X = pushed first , Previous
+	;	Y = pushed second, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L09B0		; Compare STRINGS
+	JR L06BB 		; Less or Equal
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L06CC
+L06CC:	; X > Y ? : Integer, Byte, Boolean or Char
+	; in:	X = DE, Previous
+	;	Y = HL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L0772		; Compare signed Integers
+
+L06CF:	; Greater
+	LD HL,0
+	RET Z
+	RET C
+	INC HL
+	RET
+
+	GLOBALS L_GT
+L_GT:	; X > Y ? : Longint
+	; in:	X at stack, Previous
+	;	Y in DEHL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L_CMP		; Compare longints
+	JR L06CF 		; Greater
+
+	GLOBALS L06D6
+L06D6:	; X > Y ? : Real
+	; in:	X = BCDEHL , Previous
+	;	Y = BCDEHL', Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L0BDF		; Compare REALS
+	JR L06CF 		; Greater
+
+	GLOBALS L06DB
+L06DB:	; X > Y ? : String
+	; in:	X = pushed first , Previous
+	;	Y = pushed second, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L09B0		; Compare STRINGS
+	JR L06CF 		; Greater
+
+	GLOBALS L06E0
+L06E0:	; X < Y ? : Integer, Byte, Boolean or Char
+	; in:	X = DE, Previous
+	;	Y = HL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+         CALL L0772                 ; Compare Signed Integers
+
+L06E3:	; Less
+	LD HL,1
+	RET C
+	DEC HL
+	RET
+
+	GLOBALS L_LS
+L_LS:	; X < Y ? : Longint
+	; in:	X at stack, Previous
+	;	Y in DEHL, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L_CMP		; Compare longints
+	JR L06E3 		; Less
+
+	GLOBALS L06E9
+L06E9:	; X < Y ? : Real
+	; in:	X = BCDEHL , Previous
+	;	Y = BCDEHL', Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L0BDF		; Compare REALS
+	JR L06E3 		; Less
+
+	GLOBALS L06EE
+L06EE:	; X < Y ? : String
+	; in:	X = pushed first , Previous
+	;	Y = pushed second, Current
+	; out:	HL = 1, if true
+	;	HL = 0, if false
+	CALL L09B0		; Compare STRINGS
+	JR L06E3 		; Less
+
+	; INTEGER-Arithmetic
+
+	GLOBALS L06F3
+L06F3:	; LIB
+	; FUNCTION SQR(I: INTEGER): INTEGER;
+	; in:	HL = value to calcute square
+	; out:	HL = HL * HL
+	LD D,H			; DE = HL
+	LD E,L
+
+ENDIF	; USELIB
+
+
+	GLOBALS L06F5
+L06F5:	; X * Y : INTEGER
+	; in:	DE = X
+	;	HL = Y
+	; out:	HL = X * Y
+	LD C,E			; BC = X
+	LD B,D
+	EX DE,HL
+	LD HL,0
+	LD A,D			; D non zero?
+	OR A
+	LD A,16			; assume 16 bits
+	JR NZ,L0704		; yes, continue
+	LD D,E			; no, shift E to D
+	LD A,8			; shift rest over 8 bits
+L0704:	ADD HL,HL
+	EX DE,HL
+	ADD HL,HL
+	EX DE,HL
+	JR NC,L070B
+         ADD HL,BC
+L070B:	DEC A
+	JR NZ,L0704
+	RET
+
+
+IFDEF USELIB
+
+	GLOBALS L070F
+L070F:	; X div Y : INTEGER
+	; in:	DE = X
+	;	HL = Y
+	; out:	HL = X div Y
+	;	DE = X mod Y
+	LD A,H			; Y = 0 ?
+	OR L
+	JP Z,L0A03		; jump if Division by zero
+
+	CALL I_DIV_0
+
+	LD HL,(I_DDAT)
+	RET P			; quit if result = positive
+
+	JP L0783
+
+I_DDAT:	DW 0
+I_DIV_0: ; X div Y : INTEGER
+	; in:	DE = X
+	;	HL = Y
+	; out:	C = number of bits processed
+	;	result in I_DDAT
+	;	MOD = HL shr C
+	;	A = positive if result is positive
+	;	A = negative if result is negative
+
+	; HL = INTEGER A = Y
+	; DE = INTEGER B = X
+
+	LD A,H
+	XOR D
+	PUSH AF			; save resulting sign
+				; P = positive, M = minus
+
+	CALL L0780		; HL = absolute HL
+
+	EX DE,HL
+	CALL L0780		; HL = absolute HL
+
+	; HL = X
+	; DE = Y
+
+	LD BC,0
+	LD (I_DDAT),BC
+
+	LD C,1			; bits = 1
+
+I_DIV1:	; save old B and multiply b by 2
+	PUSH DE
+	SLA E
+	RL D
+
+	PUSH HL
+	OR A
+	SBC HL,DE
+	POP HL
+	JR C,I_DIV_2
+
+	INC C
+	POP AF			; remove saved INTEGER B
+	JP I_DIV1		; repeat loop
+
+I_DIV_2: POP DE			; restore INTEGER B
+
+	LD B,8			; assume 8 bits, 0 rest
+
+	LD A,C
+	AND 7
+	JR Z,I_DIV_3		; jump if zero, means 8 bits
+	LD B,A
+
+I_DIV_3: LD A,C
+	DEC A
+	AND 18H
+	RRCA
+	RRCA
+	RRCA			; A = index to byte to start at
+	EXX
+	LD BC,I_DDAT
+	ADD A,C
+	LD C,A
+	LD A,B
+	ADC A,0
+	LD B,A
+	EXX
+
+	; HL = unsigned INTEGER A
+	; DE = unsigned INTEGER B * (2^(C - 1))
+	;   B = initial number of bits after which the first byte will
+	;       be stored
+	;   C = number of bits to proces
+	; BC' = address where to store result
+	XOR A			; init first result byte
+
+	PUSH BC			; save number of bits to proces
+
+I_DIV_4: ADD A,A			; result * 2
+
+	PUSH HL			; save INTEGER A
+	OR A
+	SBC HL,DE
+	JR C,I_DIV_5		; jump if A < B
+
+	INC SP			; remove saved LONGINT A
+	INC SP
+
+	INC A			; result:=result+1
+	JR I_DIV_6
+
+I_DIV_5: POP HL			; restore INTEGER A
+
+I_DIV_6: ADD HL,HL		; LONGINT A * 2
+
+	DJNZ I_DIV_7		; result bits - 1
+                                    ; result = full ?
+				; jump if not
+	EXX
+	LD (BC),A		; save result
+	DEC BC
+	EXX
+	LD B,8			; start al over
+
+I_DIV_7: DEC C
+	JR NZ,I_DIV_4
+
+	POP BC			; C = number of bits processes (for MOD)
+	POP AF			; A = resulting sign
+				; Sign flag still set !
+	RET
+
+	GLOBALS L073B
+L073B:	; FUNCTION Random(Range: INTEGER): INTEGER;
+	PUSH HL
+	CALL L0792
+	SRL H
+	RR L
+	POP DE			; DE = Range
+	EX DE,HL 		; HL = random value
+
+	GLOBALS L0745
+L0745:	; X mod Y : INTEGER
+	; in:	DE = X
+	;	HL = Y
+	; out:	HL = X mod Y
+;         BIT 7,D                    ; test for result sign
+;         PUSH AF                    ; save resulting sign
+
+	CALL I_DIV_0
+         PUSH AF                    ; 33f, save resulting sign
+
+	; HL = RESULT SHL C
+	LD B,C
+	CALL L075A
+
+	POP AF
+         RET P                      ; return if sign bit was '0'
+
+	JP L0783 		; X mod Y = negative
+
+	GLOBALS L074E
+L074E:	; X shl Y : INTEGER
+	; in:	DE = X
+	;	HL = Y
+	; out:	HL = X shl Y
+	CALL L0761		; Range16
+	RET Z			; return if count = 0
+
+L0752:	ADD HL,HL
+	DJNZ L0752
+	RET
+
+	GLOBALS L0756
+L0756:	; X shr Y : INTEGER
+	; in:	DE = X
+	;	HL = Y
+	; out:	HL = X shr Y
+	CALL L0761		; Range16
+	RET Z			; return if count = 0
+
+L075A:	SRL H
+	RR L
+	DJNZ L075A
+	RET
+
+ENDIF	; USELIB
+
+
+L0761:	; Range16
+	EX DE,HL
+	LD A,D
+	OR A
+	JR NZ,L076E		; HL = 0
+	LD A,E
+	CP 16
+	JR NC,L076E		; HL = 0
+	LD B,A
+	OR A
+	RET
+
+L076E:	; HL = 0
+	XOR A
+	LD H,A
+	LD L,A
+	RET
+
+L0772:	; compare two signed integers
+	; in:	DE = X, Previous
+	;	HL = Y, Current
+	; out:	DE = Y
+	;	HL = X
+	;	Equal,		if DE = HL,  Zero
+	;	Not Equal,	if DE <> HL, NonZero
+	;	Greater or Equal, if DE >= HL, NonCarry
+	;	Less or Equal,	if DE <= HL, Zero or Carry
+	;	Greater than,	if DE > HL,  NonZero and NonCarry
+	;	Less than,	if DE < HL,  Carry
+	EX DE,HL
+	LD A,H
+	XOR D
+	LD A,H			; high byte of X
+	JP M,L077E
+	CP D
+	RET NZ
+	LD A,L
+	CP E
+	RET
+
+L077E:	RLA
+	RET
+
+	GLOBALS L0780
+L0780:	; Abs X : INTEGER
+	; in:	HL = X
+	; out:	HL = -X, if X < 0
+	;	HL = X, if X >= 0
+	BIT 7,H			; LIB, HL = negative ?
+	RET Z			; return if positive
+
+	GLOBALS L0783
+L0783:	; X = -X : INTEGER
+	; in:	HL = X
+	; out:	HL = -X
+	LD A,H			; negate HL
+	CPL
+	LD H,A
+	LD A,L
+	CPL
+	LD L,A
+	INC HL
+	RET
+
+
+IFDEF USELIB
+
+	GLOBALS L078B
+L078B:	; convert integer HL to boolean HL
+	; Odd X : INTEGER
+	; in:	HL = X
+	; out:	HL = 0, false if X = even
+	;	HL = 1, true  if X = odd
+	LD A,L
+	AND 1
+	LD L,A
+	LD H,0
+	RET
+
+ENDIF	; USELIB
+
+L_CMP:	; compare two signed longints
+	; in:	X at stack, Previous
+	;	Y in DEHL, Current
+	; out:	HL'HL = X
+	;	DE'DE = Y
+	;	Equal,		if DE = HL,  Zero
+	;	Not Equal,	if DE <> HL, NonZero
+	;	Greater or Equal, if DE >= HL, NonCarry
+	;	Less or Equal,	if DE <= HL, Zero or Carry
+	;	Greater than,	if DE > HL,  NonZero and NonCarry
+	;	Less than,	if DE < HL,  Carry
+	POP IX			; save return address
+	POP BC			; return address from previous caller
+
+	EX DE,HL 		; remove X from stack
+	EX (SP),HL
+	EXX
+	POP DE
+	POP HL
+	EXX
+
+	PUSH BC			; restore return address from previous call
+	PUSH IX			; restore return address
+
+L_CM0:	; in:	X = HL'HL, Previous
+	;	Y = DE'DE, Current
+	; out:	X = HL'HL, Previous
+	;	Y = DE'DE, Current
+	EXX
+	LD A,D
+	XOR H
+	LD A,H			; high byte of X
+	JP M,L_CMP1
+	CP D
+	EXX
+	RET NZ
+	EXX
+	LD A,L
+	CP E
+	EXX
+	RET NZ
+
+L0A11:                              ; 33e
+	LD A,H
+	CP D
+	RET NZ
+
+	LD A,L
+	CP E
+	RET
+
+L_CMP1:	RLA
+	EXX
+	RET
+
+; 33e
+L0A1A:                              ; TODO: used ???
+         CALL L0A11
+         RET C
+         EX DE,HL
+         RET
+; 33e
+
+	GLOBALS L_AND
+L_AND:	; X AND Y : LONG
+	; in:	X at stack
+	;	Y in DEHL
+	; out:	DEHL
+	; changes: IX
+	POP IX			; save return address
+	POP BC			; X low-word
+	LD A,L
+	AND C
+	LD L,A
+	LD A,H
+	AND B
+	LD H,A
+	POP BC			; X high-word
+	LD A,E
+	AND C
+	LD E,A
+	LD A,D
+	AND B
+	LD D,A
+	JP (IX)
+
+	GLOBALS L_OR
+L_OR:	; X OR Y : LONG
+	; in:	X at stack
+	;	Y in DEHL
+	; out:	DEHL
+	; changes: IX
+	POP IX			; save return address
+	POP BC			; X low-word
+	LD A,L
+	OR C
+	LD L,A
+	LD A,H
+	OR B
+	LD H,A
+	POP BC			; X high-word
+	LD A,E
+	OR C
+	LD E,A
+	LD A,D
+	OR B
+	LD D,A
+	JP (IX)
+
+	GLOBALS L_XOR
+L_XOR:	; X XOR Y : LONG
+	; in:	X at stack
+	;	Y in DEHL
+	; out:	DEHL
+	; changes: IX
+	POP IX			; save return address
+	POP BC			; X low-word
+	LD A,L
+	XOR C
+	LD L,A
+	LD A,H
+	XOR B
+	LD H,A
+	POP BC			; X high-word
+	LD A,E
+	XOR C
+	LD E,A
+	LD A,D
+	XOR B
+	LD D,A
+	JP (IX)
+
+	GLOBALS L_NOT
+L_NOT:	; X = NOT X : LONG
+	; in:	X in DEHL
+	; out:	DEHL
+	; changes: IX
+	LD A,L
+	CPL
+	LD L,A
+	LD A,H
+	CPL
+	LD H,A
+	LD A,E
+	CPL
+	LD E,A
+	LD A,D
+	CPL
+	LD D,A
+	RET
+
+	GLOBALS L_ABS
+L_ABS:	; Abs X : LONGINT
+	; in:	DEHL = X
+	; out:	DEHL = -X, if X < 0
+	;	DEHL =  X, if X >= 0
+	BIT 7,D			; LIB, DEHL = negative ?
+	RET Z			; return if positive
+
+	GLOBALS L_NEG
+L_NEG:	; X = -X : LONG
+	; in:	X in DEHL
+	; out:	DEHL
+	; changes: BC, A = 0
+	LD C,L			; BC = low-word
+	LD B,H
+	XOR A			; Carry = 0
+	LD L,A
+	LD H,A
+	SBC HL,BC		; 0 - low-word
+	EX DE,HL
+	LD C,L			; BC = high-word
+	LD B,H
+	LD L,A
+	LD H,A
+	SBC HL,BC		; 0 - high-word - carry
+	EX DE,HL
+	RET
+
+	GLOBALS L_ADD
+L_ADD:	; X + Y : LONG
+	; in:	X at stack
+	;	Y in DEHL
+	; out:	DEHL
+	; changes: IX
+	POP IX			; save return address
+	POP BC			; BC = X low-word
+	ADD HL,BC		; X + Y, low
+	POP BC			; BC = Y high-word
+	EX DE,HL
+	ADC HL,BC		; X + Y, high
+	EX DE,HL
+	JP (IX)
+
+	GLOBALS L_SUB
+L_SUB:	; X - Y : LONG
+	; in:	X at stack
+	;	Y in DEHL
+	; out:	DEHL
+	; changes: IX
+	POP IX			; save return address
+	LD C,L			; BC = Y low-word
+	LD B,H
+	POP HL			; HL = X low-word
+	OR A
+	SBC HL,BC		; X - Y, low
+	EX DE,HL
+	LD C,L			; BC = Y high-word
+	LD B,H
+	POP HL			; HL = X high-word
+	SBC HL,BC		; X - Y, high
+	EX DE,HL
+	JP (IX)
+
+L_MDAT:	DS 4
+
+         GLOBALS L_SQR
+L_SQR:   ; LIB
+         ; FUNCTION SQR(L: LONGINT): LONGINT;
+         ; in:    DE:HL = value to calcute square
+         ; out:   DE:HL = DE:HL * DE:HL
+         POP IX
+
+         PUSH DE
+         PUSH HL
+
+         PUSH IX
+
+         GLOBALS L_MUL
+L_MUL:	; X * Y : LONG
+	; in:	X at stack
+	;	Y in DEHL
+	; out:	DEHL
+	; changes: IX
+	POP IX
+
+         LD (L_MDAT),HL
+	LD (L_MDAT+2),DE
+	LD HL,0			; init SUM low-word
+	POP DE			; DE = X low-word
+	EXX
+	LD HL,0			; init SUM high-word
+	POP DE			; DE' = X high-word
+	EXX
+	LD A,(L_MDAT+0)
+	CALL L_MUL1
+	LD A,(L_MDAT+1)
+	CALL L_MUL1
+	LD A,(L_MDAT+2)
+	CALL L_MUL1
+	LD A,(L_MDAT+3)
+	OR A
+	CALL NZ,L_MUL11
+
+	; HL = low-word SUM
+	EXX
+	PUSH HL
+	EXX
+	POP DE			; DE = high-word SUM
+	JP (IX)
+
+L_MUL1:	OR A
+	JR Z,L_MUL4
+
+L_MUL11: LD B,8
+
+L_MUL2:	RRCA			; rotate byte from Y
+	JR NC,L_MUL3
+
+	ADD HL,DE		; SUM += X
+	EXX
+	ADC HL,DE
+	EXX
+
+L_MUL3:
+	SLA E			; X * 2
+	RL D
+	EXX
+	RL E
+	RL D
+	EXX
+
+	DJNZ L_MUL2
+	RET
+
+L_MUL4:	; in:	DE'DE
+	; out:	DE'DE SHL 8
+	LD A,D
+	LD D,E
+	LD E,0
+	EXX
+	LD D,E
+	LD E,A
+	EXX
+	RET
+
+L_DIV10: ; divides DE:HL by 10
+	; in:	DE:HL = long
+	; out:	DE:HL div 10, A = remainder
+	; changes: BC
+
+	LD C,0
+	LD B,32			; 32 bits
+	XOR A			; carry 0
+
+L_DIV101:
+	RL L
+	RL H
+	RL E
+	RL D
+	RL C
+	LD A,C
+	SUB 10
+	CCF
+	JP NC,L_DIV102
+
+	LD C,A
+
+L_DIV102:
+	DJNZ L_DIV101		; repeat for 32 bits
+
+	RL L			; DE:HL = 32 bit result
+	RL H
+	RL E
+	RL D
+	LD A,C			; A = remainder
+	RET
+
+L_DDAT:	DS 4
+
+	GLOBALS L_DIV
+L_DIV:	; X / Y : LONG
+	; in:	X at stack
+	;	Y in DEHL
+	; out:	DEHL
+	; changes:
+
+	POP BC
+
+	EX DE,HL
+	EX (SP),HL
+	EXX
+	POP DE
+	POP HL
+	EXX
+
+	PUSH BC			; restore return address
+
+	CALL L_DIV_0
+
+	LD HL,(L_DDAT)
+	LD DE,(L_DDAT+2)
+	RET P
+
+	JP L_NEG
+
+	GLOBALS L_MOD
+L_MOD:	; X mod Y : LONG
+	; in:	X at stack
+	;	Y in DEHL
+	; out:	DEHL
+	; changes:
+
+	POP BC			; save return address
+
+	EX DE,HL
+	EX (SP),HL
+	EXX
+	POP DE
+	POP HL
+; 33f    BIT 7,H                    ; test for result sign
+	EXX
+
+	PUSH BC			; restore return address
+; 33f    PUSH AF                    ; save resulting sign
+
+	CALL L_DIV_0
+         PUSH AF                    ; 33f, save resulting sign
+
+	EXX
+	PUSH HL
+	EXX
+	POP DE			; DE:HL = RESULT SHL C
+
+	LD A,C
+	CALL L_SHR_1
+
+         POP AF                     ; restore resulting sign
+	RET P
+
+	JP L_NEG
+
+L_DIV_0: ; X DIV Y : LONG
+	; in:	X = HL'HL
+	;	Y = DE'DE
+	; out:	C = number of bits processed
+	;	result in L_DDAT
+	;	MOD = HL'HL shr C
+	;	A = positive if result is positive
+	;	A = negative if result is negative
+
+	; HL'HL = LONGINT A
+	; DE'DE = LONGINT B
+
+	EXX
+	LD A,H
+	XOR D
+	EXX
+	PUSH AF			; save resulting sign
+				; P = positive, M = minus
+
+	CALL L_ABS1		; HL'HL = ABS( HL'HL )
+
+	EXX			; swap HL'HL with DE'DE
+	EX DE,HL
+	LD A,H
+	OR L
+	EXX
+	EX DE,HL
+	OR H
+	OR L			; B = 0 ?
+	JP Z,L0A03		; jump if Division by zero
+
+	CALL L_ABS1		; DE'DE = ABS( DE'DE )
+
+	EXX			; swap HL'HL with DE'DE
+	EX DE,HL
+	EXX
+	EX DE,HL
+
+	LD BC,0
+	LD (L_DDAT),BC
+	LD (L_DDAT+2),BC
+
+	LD C,1			; bits = 1
+
+L_DIV1:	; save old B and multiply b by 2
+	PUSH DE
+	SLA E
+	RL D
+	EXX
+	PUSH DE
+	RL E
+	RL D
+	EXX
+
+	PUSH HL
+	OR A
+	SBC HL,DE
+	POP HL
+	EXX
+	PUSH HL
+	SBC HL,DE
+	POP HL
+	EXX
+	JR C,L_DIV_2
+
+	INC C
+	POP AF			; remove saved LONGINT B
+	POP AF
+	JP L_DIV1		; repeat loop
+
+L_DIV_2: EXX
+	POP DE			; restore high-word LONGINT B
+	EXX
+	POP DE			; restore low-word LONGINT B
+
+	LD B,8			; assume 8 bits, 0 rest
+
+	LD A,C
+	AND 7
+	JR Z,L_DIV_3		; jump if zero, means 8 bits
+	LD B,A
+
+L_DIV_3: LD A,C
+	DEC A
+	AND 18H
+	RRCA
+	RRCA
+	RRCA			; A = index to byte to start at
+	EXX
+	LD BC,L_DDAT
+	ADD A,C
+	LD C,A
+	LD A,B
+	ADC A,0
+	LD B,A
+	EXX
+
+	; HL'HL = unsigned LONGINT A
+	; DE'DE = unsigned LONGINT B * (2^(C - 1))
+	;   B = initial number of bits after which the first byte will
+	;       be stored
+	;   C = number of bits to proces
+	; BC' = address where to store result
+	XOR A			; init first result byte
+
+	PUSH BC			; save number of bits to proces
+
+L_DIV_4: ADD A,A			; result * 2
+
+	PUSH HL			; save low-word LONGINT A
+	OR A
+	SBC HL,DE
+	EXX
+	PUSH HL			; save high-word LONGINT A
+	SBC HL,DE
+	EXX
+	JR C,L_DIV_5		; jump if A < B
+
+	INC SP			; remove saved LONGINT A
+	INC SP
+	INC SP
+	INC SP
+
+	INC A			; result:=result+1
+	JR L_DIV_6
+
+L_DIV_5:
+	EXX
+	POP HL			; restore high-word LONGINT A
+	EXX
+	POP HL			; restore low-word LONGINT A
+
+L_DIV_6: ADD HL,HL		; LONGINT A * 2
+	EXX
+	ADC HL,HL
+	EXX
+
+	DJNZ L_DIV_7		; result bits - 1
+				; result = full ?
+				; jump if not
+	EXX
+	LD (BC),A		; save result
+	DEC BC
+	EXX
+	LD B,8			; start al over
+
+L_DIV_7: DEC C
+	JR NZ,L_DIV_4
+
+	POP BC			; C = number of bits processes (for MOD)
+	POP AF			; A = resulting sign
+				; Sign flag still set !
+	RET
+
+	GLOBALS L_SHL
+L_SHL:	; X shl Y : LONGINT
+	; in:	X at stack
+	;	HL = count
+	; out:	DEHL shl count
+	; changes: AF,BC,DE,HL
+
+	POP BC			; save return address
+	LD A,L			; A = count
+	POP HL			; DE:HL = X
+	POP DE
+	PUSH BC			; restore stack
+
+L_SHL_1: SUB 8
+	JR C,L_SHL_2
+	LD D,E
+	LD E,H
+	LD H,L
+	LD L,0
+	JR L_SHL_1
+
+L_SHL_2: ADD A,8
+	RET Z
+	LD B,A
+
+L_SHL_3: ADD HL,HL
+	EX DE,HL
+	ADC HL,HL
+	EX DE,HL
+	DJNZ L_SHL_3
+	RET
+
+	GLOBALS L_SHR
+L_SHR:	; X shr Y : LONGINT
+	; in:	X at stack
+	;	HL = count
+	; out:	DEHL shr count
+	; changes: AF,BC,DE,HL
+
+	POP BC			; save return address
+	LD A,L			; A = count
+	POP HL			; DE:HL = X
+	POP DE
+	PUSH BC			; restore stack
+
+L_SHR_1: SUB 8
+	JR C,L_SHR_2
+	LD L,H
+	LD H,E
+	LD E,D
+	LD D,0
+	JR L_SHR_1
+
+L_SHR_2: ADD A,8
+	RET Z
+	LD B,A
+
+L_SHR_3: SRL D
+	RR E
+	RR H
+	RR L
+	DJNZ L_SHR_3
+	RET
+
+L_ABS1:	; in:	HL'HL = LONGINT
+	; out:  -HL'HL if HL'HL < 0
+	;	HL'HL if HL'HL >= 0
+	EXX
+	BIT 7,H
+	EXX
+	RET Z			; quit if positive
+
+	LD C,L			; BC = low-word
+	LD B,H
+	XOR A			; Carry = 0
+	LD L,A
+	LD H,A
+	SBC HL,BC		; 0 - low-word
+	EXX
+	LD C,L			; BC = high-word
+	LD B,H
+	LD L,A
+	LD H,A
+	SBC HL,BC		; 0 - high-word - carry
+	EXX
+	RET
+
+L0792:	; in:	-
+	; out:	Seed := Seed + (Seed shl 7) + 361962E9h
+	;	equals
+	;	Seed := (Seed * 129) + 907,633,385d
+	;	BCDE = Seed
+	LD BC,(L00C8+2)
+	LD DE,(L00C8)
+	PUSH BC
+	PUSH DE
+	LD A,B			; shl 8
+	LD B,C
+	LD C,D
+	LD D,E
+	LD E,0
+
+	RRA			; shr 1
+	RR B
+	RR C
+	RR D
+	RR E
+
+	POP HL			; Seed := Seed + (Seed shl 7)
+	ADD HL,DE
+	EX DE,HL
+	POP HL
+	ADC HL,BC
+	LD B,H
+	LD C,L
+
+	LD HL,62E9H		; Seed := Seed + 361962E9h
+	ADD HL,DE
+	LD (L00C8),HL
+	EX DE,HL
+	LD HL,3619H
+	ADC HL,BC
+	LD (L00C8+2),HL
+	LD B,H
+	LD C,L
+	RET
+
+L07C6:   ; unsigned Integer to ASCII
+	; in:	HL = unsigned INTEGER
+	;	IX = destination address of ASCII result
+	; out:	IX = address after ASCII result
+	LD B,0			; Flag = 0, no leading zero
+	LD DE,10000
+	CALL L07E2
+	LD DE,1000
+	CALL L07E2
+	LD DE,100
+	CALL L07E2
+	LD E,10
+	CALL L07E2
+	LD A,L
+	JR L07EF
+
+L07E2:	XOR A
+L07E3:	INC A
+	SBC HL,DE
+	JR NC,L07E3
+	ADD HL,DE
+	INC B			; increase, assume NonZero
+	DEC A
+	JR NZ,L07EF		; jump if digit > 0
+
+	DEC B			; Flag = 0 ?, suppress leading zero's
+	RET Z
+
+L07EF:	ADD A,'0'
+	LD (IX+0),A
+	INC IX
+	RET
+
+L07F7:	; ASCII hexadecimal or decimal to Integer
+	; converts ascii hexadecimal or decimal number at IX to
+	; a value in HL
+	; in:	IX = address of ascii digit sequence
+	; out:	carry set if value out of range
+	;	carry reset, HL = value
+	LD A,(IX+0)
+	SUB '$'
+	LD C,A
+	LD HL,0
+	JR NZ,L0804		; NonZero, do not skip '$' character
+
+L0802:	INC IX
+
+L0804:	LD A,(IX+0)
+	CALL L04A6		; upcase
+	SUB '0'                    ; < '0' ?
+	JR C,L0837		; yes, quit
+	CP 10			; < 10 ?
+	JR C,L0820		; yes, continue
+
+	; A..F ?
+	INC C			; started with '$' ?
+	DEC C
+	JR NZ,L0837		; no, quit
+	SUB 7			; 'A' --> 10, 'B' --> 11
+	CP 10			; < 10 ?
+	JR C,L0837		; yes, quit
+	CP 16			; >= 16 ?
+	JR NC,L0837		; yes, quit
+L0820:	LD D,H			; save old HL
+	LD E,L
+	ADD HL,HL		; * 2
+	RET C			; quit if carry, overflow
+	ADD HL,HL		; * 4
+	RET C			; quit if error
+	INC C			; hexadecimal ?
+	DEC C
+	JR NZ,L082C
+	LD D,H			; yes, hexadecimal (perform * 16)
+	LD E,L
+L082C:	ADD HL,DE		; * 5 if decimal
+				; * 8 if hexadecimal
+	RET C			; quit if error
+	ADD HL,HL		; * 10 if decimal
+				; * 16 if hexadecimal
+	RET C			; quit if error
+	LD E,A
+	LD D,0
+	ADD HL,DE		; * 10 + digit if decimal
+				; * 16 + digit if hexadecimal
+	RET C			; quit if error
+	JR L0802 		; go for the next digit
+
+L0837:	OR A
+	;RET Z			; quit if carry reset if hexadecimal
+				; allow hexadecimals that are negative
+				; decimals
+	;LD A,H
+	;ADD A,A
+	RET			; quit with carry set if HL > 32767?
+
+L2A:     ; unsigned long to ASCII
+	; in:	DE:HL = unsigned long
+	;	IX = destination address of ASCII result
+	; out:	IX = address after ASCII result
+
+	XOR A
+	PUSH AF			; set end of digits
+
+L2A_1:
+	CALL L_DIV10		; divide by 10
+
+	INC A
+	PUSH AF			; save remainder, 1..10
+
+	LD A,H
+	OR L
+	OR D
+	OR E
+	JR NZ,L2A_1		; repeat while long > 0
+
+L2A_2:
+	POP AF			; take digit
+	DEC A
+	RET M			; quit if end of digits
+
+         ADD A,'0'
+	LD (IX+0),A		; store in result
+	INC IX
+	JR L2A_2
+
+A2L_FLAG:DB 0			; hexadecimal flag
+				; 0 = convert as hexadecimal
+				; NonZero = convert as decimal
+A2L:	; ASCII hexadecimal or decimal to LONGINT
+	; converts ascii hexadecimal or decimal number at IX to
+	; an unsigned value in DE:HL
+	; in:	IX = address of ascii digit sequence
+	; out:	carry set if value out of range
+	;	carry reset, DE:HL = unsigned value
+	;	A = 0, if hexadecimal constant parsed
+	LD A,(IX+0)
+	SUB '$'
+	LD (A2L_FLAG),A
+	LD HL,0			; DE:HL = 0
+	LD DE,0
+	JR NZ,A2L04		; NonZero, do not skip '$' character
+
+A2L02:	INC IX
+
+A2L04:	LD A,(A2L_FLAG)
+	LD C,A
+	LD A,(IX+0)
+	CALL L04A6		; upcase
+	SUB '0'                    ; < '0' ?
+	JR C,A2L37		; yes, quit --> error
+	CP 10			; < 10 ?
+	JR C,A2L20		; yes, continue
+
+	; A..F ?
+	INC C			; started with '$' ?
+	DEC C
+	JR NZ,A2L37		; no, quit --> error
+
+	; hexadecimal
+	SUB 7			; 'A' --> 10, 'B' --> 11
+	CP 10			; < 10 ?
+	JR C,A2L37		; yes, quit --> error
+	CP 16			; >= 16 ?
+	JR NC,A2L37		; yes, quit --> error
+
+A2L20:	PUSH AF
+	LD A,(A2L_FLAG)
+	OR A			; hexadecimal or decimal ?
+	JR Z,A2L_HEX		; jump if hexadecimal
+
+	; multiply DE:HL by 10 with overflow detection
+	PUSH DE			; save old DE:HL * 1
+	PUSH HL
+	CALL L_M2		; DE:HL * 2
+	JR C,A2L38		; quit if carry, overflow
+
+	CALL L_M2		; DE:HL * 4
+	JR C,A2L38		; quit if carry, overflow
+
+	POP BC			; DE:HL * 4 + DE:HL * 1
+	ADD HL,BC
+	EX DE,HL
+	POP BC
+	ADC HL,BC
+	EX DE,HL
+	POP BC
+	LD A,B			; A = digit to add
+	RET C			; quit if carry, overflow
+
+	CALL L_M2		; DE:HL * 2
+	RET C
+	JR A2L36 		; add the current digit
+
+A2L_HEX: POP AF
+	CALL L_M2		; DE:HL * 2
+	RET C			; quit if carry, overflow
+	CALL L_M2		; DE:HL * 4
+	RET C			; quit if carry, overflow
+	CALL L_M2		; DE:HL * 8
+	RET C			; quit if carry, overflow
+	CALL L_M2		; DE:HL * 16
+	RET C			; quit if carry, overflow
+
+A2L36:	; add the new digit and repeat
+	LD C,A
+	LD B,0
+	ADD HL,BC
+	EX DE,HL
+	LD BC,0
+	ADC HL,BC
+	EX DE,HL
+	JR A2L02 		; go for the next digit
+
+A2L37:	LD A,C
+	OR A
+	RET
+
+A2L38:	POP HL
+	POP HL
+	POP DE
+	RET
+
+L_M2:	; in:	DE:HL
+	; out:	DE:HL * 2
+	;	Carry if overflow
+	ADD HL,HL
+	EX DE,HL
+	ADC HL,HL
+	EX DE,HL
+	RET
+
+IFDEF USELIB
+
+	GLOBALS L083D
+L083D:	; STRING + STRING
+	POP IX			; LIB
+	POP HL
+	PUSH HL
+	LD A,L
+	LD H,0
+	INC HL
+	ADD HL,SP
+	LD C,(HL)
+	ADD A,C
+	JR C,L0866		; jump if String Length Error
+	LD (HL),A
+	EX DE,HL
+	LD HL,0
+	LD B,H
+	SBC HL,BC
+	ADD HL,SP
+	LD SP,HL
+	EX DE,HL
+	PUSH HL
+	INC BC
+	LDIR
+	EX DE,HL
+	POP HL
+	DEC HL
+	DEC DE
+	LD C,A
+	INC BC
+	LDDR
+	EX DE,HL
+	INC HL
+	LD SP,HL
+	JP (IX)
+
+L0866:	LD A,10H 		; r.error 10H: String length error
+	JP L2029
+
+	GLOBALS L086B
+L086B:	POP IX			; LIB
+	CALL L04C8		; int HL to byte A
+	LD D,A
+	POP HL
+	CALL L09DD
+	LD E,A
+	POP HL
+	PUSH HL
+	LD A,L
+	SUB E
+	JR C,L0896
+	INC D
+	DEC D
+	JR Z,L0896
+	CP D
+	JR C,L0899
+	LD C,D
+	LD B,0
+	LD H,B
+	ADD HL,SP
+	LD A,E
+	ADD A,D
+	LD D,H
+	LD E,L
+	DEC A
+	LD L,A
+	LD H,B
+	ADD HL,SP
+	LD A,C
+	LDDR
+	EX DE,HL
+	JR L089F
+
+L0896:	XOR A
+	JR L089C
+
+L0899:	INC A
+	LD L,E
+	DEC L
+
+L089C:	LD H,0
+	ADD HL,SP
+
+L089F:	LD (HL),A
+	LD SP,HL
+	JP (IX)
+
+	GLOBALS L08A3
+L08A3:	; LIB
+	POP IX
+	POP HL
+	PUSH HL
+	LD A,L
+	LD H,0
+	INC HL
+	ADD HL,SP
+	LD SP,HL
+	LD L,A
+	LD H,0
+	JP (IX)
+
+	GLOBALS L08B2
+L08B2:	; LIB
+	POP IX
+	LD HL,0
+	LD D,H
+	ADD HL,SP
+	LD E,(HL)
+	LD C,E
+	INC HL
+	PUSH HL
+	ADD HL,DE
+	LD E,(HL)
+	LD B,E
+	INC HL
+	PUSH HL
+	ADD HL,DE
+	PUSH HL
+	POP IY
+	POP DE
+	POP HL
+	LD A,C
+	SUB B
+	JR C,L08DC
+	INC A
+	LD C,A
+
+L08CE:	PUSH BC
+	PUSH DE
+	PUSH HL
+
+L08D1:	LD A,(DE)
+	CP (HL)
+	JR Z,L08E1
+	POP HL
+	POP DE
+	POP BC
+	INC HL
+	DEC C
+	JR NZ,L08CE
+
+L08DC:	LD HL,0
+	JR L08EF
+
+L08E1:	INC HL
+	INC DE
+	DJNZ L08D1
+	POP DE
+	POP HL
+	POP BC
+	LD HL,0
+	ADD HL,SP
+	EX DE,HL
+	SBC HL,DE
+L08EF:	LD SP,IY
+	JP (IX)
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L08F3
+L08F3:	; PROCEDURE Delete(VAR S: STRING; Pos, Len: INTEGER);
+	; in:	S pushed first
+	;	Pos pushed second
+	;	HL = len
+	POP IX
+	CALL L04C8		; int HL to byte A
+	LD C,A			; C = Len
+	POP HL
+	CALL L09DD
+	LD E,A
+	POP HL
+	LD A,(HL)
+	SUB E
+	JR C,L091E
+	INC C
+	DEC C
+	JR Z,L091E
+	SUB C
+	JR C,L091C
+	PUSH AF
+	LD A,(HL)
+	SUB C
+	LD (HL),A
+	LD B,0
+	LD D,B
+	ADD HL,DE
+	LD D,H
+	LD E,L
+	ADD HL,BC
+	POP AF
+	INC A
+	LD C,A
+	LDIR
+	JR L091E
+
+L091C:	DEC E
+	LD (HL),E
+L091E:	JP (IX)
+
+ENDIF	; USELIB
+
+	GLOBALS L0920
+L0920:	; LIB
+	POP IX
+	CALL L09DD
+	LD C,A
+	POP DE
+	LD (L00E8),DE
+	LD HL,0
+	ADD HL,SP
+	LD A,(DE)
+	PUSH AF
+	ADD A,(HL)
+	JR C,L0937
+	CP B
+	JR C,L0938
+L0937:	LD A,B
+L0938:	LD (DE),A
+	POP AF
+	LD D,A
+	LD E,(HL)
+	SUB C
+	JR C,L096E
+	INC A
+	LD L,A
+	LD A,D
+	ADD A,E
+	JR C,L0949
+	CP B
+	LD A,L
+	JR C,L0951
+L0949:	LD A,B
+	SUB E
+	JR C,L0973
+	SUB C
+	JR C,L0973
+	INC A
+L0951:	OR A
+	JR Z,L0973
+	PUSH BC
+	PUSH DE
+	LD HL,(L00E8)
+	LD E,A
+	DEC E
+	LD D,0
+	LD B,D
+	ADD HL,DE
+	ADD HL,BC
+	POP DE
+	PUSH DE
+	PUSH HL
+	LD D,B
+	ADD HL,DE
+	EX DE,HL
+	POP HL
+	LD C,A
+	LDDR
+	POP DE
+	POP BC
+	JR L0973
+L096E:	LD A,D
+	INC A
+	JR Z,L098B
+	LD C,A
+L0973:	LD A,B
+	SUB C
+	INC A
+	CP E
+	JR C,L097A
+	LD A,E
+L097A:	OR A
+	JR Z,L098B
+	LD HL,(L00E8)
+	LD B,0
+	ADD HL,BC
+	EX DE,HL
+	LD HL,1
+	ADD HL,SP
+	LD C,A
+	LDIR
+L098B:	LD HL,0
+	LD D,H
+	ADD HL,SP
+	LD E,(HL)
+	INC DE
+	ADD HL,DE
+	LD SP,HL
+	JP (IX)
+
+
+IFDEF USELIB
+
+	GLOBALS L0996
+L0996:	POP IX			; LIB, convert string to character
+	POP HL
+	DEC L			; original length > 1
+	JP NZ,L0866		; jump if String Length Error
+	LD L,H
+	LD H,0
+	JP (IX)
+
+	GLOBALS L09A2
+L09A2:	; LIB
+	; this routine converts the second parameter that is on the stack
+	; to a string, the first parameter is a string
+	; in:	<return address>
+	;	<string>
+	;	<character value>
+	; out:	<return address>
+	;	<string>
+	;	<string>
+	LD HL,2
+	LD D,H			; D = 0
+	ADD HL,SP
+	LD E,(HL)		; DE = string length
+	INC DE
+	ADD HL,DE
+	LD A,(HL)
+	LD (HL),1
+	INC HL
+	LD (HL),A
+	RET
+
+ENDIF	; USELIB
+
+
+L09B0:	; Compare STRINGS
+	LD HL,4
+	LD D,H
+	ADD HL,SP
+	LD E,(HL)
+	LD C,E
+	INC HL
+	PUSH HL
+	ADD HL,DE
+	LD E,(HL)
+	LD B,E
+	INC HL
+	PUSH HL
+	ADD HL,DE
+	PUSH HL
+	POP IY
+	POP DE
+	POP HL
+L09C4:	XOR A
+	CP B
+	JR Z,L09CC
+	CP C
+	JR NZ,L09D3
+	LD A,B
+L09CC:	CP C
+L09CD:	POP HL
+	POP DE
+	LD SP,IY
+	PUSH DE
+	JP (HL)
+L09D3:	LD A,(DE)
+	CP (HL)
+	JR NZ,L09CD
+	INC HL
+	INC DE
+	DEC B
+	DEC C
+	JR L09C4
+L09DD:	LD A,H
+	OR A
+	JR NZ,L09E4
+	LD A,L
+	OR A
+	RET NZ
+L09E4:	LD A,11H 		; r.error 11H: Invalid string index
+	JP L2029
+
+	GLOBALS L09E9
+L09E9:	CALL L0A0D		; LIB
+
+L09EC:	RET NC
+	LD A,1			; r.error 1: Floating point overflow
+	JP L2027 		; Run-time error
+
+
+IFDEF USELIB
+
+	GLOBALS L09F2
+L09F2:	CALL L0A81		; LIB
+	JR L09EC
+
+	GLOBALS L09F7
+L09F7:	; FUNCTION Sqr(R: REAL): REAL;
+	CALL L0FAC		; LIB
+
+	GLOBALS L09FA
+L09FA:	CALL L0A97		; LIB
+	JR L09EC
+
+	GLOBALS L09FF
+L09FF:	; Divide two REALS
+	EXX			; LIB
+	LD A,L
+	OR A
+	EXX
+
+ENDIF	; USELIB
+
+L0A03:	LD A,2			; r.error 2: Division by zero attempted
+	JP Z,L2027		; Run-time error
+	CALL L0AF5
+	JR L09EC
+
+L0A0D:	EXX
+	BIT 7,B
+	EXX
+	JP NZ,L0A88
+L0A14:	EXX
+	LD A,L
+	OR A
+	EXX
+	RET Z
+	EXX
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	EXX
+	LD A,L
+	OR A
+	JR NZ,L0A27
+	EXX
+	RES 7,B
+	JR L0A7B
+L0A27:	PUSH BC
+	SET 7,B
+	XOR A
+	EX AF,AF'
+	EXX
+	SET 7,B
+	LD A,L
+	EXX
+	SUB L
+	JR Z,L0A47
+	JR NC,L0A3C
+	NEG
+	EX AF,AF'
+	DEC A
+	EX AF,AF'
+	EXX
+L0A3C:	CALL L0B7A
+	INC L
+	DEC A
+	JR NZ,L0A3C
+	EX AF,AF'
+	JR Z,L0A47
+	EXX
+L0A47:	POP AF
+	AND 80H
+	JR NZ,L0A5B
+	CALL L0B92
+	JR NC,L0A76
+	CALL L0B7B
+	OR A
+	INC L
+	JR NZ,L0A76
+	SCF
+	JR L0A7B
+
+L0A5B:   CALL L0BC6
+	CCF
+	PUSH AF
+	JR Z,L0A72
+
+	JR C,L0A65
+	EXX
+L0A65:	CALL L0BAC
+L0A68:	BIT 7,B
+	JR NZ,L0A75
+	CALL L0B86
+	DEC L
+	JR NZ,L0A68
+
+L0A72:	CALL L0B72		; HLDEBC = 0.0
+
+L0A75:	POP AF
+L0A76:	JR C,L0A7A
+	RES 7,B
+L0A7A:	OR A
+L0A7B:	EXX
+	POP HL
+	POP DE
+	POP BC
+	EXX
+	RET
+L0A81:	EXX
+	BIT 7,B
+	EXX
+	JP NZ,L0A14
+L0A88:	CALL L0A8F
+	CALL L0A14
+	RET C
+L0A8F:	INC L
+	DEC L
+	RET Z
+	LD A,B
+	XOR 80H
+	LD B,A
+	RET
+L0A97:	EXX
+	LD A,L
+	OR A
+	EXX
+	JP Z,L0B72		; Zero --> HLDEBC = 0.0
+
+	LD A,L
+	OR A
+	RET Z
+	EXX
+	ADD A,L
+	EXX
+	CALL L0B4D
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	ADD IX,SP
+
+IFNDEF FASTREAL
+	CALL L0B72		; HLDEBC = 0.0
+	EXX
+	LD L,5
+	EXX
+L0AB3:	LD A,8
+	INC IX
+IFDEF MSX
+	LD L,(IX+0)
+ELSE
+;!	mov bl,ss:[si + 0]	; read from stack !!! ----
+ENDIF
+L0ABA:	EX AF,AF'
+	RR L
+	JR NC,L0AC2
+	CALL L0B92
+L0AC2:	CALL L0B7B
+	EX AF,AF'
+	DEC A
+	JR NZ,L0ABA
+	EXX
+	DEC L
+	EXX
+	JR NZ,L0AB3
+
+ELSE	; FASTREAL
+
+	EXX
+	PUSH BC
+	LD C,H
+	EXX
+	POP DE			; BCDEHL' --> DED'E'C'
+
+	XOR A			; HLH'L'A = 0
+	LD L,A
+	LD H,A
+	EXX
+	LD L,A
+	LD H,A
+	LD B,5			; B' = byte count
+	EXX
+
+MultReal1:
+	LD B,8			; B = bit count
+	INC IX
+;	 LD C,(IX+0)
+IFDEF MSX
+	LD C,(IX+0)
+ELSE
+;!	mov cl,ss:[si + 0]	; read from stack !!! ----
+ENDIF
+
+MultReal2:
+	RR C
+	JR NC,MultReal3
+	EXX
+	ADD A,C
+	ADC HL,DE
+	EXX
+	ADC HL,DE
+
+MultReal3:
+	RR H
+	RR L
+	EXX
+	RR H
+	RR L
+	EXX
+	RRA
+
+	DJNZ MultReal2
+
+	EXX
+	DEC B
+	EXX
+	JR NZ,MultReal1
+
+	; BCDEH = HLH'L'A
+	LD B,H
+	LD C,L
+	LD H,A
+	EXX
+	PUSH HL
+	EXX
+	POP DE
+
+	EX AF,AF'                  ; save Carry from RRA
+
+ENDIF	; FASTREAL
+
+IFDEF MSX
+	LD L,(IX-5)
+ELSE
+;!	mov bl,ss:[si - 5]
+ENDIF
+	BIT 7,B
+	JR NZ,L0ADE
+	EX AF,AF'
+	CALL L0B87
+	INC L
+	DEC L
+	JR Z,L0ADE
+	DEC L
+L0ADE:	POP AF
+	POP AF
+	POP AF
+
+L0AE1:	OR A
+
+L0AE2:	EX AF,AF'
+	POP AF
+	EXX
+	POP BC
+	POP DE			; FastReal
+	POP HL
+	EXX
+	POP IX
+	RES 7,B
+	OR B
+	LD B,A
+	INC L
+	DEC L
+	CALL Z,L0B72		; Zero --> HLDEBC = 0.0
+
+	EX AF,AF'
+	RET
+
+L0AF5:   LD A,L
+	OR A
+	RET Z
+	EXX
+	SUB L
+	EXX
+	CCF
+	CALL L0B4D
+	PUSH HL
+L0B00:	PUSH HL
+	PUSH HL
+	ADD IX,SP
+
+IFNDEF FASTREAL
+	EXX
+	LD L,5
+	EXX
+	LD A,8
+L0B0A:	EX AF,AF'
+	CALL L0BC6
+	JR C,L0B13
+	CALL L0BAC
+L0B13:	CCF
+	RL L
+	EX AF,AF'
+	DEC A
+	JR NZ,L0B26
+IFDEF MSX
+	LD (IX+5),L
+ELSE
+;!	mov byte ptr ss:[si+5],bl
+ENDIF
+	DEC IX
+	EXX
+	DEC L
+	EXX
+	JR Z,L0B32
+	LD A,8
+L0B26:	CALL L0B86
+	JR NC,L0B0A
+	EX AF,AF'
+	CALL L0BAC
+	OR A
+	JR L0B13
+L0B32:	CALL L0B86
+	JR C,L0B3B
+	CALL L0BC6
+	CCF
+ELSE	; FASTREAL
+
+	LD A,H
+	EX AF,AF'
+	LD H,B
+	LD L,C
+	PUSH DE
+	EXX
+	LD A,H
+	POP HL
+	PUSH BC
+	LD C,A
+	LD B,5			; B' = byte count
+	EXX
+	POP DE
+	EX AF,AF'
+
+	LD B,8			; B = bit count
+
+DivReal1:CALL CompMantisse
+	JR C,DivReal2
+
+	; SubMantisse
+	EXX
+	SUB C
+	SBC HL,DE
+	EXX
+	SBC HL,DE
+
+DivReal2:CCF
+	RL C
+
+	DJNZ DivReal3
+
+;	 LD (IX+5),C
+IFDEF MSX
+	LD (IX+5),C
+ELSE
+;!	mov byte ptr ss:[si+5],cl
+ENDIF
+	DEC IX
+
+	EXX
+	DEC B
+	EXX
+	JR Z,DivReal4
+
+	LD B,8			; B = bit count
+
+DivReal3:; SLAMantisse
+	OR A
+	RLA
+	EXX
+	ADC HL,HL
+	EXX
+	ADC HL,HL
+	JR NC,DivReal1
+
+	; SubMantisse
+	EXX
+	SUB C
+	SBC HL,DE
+	EXX
+	SBC HL,DE
+	OR A
+	JP DivReal2
+
+DivReal4:; SLAMantisse
+	OR A
+	RLA
+	EXX
+	ADC HL,HL
+	EXX
+	ADC HL,HL
+	JR C,DivReal5
+
+	CALL CompMantisse
+	CCF
+
+DivReal5:
+
+ENDIF	; FASTREAL
+
+L0B3B:	POP HL
+	POP DE
+	POP BC
+;!       lahf                       ; store carry in ah
+
+         BIT 7,B
+	JR NZ,L0B47
+
+;!       sahf                       ; restore carry
+         CALL L0B87
+	JP L0AE1
+
+IFDEF FASTREAL
+CompMantisse:
+	OR A
+	SBC HL,DE
+	PUSH AF
+	ADD HL,DE
+	POP AF
+	RET NZ
+
+	EXX
+	OR A
+	SBC HL,DE
+	PUSH AF
+	ADD HL,DE
+	POP AF
+	EXX
+	RET NZ
+
+	EXX
+	CP C
+	EXX
+	RET
+
+ENDIF	; FASTREAL
+
+L0B47:	INC L
+	JP NZ,L0AE1
+	SCF
+	JP L0AE2
+
+L0B4D:	JR C,L0B55
+	ADD A,80H
+	JR C,L0B59
+	JR L0B70
+L0B55:	ADD A,80H
+	JR C,L0B70
+L0B59:	LD L,A
+	EX (SP),IX
+	EXX
+	PUSH HL
+	PUSH DE
+	PUSH BC
+	LD A,B
+	SET 7,B
+	EXX
+	XOR B
+	AND 80H
+	PUSH AF
+	SET 7,B
+	PUSH IX
+	LD IX,0
+	RET
+L0B70:	POP HL
+	RET C
+
+L0B72:	; create a REAL HLDEBC with 0.0 as value
+	; in:	-
+	; out:	REAL HLDEBC filled with zeroes
+	XOR A
+	LD L,A
+	LD B,A
+	LD C,A
+	LD D,A
+	LD E,A
+	LD H,A
+	RET
+
+L0B7A:	OR A
+L0B7B:	RR B
+	RR C
+	RR D
+	RR E
+	RR H
+	RET
+L0B86:	OR A
+L0B87:	RL H
+	RL E
+	RL D
+	RL C
+	RL B
+	RET
+L0B92:	LD A,H
+	EXX
+	ADD A,H
+	EXX
+	LD H,A
+	LD A,E
+	EXX
+	ADC A,E
+	EXX
+	LD E,A
+	LD A,D
+	EXX
+	ADC A,D
+	EXX
+	LD D,A
+	LD A,C
+	EXX
+	ADC A,C
+	EXX
+	LD C,A
+	LD A,B
+	EXX
+	ADC A,B
+	EXX
+	LD B,A
+	RET
+L0BAC:	LD A,H
+	EXX
+	SUB H
+	EXX
+	LD H,A
+	LD A,E
+	EXX
+	SBC A,E
+	EXX
+	LD E,A
+	LD A,D
+	EXX
+	SBC A,D
+	EXX
+	LD D,A
+	LD A,C
+	EXX
+	SBC A,C
+	EXX
+	LD C,A
+	LD A,B
+	EXX
+	SBC A,B
+	EXX
+	LD B,A
+	RET
+
+L0BC6:	LD A,B
+	EXX
+	CP B
+	EXX
+	RET NZ
+	LD A,C
+	EXX
+	CP C
+	EXX
+	RET NZ
+	LD A,D
+	EXX
+	CP D
+	EXX
+	RET NZ
+	LD A,E
+	EXX
+	CP E
+	EXX
+	RET NZ
+	LD A,H
+	EXX
+	CP H
+	EXX
+	RET
+
+L0BDF:	; Compare REALS
+	EXX
+	LD A,B
+	EXX
+	XOR B
+	JP P,L0BE9
+	LD A,B
+	RLA
+	RET
+L0BE9:	BIT 7,B
+	JR Z,L0BF3
+	CALL L0BF3
+	RET Z
+	CCF
+	RET
+L0BF3:	LD A,L
+	EXX
+	CP L
+	EXX
+	RET NZ
+	OR A
+	RET Z
+	JP L0BC6
+
+
+IFDEF USELIB
+
+	GLOBALS L0BFD
+L0BFD:	; FUNCTION Int(R: REAL): REAL;
+	LD A,L			; LIB
+	SUB 81H
+	JP C,L0B72		; Carry --> HLDEBC = 0.0
+
+	INC A
+	CP 28H
+	RET NC
+	EXX
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	EX AF,AF'
+	CALL L0B72		; HLDEBC = 0.0
+	EX AF,AF'
+L0C10:	SCF
+	CALL L0B7B
+	DEC A
+	JR NZ,L0C10
+	EXX
+	LD A,H
+	EXX
+	AND H
+	EXX
+	LD H,A
+	LD A,E
+	EXX
+	AND E
+	EXX
+	LD E,A
+	LD A,D
+	EXX
+	AND D
+	EXX
+	LD D,A
+	LD A,C
+	EXX
+	AND C
+	EXX
+	LD C,A
+	LD A,B
+	EXX
+	AND B
+	EXX
+	LD B,A
+L0C31:	JP L0A7B
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L0C34
+L0C34:	; FUNCTION Frac(R: REAL): REAL;
+	EXX			; LIB
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	EXX
+	CALL L0FAC
+	EXX
+	CALL L0BFD		; FUNCTION Int(R: REAL): REAL;
+	EXX
+	CALL L0A81
+	JR L0C31
+
+	GLOBALS L0C46
+L0C46:	; FUNCTION Sqrt(R: REAL): REAL;
+	LD A,L			; LIB
+	OR A
+	RET Z
+	BIT 7,B
+	LD A,3			; r.error 3: Sqrt argument error
+	JP NZ,L2027		; Run-time error
+	CALL L0FAC
+	LD A,L
+	ADD A,80H
+	SRA A
+	ADD A,80H
+	LD L,A
+	SUB 14H
+	PUSH AF
+	EXX
+L0C5F:	PUSH BC
+	PUSH DE
+	PUSH HL
+	CALL L0AF5
+	CALL L0A0D
+	DEC L
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	CALL L0A81
+	LD A,L
+	POP HL
+	POP DE
+	POP BC
+	EXX
+	POP HL
+	POP DE
+	POP BC
+	EX (SP),HL
+	CP H
+	EX (SP),HL
+	JR NC,L0C5F
+	POP AF
+	EXX
+	RET
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L0C7F
+L0C7F:	; FUNCTION Cos(R: REAL): REAL;
+	EXX			; LIB
+	CALL L0F8E		; get REAL PI
+	DEC L
+	CALL L0A81
+
+	GLOBALS L0C87
+L0C87:	; FUNCTION Sin(R: REAL): REAL;
+	EXX			; LIB
+	CALL L0F8E		; get REAL PI
+	INC L
+	EXX
+	LD A,L
+	CP 6CH
+	RET C
+	PUSH BC
+	RES 7,B
+	CALL L0BDF		; Compare REALS
+	POP BC
+	JR C,L0CA3
+
+	CALL L0AF5
+	CALL L0C34		; FUNCTION Frac(R: REAL): REAL;
+	CALL L0A97
+
+L0CA3:	BIT 7,B
+	JR Z,L0CAA
+	CALL L0A0D
+
+L0CAA:	EXX
+	DEC L
+	EXX
+	CALL L0BDF		; Compare REALS
+	PUSH AF
+	JR C,L0CB6
+	CALL L0A81
+
+L0CB6:	EXX
+	DEC L
+	EXX
+	CALL L0BDF		; Compare REALS
+	JR C,L0CC3
+	EXX
+	INC L
+	CALL L0A81
+
+L0CC3:	LD A,L
+	CP 6CH
+	JR C,L0D03
+	EXX
+
+	LD BC,2AAAH		; 3.3333333333E-01
+	LD DE,0AAAAH
+	LD HL,0AA7FH
+
+	CALL L0A97
+	PUSH IX
+	LD IX,L0D0D-6
+	LD A,5
+	CALL L0F34
+	POP IX
+	CALL L0FAC
+	CALL L0A97
+	CALL L0A97
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	EXX
+	CALL L0FAC
+	DEC L
+	DEC L
+	EXX
+	DEC L
+	CALL L0A0D
+	EXX
+	POP HL
+	POP DE
+	POP BC
+	EXX
+	CALL L0A81
+	INC L
+	INC L
+L0D03:	POP AF
+	INC L
+	DEC L
+	RET Z
+	RET C
+	LD A,B
+	XOR 80H
+	LD B,A
+	RET
+
+L0D0D:
+	; arctan
+	DB 67H,0AAH, 3FH, 2BH, 32H,0D7H		; -1 / 11!
+	DB 6EH,0B6H,02AH, 1DH,0EFH, 38H		;  1 / 9!
+	DB 74H, 0DH,0D0H,  0,  0DH,0D0H		; -1 / 7!
+	DB 7AH, 88H, 88H, 88H, 88H,  8		;  1 / 5!
+	DB 7EH,0ABH,0AAH,0AAH,0AAH,0AAH		; -1 / 3!
+
+	GLOBALS L0D2B
+L0D2B:	; FUNCTION Ln(R: REAL): REAL;
+	; calculates ln(REAL HLDEBC) ; LIB
+	INC L
+	DEC L
+	LD A,4			; r.error 4: Ln argument error
+	JP Z,L2027		; error if zero
+	BIT 7,B
+	JP NZ,L2027		; error if negative
+	EXX
+	CALL L0F98		; get REAL sqrt(2)
+	EXX
+	LD A,L
+	LD L,81H
+	SUB L
+	PUSH AF
+	CALL L0AF5
+	EXX
+	CALL L0F86		; get REAL 1.0
+	EXX
+	CALL L0A81
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	EXX
+	INC L
+	CALL L0A0D
+	EXX
+	POP HL
+	POP DE
+	POP BC
+	CALL L0AF5
+	PUSH IX
+	LD IX,L0DF2-6
+	LD A,6
+	CALL L0F34
+	POP IX
+	INC L
+	EXX
+	CALL L0FA2		; get REAL ln(2)
+	DEC L
+	EXX
+	CALL L0A0D
+	POP AF
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	LD L,A
+	LD H,0
+	JR NC,L0D7C
+	DEC H
+
+L0D7C:	CALL L1008		; convert integer HL to REAL HLDEBC
+	EXX
+	INC L
+	CALL L0A97
+	EXX
+	POP HL
+	POP DE
+	POP BC
+	CALL L0A0D
+	LD A,L
+	CP 67H
+	JP C,L0B72		; Carry --> HLDEBC = 0.0
+	RET
+
+L0DF2:
+	DB 7DH, 8AH, 9DH,0D8H, 89H,1DH	; 1 / 13.0
+	DB 7DH,0E9H,0A2H, 8BH, 2EH,3AH	; 1 / 11.0
+	DB 7DH, 8EH,0E3H, 38H, 8EH,63H	; 1 /  9.0
+	DB 7EH, 49H, 92H, 24H, 49H,12H	; 1 /  7.0
+	DB 7EH,0CDH,0CCH,0CCH,0CCH,4CH	; 1 /  5.0
+	DB 7FH,0ABH,0AAH,0AAH,0AAH,2AH	; 1 /  3.0
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L0DB6
+L0DB6:	; FUNCTION Exp(R: REAL): REAL;
+	EXX			; LIB
+	CALL L0FA2		; get REAL ln(2)
+	EXX
+	OR A
+	BIT 7,B
+	PUSH AF
+	RES 7,B
+	CALL L0AF5
+	LD A,L
+	CP 88H
+	JR NC,L0E10
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	INC L
+	CALL L0FD0
+	PUSH HL
+	SRL H
+	RR L
+	LD A,L
+	POP HL
+	PUSH AF
+	CALL L1008		; convert integer HL to REAL HLDEBC
+	INC L
+	DEC L
+	JR Z,L0DE0
+	DEC L
+
+L0DE0:	EXX
+	POP AF
+	POP HL
+	POP DE
+	POP BC
+	PUSH AF
+	CALL L0A81
+	PUSH IX
+	LD IX,L0E16-6
+	LD A,8
+	CALL L0F49
+	POP IX
+	POP AF
+	JR NC,L0E03
+	PUSH AF
+	EXX
+	CALL L0F98		; get REAL sqrt(2)
+	EXX
+	CALL L0A97
+	POP AF
+
+L0E03:	ADD A,L
+	LD L,A
+	JR C,L0E10
+
+	POP AF
+	RET Z
+	EXX
+	CALL L0F86		; get REAL 1.0
+	JP L0AF5
+
+L0E10:	POP HL
+	LD A,1			; r.error 1: Floating point overflow
+	JP L2027 		; Run-time error
+
+L0E16:	DB 6DH,2EH,1DH,11H,60H,31H 	; 1.3215486790E-06
+	DB 70H,46H,2CH,0FEH,0E5H,7FH	; 1.5252733804E-05
+	DB 74H,36H,7CH,89H,84H,21H 	; 1.5403530393E-04
+	DB 77H,53H,3CH,0FFH,0C3H,2EH	; 1.3333558146E-03
+	DB 7AH,0D2H,7DH,5BH,95H,1DH	; 9.6181291076E-03
+	DB 7CH,25H,0B8H,46H,58H,63H	; 5.5504108665E-02
+	DB 7EH,16H,0FCH,0EFH,0FDH,75H	; 2.4022650696E-01
+	DB 80H,0D2H,0F7H,17H,72H,31H	; 6.9314718056E-01
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L0E46
+L0E46:	; FUNCTION ArcTan(R: REAL): REAL;
+	LD A,L			; LIB
+	OR A
+	RET Z
+	PUSH IX
+	EXX
+	CALL L0F86		; get REAL 1.0
+	EXX
+	XOR A
+	BIT 7,B
+	JR Z,L0E58
+	INC A
+	RES 7,B
+
+L0E58:	PUSH AF
+	CALL L0BDF		; Compare REALS
+	JR C,L0E66
+	EXX
+	CALL L0AF5
+	POP AF
+	SET 7,A
+	PUSH AF
+
+L0E66:	EXX
+	LD BC,  6CFH		; 1.3165249759E-01
+	LD DE,0E98EH
+	LD HL, 4A7EH
+	EXX
+	CALL L0BDF		; Compare REALS
+	JR NC,L0E7B
+
+	CALL L0F2E
+	JR L0ECA
+
+L0E7B:	LD IX,L0EE0-18
+	LD A,2
+L0E81:	EX AF,AF'
+	EXX
+	LD DE,18
+	ADD IX,DE
+	CALL L0F73		; get REAL at address IX
+	EXX
+	CALL L0BDF		; Compare REALS
+	JR C,L0E9C
+	EX AF,AF'
+	DEC A
+	JR NZ,L0E81
+	EXX
+	LD DE,12
+	ADD IX,DE
+	EXX
+
+L0E9C:	EXX
+	CALL L0F6E		; get REAL at address IX+6
+	SET 7,B
+	CALL L0A0D
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	CALL L0F73		; get REAL at address IX
+	CALL L0A97
+	EXX
+	CALL L0F86		; get REAL 1.0
+	CALL L0A0D
+	EXX
+	POP HL
+	POP DE
+	POP BC
+	CALL L0AF5
+	PUSH IX
+	CALL L0F2E
+	POP IX
+	EXX
+	CALL L0F6E		; get REAL at address IX+6
+	CALL L0A0D
+
+L0ECA:	POP AF
+	RLA
+	JR NC,L0ED8
+
+L0ECE:	PUSH AF
+	EXX
+	CALL L0F8E		; get REAL PI
+	DEC L
+	CALL L0A81
+	POP AF
+
+L0ED8:	POP IX
+	BIT 1,A
+	RET Z
+	SET 7,B
+	RET
+
+ENDIF	; USELIB
+
+
+L0EE0:	DB 7FH,0E7H,0CFH,0CCH, 13H, 54H	; 2.4142135624E+00
+	DB 7FH,0F6H,0F4H,0A2H, 30H,  9	; TAN(PI/12)
+	DB 7FH, 6AH,0C1H, 91H, 0AH,  6	; 3.8197186342E+00
+	DB 80H,0B5H, 9EH, 8AH, 6FH, 44H	; 1.3032253728E+00
+	DB 80H, 82H, 2CH, 3AH,0CDH, 13H	; TAN(PI/6)
+	DB 80H, 6AH,0C1H, 91H, 0AH,  6	; PI/6
+	DB 81H,	0,   0,	 0,   0,   0	; 1.0
+
+L0F0A:	DB 80H, 21H,0A2H,0DAH, 0FH, 49H	; PI/4
+
+L0F10:	DB 7DH,0E8H,0A2H, 8BH, 2EH,0BAH	; -1 / 11.0
+	DB 7DH, 8EH,0E3H, 38H, 8EH, 63H	;  1 /  9.0
+	DB 7EH, 49H, 92H, 24H, 49H, 92H	; -1 /  7.0
+	DB 7EH,0CDH,0CCH,0CCH,0CCH, 4CH	;  1 /  5.0
+	DB 7FH,0ABH,0AAH,0AAH,0AAH,0AAH	; -1 /  3.0
+
+L0F2E:	LD IX,L0F10-6
+
+	LD A,5			; 5 iteration for a accurate result
+L0F34:	PUSH BC
+	PUSH DE
+	PUSH HL
+	PUSH AF
+	CALL L0FAC
+	CALL L0A97
+	POP AF
+	CALL L0F49
+	EXX
+	POP HL
+	POP DE
+	POP BC
+	JP L0A97
+
+L0F49:	PUSH AF
+	EXX
+	CALL L0F6E		; get REAL at address IX+6
+	JR L0F60
+
+L0F50:	PUSH AF
+	EXX
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	CALL L0F6E		; get REAL at address IX+6
+	CALL L0A0D
+	EXX
+	POP HL
+	POP DE
+	POP BC
+	EXX
+L0F60:	CALL L0A97
+	POP AF
+	DEC A
+	JR NZ,L0F50
+	EXX
+	CALL L0F86		; get REAL 1.0
+	JP L0A0D
+
+L0F6E:	; get REAL at address IX+6
+	LD DE,6
+	ADD IX,DE
+
+L0F73:	; in:	IX = address of REAL
+	; out:	HLDEBC = REAL located at address IX
+	;	IX unchanged
+	LD L,(IX+0)
+	LD H,(IX+1)
+	LD E,(IX+2)
+	LD D,(IX+3)
+	LD C,(IX+4)
+	LD B,(IX+5)
+	RET
+
+L0F86:	LD HL,81H		; 1.0
+	LD B,H
+	LD C,H
+	LD D,H
+	LD E,H
+	RET
+
+L0F8E:	LD BC, 490FH		; PI
+	LD DE,0DAA2H
+	LD HL, 2182H
+	RET
+
+L0F98:	LD BC, 3504H		; sqrt(2)
+	LD DE,0F333H
+	LD HL,0FA81H
+	RET
+
+L0FA2:	LD BC, 3172H		; ln(2)
+	LD DE, 17F7H
+	LD HL,0D280H
+	RET
+
+L0FAC:	PUSH BC
+	PUSH DE
+	PUSH HL
+	EXX
+	POP HL
+	POP DE
+	POP BC
+	RET
+
+
+IFDEF USELIB
+
+	GLOBALS L0FB4
+L0FB4:	; FUNCTION Random: REAL;
+	CALL L0792		; LIB
+	LD HL,80H
+	LD A,20H
+L0FBC:	BIT 7,B
+	JR NZ,L0FCD
+	SLA E
+	RL D
+	RL C
+	RL B
+	DEC L
+	DEC A
+	JR NZ,L0FBC
+	LD L,A
+
+L0FCD:	RES 7,B
+	RET
+
+	GLOBALS L0FD0
+L0FD0:	BIT 7,B			; LIB
+	EXX
+	CALL L0F86		; get REAL 1.0
+	JR Z,L0FDA
+	SET 7,B
+L0FDA:	DEC L
+	CALL L0A0D
+
+	GLOBALS L0FDE
+L0FDE:	OR A			; LIB, convert REAL HLDEBC to int HL
+	BIT 7,L
+	JR Z,L0FFF		; return HL = 0 if REAL = 0.0
+
+	BIT 7,B
+	EX AF,AF'
+	SET 7,B
+L0FE8:	LD A,8FH
+	CP L
+	JR C,L1003
+	JR Z,L0FF5
+	CALL L0B7A
+	INC L
+	JR L0FE8
+
+L0FF5:	CALL L0B7A
+	EX AF,AF'
+	LD H,B
+	LD L,C
+	RET Z
+	JP L0783 		; negate HL
+
+L0FFF:	LD HL,0
+	RET
+
+L1003:	LD A,92H 		; r.error 92H: Out of INTEGER range
+	JP L2027 		; Run-time error
+
+ENDIF	; USELIB
+
+L10031:	LD A,93H 		; r.error 93H: Out of LONGINT range
+	JP L2027
+
+	GLOBALS L1008
+L1008:	LD A,H			; LIB, convert integer HL to REAL HLDEBC
+	OR L
+	JP Z,L0B72		; return 0.0 REAL if HL = 0
+
+	BIT 7,H
+	EX AF,AF'                  ; save NZ for negative
+
+	CALL L0780		; absolute HL
+
+	LD A,90H
+
+	; shift, normalization
+L1015:	ADD HL,HL
+	DEC A
+	BIT 7,H
+	JR Z,L1015
+
+	LD B,H			; BC = integer, bit 7 of B always '1'
+	LD C,L
+	LD DE,0			; D = E = 0
+	LD H,D			; H = 0
+	LD L,A
+
+	EX AF,AF'
+	RET NZ			; keep bit 7 of B '1' if negative
+
+	RES 7,B			; no, make if positive
+	RET
+
+	GLOBALS L_R
+L_R:	; convert LONGINT DEHL to REAL HLDEBC
+	; in:	DEHL = signed LONGINT
+	; out:	HLDEBC = REAL
+	LD A,H
+	OR L
+	OR D
+	OR E
+	JP Z,L0B72		; jump if long is zero
+
+	BIT 7,D			; is this long negative ?
+	PUSH AF			; rember this
+	CALL NZ,L_NEG		; make positive if long is negative
+	LD A,0A0H
+
+	; perform normalization
+L_R_SH:	ADD HL,HL
+	EX DE,HL
+	ADC HL,HL
+	EX DE,HL
+	DEC A
+	BIT 7,D
+	JR Z,L_R_SH		; shift until bit 31 = '1'
+
+	EX DE,HL 		; HL:DE = normalized mantissa
+	LD B,H
+	LD C,L
+	LD H,0
+	LD L,A			; exponent + 81H in A
+	POP AF			; ZeroFlag = 0 if long was negative
+	RET NZ			; if negative then leave bit 7 of B '1'
+
+	RES 7,B
+	RET
+
+	GLOBALS R_L
+R_L:	; convert LONGINT DEHL to REAL HLDEBC
+	; in:	HLDEBC = REAL
+	; out:	DEHL = signed LONGINT
+	BIT 7,L			; exponent < 80H then float = 0.0
+				; in other words float < 1.0
+	JP Z,L0B72		; return DEHL = 0 if REAL < 1.0
+
+	BIT 7,B			; ZeroFlag = 0 if REAL is negative
+	PUSH AF			; save sign of REAL
+
+	SET 7,B			; restore hidden bit
+
+R_L_SH:	LD A,9FH
+	CP L			; more than 31 bits before the comma
+	JR C,L10031		; r.error 93H: Out of LONGINT range
+
+	JR Z,R_L_READY		; jump if no more shifts
+	SRL B
+	RR C
+	RR D
+	RR E
+	RR H
+	INC L
+	JR R_L_SH		; go for next possible shift
+
+R_L_READY:
+	SRL B
+	RR C
+	RR D
+	RR E
+	RR H
+	POP AF			; restore sign of REAL
+	LD H,B
+	LD L,C			; long HLDE complete, if positive
+	EX DE,HL 		; deliver in format DE:HL
+
+	RET Z			; return if float was positive
+
+	JP L_NEG 		; make long negative if REAL was negative
+
+L1027:	; in:	BCDEHL' = REAL to convert to ASCII
+	;	HL = number of digits after decimal point
+	CALL L04C8		; int to byte
+	EX DE,HL
+	LD E,0
+	JR C,L1033
+	CP 19H
+	JR C,L104B
+
+L1033:	DEC E
+	CALL L04C8		; int to byte
+	EXX
+	BIT 7,B			; NonZero if REAL HLDEBC is negative
+	EXX
+	LD D,7			; 7 digits if positive
+	JR Z,L1040
+
+	INC D			; no, 8 digits, sign included
+
+L1040:	SUB D			; subtract from total bytes of space
+	JR NC,L1044		; jump if enough room
+	XOR A
+L1044:	CP 9			; less than 9 digits of space left ?
+	JR C,L104A		; yes, jump
+
+	LD A,9			; no, make it 9 digits at the most
+
+L104A:	INC A
+
+L104B:	LD D,A
+	PUSH DE
+	EXX
+	LD IY,L005D		; destination for ascii-float
+	PUSH IX
+	CALL L10EB		; convert HLDEBC to ascii at IY
+	POP IX
+	POP DE
+	LD C,A
+	LD A,D
+	INC A
+	BIT 7,E
+	JR NZ,L1071
+	ADD A,C
+	JP P,L106B
+
+	LD (IY+0),0
+	JR L1076
+
+L106B:	CP 0CH
+	JR C,L1071
+
+	LD A,0BH
+
+L1071:	PUSH DE
+	CALL L1180
+	POP DE
+L1076:	BIT 7,B
+	JR Z,L107F
+
+	LD A,'-'
+	CALL L10E5		; add '-' at (IX+0)
+
+L107F:	BIT 7,E
+	JR Z,L1086
+	LD H,C
+	LD C,0
+L1086:	BIT 7,C
+	JR Z,L108F
+
+	CALL L10E3		; add '0' at (IX+0)
+	JR L1096
+
+L108F:	CALL L10D9
+	DEC C
+	JP P,L108F
+
+L1096:	LD A,D
+	OR A
+	JR Z,L10B1
+
+	LD A,'.'
+	CALL L10E5		; add '.' at (IX+0)
+
+L109F:	INC C
+	JR Z,L10A8
+
+	CALL L10E3		; add '0' at (IX+0)
+	DEC D
+	JR NZ,L109F
+L10A8:	DEC D
+	JP M,L10B1
+	CALL L10D9
+	JR L10A8
+
+L10B1:	BIT 7,E
+	RET Z
+
+	LD A,'E'
+	CALL L10E5		; add 'E' at (IX+0)
+
+	LD A,'+'                   ; add '+'
+	BIT 7,H
+	JR Z,L10C5
+	LD A,H
+	NEG
+	LD H,A
+
+	LD A,'-'
+L10C5:	CALL L10E5		; add '+' or '-' at (IX+0)
+	LD A,H
+	LD B,'0'-1
+
+L10CB:	INC B
+	SUB 10
+	JR NC,L10CB
+
+	ADD A,'0'+10
+	LD (IX+0),B
+	INC IX
+	JR L10E5
+
+L10D9:	LD A,(IY+0)
+	INC IY
+	OR A
+	JR NZ,L10E5
+
+	DEC IY
+
+L10E3:	LD A,'0'
+L10E5:	LD (IX+0),A
+	INC IX
+	RET
+
+L10EB:	; in:	IY = destination address for REAL in ASCII format
+	;	HLDEBC = REAL
+	PUSH IY
+	INC L			; REAL represents zero?
+	DEC L
+	JR NZ,L10FF		; no, continue
+
+	; fill destination address at IY with 12 '0' characters
+	LD B,12
+L10F3:	LD (IY+0),'0'
+	INC IY
+	DJNZ L10F3
+	XOR A
+	JP L117D 		; jump POP IY and RET
+
+L10FF:	PUSH BC
+	RES 7,B
+	LD A,L
+	EXX
+	SUB 80H
+	LD L,A
+	SBC A,A			; A = 255, if L was < 80H, otherwise A = 0
+	LD H,A			; HL = signed L - 80H = exponend
+	LD DE,4DH
+	CALL L06F5		; LIB
+	LD DE,5
+	ADD HL,DE
+	LD A,H
+	CP 0D9H
+	JR NZ,L1119
+	INC A
+L1119:	LD (IY+0),A
+	NEG
+	CALL L1240
+	LD A,L
+	CP 81H
+	JR NC,L112C
+	CALL L12B3
+	DEC (IY+0)
+L112C:	SET 7,B
+	LD A,84H
+	SUB L
+	LD L,0
+	JR Z,L113D
+L1135:	CALL L0B7A
+	RR L
+	DEC A
+	JR NZ,L1135
+L113D:	LD A,(IY+0)
+	PUSH AF
+	LD A,0CH
+L1143:	EX AF,AF'
+	LD A,B
+	RRA
+	RRA
+	RRA
+	RRA
+	AND 0FH
+	ADD A,30H
+	LD (IY+0),A
+	INC IY
+	LD A,B
+	AND 0FH
+	LD B,A
+	PUSH BC
+	PUSH DE
+	PUSH HL
+	SLA L
+	CALL L0B87
+	SLA L
+	CALL L0B87
+	EX DE,HL
+	EX (SP),HL
+	ADD HL,DE
+	POP DE
+	EX (SP),HL
+	ADC HL,DE
+	EX DE,HL
+	POP HL
+	EX (SP),HL
+	ADC HL,BC
+	LD B,H
+	LD C,L
+	POP HL
+	SLA L
+	CALL L0B87
+	EX AF,AF'
+	DEC A
+	JR NZ,L1143		; repeat until ready with conversion
+	POP AF
+	POP BC
+L117D:	POP IY
+	RET
+
+
+	; ----------
+	; subroutine
+	; ----------
+L1180:	PUSH IY
+	POP HL
+	LD E,A
+	LD D,0
+	ADD HL,DE
+	LD A,(HL)
+	LD (HL),0
+	CP 35H
+	RET C
+
+L118D:	DEC E
+	JP M,L119C
+	DEC HL
+	LD A,(HL)
+	INC A
+	LD (HL),A
+	CP 3AH
+	RET C
+	LD (HL),0
+	JR L118D
+
+L119C:	LD (HL),31H
+	INC HL
+	LD (HL),0
+	INC C
+	RET
+	; ----------
+
+L11A3:	; converts ascii REAL at IX to binary REAL in HLDEBC
+	; in:	IX = address of ascii REAL
+	; out:	carry set if conversion did not succeed
+	EXX
+	LD BC,0
+	EXX
+	CALL L0B72		; HLDEBC = 0.0
+
+L11AB:	LD A,(IX+0)
+	CALL L04A6		; upcase
+	CP '.'
+	JR NZ,L11C1
+
+	EXX
+	BIT 6,B
+	SCF
+	RET NZ
+
+	SET 6,B
+	EXX
+L11BD:	INC IX
+	JR L11AB
+
+L11C1:	CP 'E'
+	JR Z,L11E6
+
+         CALL L1239
+	JR NC,L121E
+
+         EX AF,AF'
+	CALL L12B3
+	RET C
+
+         EX AF,AF'
+	EXX
+	PUSH BC
+
+         LD L,A
+	LD H,0
+	CALL L1008		; convert integer HL to REAL HLDEBC
+	CALL L09E9
+
+	EXX
+	POP BC
+
+         RET C
+
+         BIT 6,B
+	JR Z,L11E3
+
+	DEC C
+
+L11E3:	EXX
+	JR L11BD
+
+L11E6:	CALL L121E
+	RET C
+
+	EXX
+	SET 4,B
+	INC IX
+
+	LD A,(IX+0)
+
+	CP '+'
+	JR Z,L11FC		; jump if '+', ignore it
+
+	CP '-'
+	JR NZ,L11FE
+
+	SET 5,B			; set bit 5 for negative
+
+L11FC:	INC IX
+L11FE:	CALL L1236		; check digit at (IX+0)
+	CCF
+	RET C
+
+	LD C,A
+	INC IX
+
+         CALL L1236                 ; check digit at (IX+0)
+	JR NC,L1215
+
+	INC IX
+	LD D,A
+	LD A,C
+	ADD A,A
+	ADD A,A
+	ADD A,C
+	ADD A,A
+	ADD A,D
+	LD C,A
+
+L1215:	BIT 5,B
+	JR Z,L121D
+	LD A,C
+	NEG
+	LD C,A
+L121D:	EXX
+
+L121E:	EXX
+	LD A,C
+	ADD A,80H
+	CP 5AH
+	RET C
+
+         CP 0A6H
+	CCF
+	RET C
+
+         PUSH BC
+	PUSH IX
+
+         LD A,C
+	CALL L1240
+
+         POP IX
+	EXX
+	POP BC
+	EXX
+	RET
+
+L1236:	; checks if byte at (IX+0)
+
+	LD A,(IX+0)
+
+L1239:	; in:	A = byte to check
+	; out:	A = 0 .. 9
+	;	C-flag set if A is a correct digit
+	SUB '0'
+	CCF
+	RET NC
+	CP 10
+	RET
+
+L1240:	PUSH AF
+	OR A
+	JP P,L1247
+	NEG
+
+L1247:	PUSH AF
+	SRL A
+	SRL A
+	INC A
+	LD HL,-6
+	LD DE,6
+
+L1253:	ADD HL,DE
+	DEC A
+	JR NZ,L1253
+
+         EX DE,HL
+	LD IX,L1277
+	ADD IX,DE
+
+         CALL L0F73                 ; get REAL at address IX
+
+         POP AF
+	AND 3
+	JR Z,L126E
+
+L1266:	PUSH AF
+	CALL L12B3
+	POP AF
+	DEC A
+	JR NZ,L1266
+
+L126E:	POP AF
+	OR A
+	JP P,L0A97
+	EXX
+	JP L0AF5
+
+L1277:	DB  81H,  0 ,  0 ,  0 ,  0 ,  0	; 1.0E+00
+	DB  8EH,  0 ,  0 ,  0 , 40H, 1CH	; 1.0E+04
+	DB  9BH,  0 ,  0 , 20H,0BCH, 3EH	; 1.0E+08
+	DB 0A8H,  0 , 10H,0A5H,0D4H, 68H	; 1.0E+12
+	DB 0B6H,  4 ,0BFH,0C9H, 1BH, 0EH	; 1.0E+16
+	DB 0C3H,0ACH,0C5H,0EBH, 78H, 2DH	; 1.0E+20
+	DB 0D0H,0CDH,0CEH, 1BH,0C2H, 53H	; 1.0E+24
+	DB 0DEH,0F9H, 78H, 39H, 3FH,  1	; 1.0E+28
+	DB 0EBH, 2BH,0A8H,0ADH,0C5H, 1DH	; 1.0E+32
+	DB 0F8H,0C9H, 7BH,0CEH, 97H, 40H	; 1.0E+36
+
+L12B3:	LD A,L
+	OR A
+	RET Z
+
+	SET 7,B
+	PUSH BC
+	PUSH DE
+	LD A,H
+
+	CALL L0B7A
+	CALL L0B7A
+
+	ADD A,H
+	LD H,A
+	EX (SP),HL
+	ADC HL,DE
+	EX DE,HL
+	POP HL
+	EX (SP),HL
+	ADC HL,BC
+	LD B,H
+	LD C,L
+	POP HL
+	JR NC,L12D6
+
+	CALL L0B7B
+	INC L
+	SCF
+	RET Z
+
+L12D6:	LD A,L
+	ADD A,3
+	LD L,A
+	RES 7,B
+	RET
+
+
+IFDEF USELIB
+
+	GLOBALS L12DD
+L12DD:	; SET <> SET ?
+	; HL = 1, if true
+	; HL = 0, if false
+	LD C,1			; LIB
+	JR L12E3
+
+	GLOBALS L12E1
+L12E1:	; SET = SET ?
+	; HL = 1, if true
+	; HL = 0, if false
+	LD C,0			; LIB
+
+L12E3:	CALL L133F
+L12E6:	LD A,(DE)
+	CP (HL)
+	JR NZ,L12F2
+
+	INC HL
+	INC DE
+	DJNZ L12E6
+
+	LD A,C
+	XOR 1
+	LD C,A
+
+L12F2:	; removes the two sets from the stack
+	; in:	IX = return address
+	;	C = boolean value to return
+	; out:	HL = C
+	LD HL,40H
+	ADD HL,SP
+	LD SP,HL 		; remove the two sets from the stack
+	LD L,C			; 0 = false, 1 = true
+	LD H,0
+	JP (IX)
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L12FC
+L12FC:	; SET <= SET ?
+	; HL = 1, if true
+	; HL = 0, if false
+	LD C,1			; LIB
+	JR L1302
+
+	GLOBALS L1300
+L1300:	; SET >= SET ?
+	; HL = 1, if true
+	; HL = 0, if false
+	LD C,0			; LIB
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+L1302:	CALL L133F
+	DEC C
+	JR NZ,L1309
+	EX DE,HL
+
+L1309:	LD C,0
+
+L130B:	LD A,(DE)
+	OR (HL)
+	CP (HL)
+	JR NZ,L12F2
+	INC HL
+	INC DE
+	DJNZ L130B
+	LD C,1
+	JR L12F2
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L1318
+L1318:	; LIB
+	CALL L133F		; LIB
+
+L131B:	LD A,(DE)
+	OR (HL)
+	LD (HL),A
+	INC HL
+	INC DE
+	DJNZ L131B
+
+ENDIF	; USELIB
+
+
+L1322:	EX DE,HL
+	LD SP,HL
+	JP (IX)
+
+
+IFDEF USELIB
+
+	GLOBALS L1326
+L1326:	; LIB
+	CALL L133F		; LIB
+
+L1329:	LD A,(DE)
+	CPL
+	AND (HL)
+	LD (HL),A
+	INC HL
+	INC DE
+	DJNZ L1329
+	JR L1322
+
+	GLOBALS L1333
+L1333:	; X * Y : SET
+	CALL L133F		; LIB
+
+L1336:	LD A,(DE)
+	AND (HL)
+	LD (HL),A
+	INC HL
+	INC DE
+	DJNZ L1336
+	JR L1322
+
+ENDIF	; USELIB
+
+
+L133F:	; in:	2 sets pushed at the stack
+	; out:	DE = address of second pushed set
+	;	HL = address of first pushed set
+	;	IX = return address from routine that called this routine
+	POP IY			; pop return address
+	POP IX			; IX = return address of main call !!!
+	LD HL,0
+	ADD HL,SP
+	EX DE,HL 		; DE = address of second pushed set
+
+	LD HL,20H		; HL = length of set
+	LD B,L
+	ADD HL,SP		; HL = address of first pushed set
+
+	JP (IY)			; jump to return address
+
+
+IFDEF USELIB
+
+	GLOBALS L134F
+L134F:	POP IX			; LIB
+	LD HL,21H
+	ADD HL,SP
+	LD A,(HL)
+	OR A
+	JR Z,L135C
+	XOR A
+	JR L1362
+
+L135C:	DEC HL
+	LD B,(HL)
+	CALL L05BA
+	AND (HL)
+L1362:
+;!	pushf
+	LD HL,22H
+	ADD HL,SP
+	LD SP,HL
+	LD HL,0
+;!	popf
+	JR Z,L136D
+	INC HL
+L136D:	JP (IX)
+
+	GLOBALS L136F
+L136F:	; assign (text file, filename);
+         DB 3Eh
+;         LD A,0AFH                  ; LIB, text file
+;         JR L1371
+
+	GLOBALS L1370
+L1370:	; assign (untyped/typed file, filename);
+         XOR A                      ; LIB, untyped or typed file
+;L1371:
+         LD (L00E8),A
+	POP IY			; save return address
+
+         LD HL,(L00D2)              ; HL = destination address of string
+;         LD B,10H                   ; maximum length of 16
+         LD B,63                    ; maximum length of 63
+	CALL L05E2		; LIB, pop string from stack
+	XOR A
+	LD (DE),A		; fill byte after string with 0
+
+	POP HL
+         LD (L00E2),HL              ; save address of FIB
+
+	PUSH IY			; restore return address
+
+         LD A,H                     ; std file if address < 400h
+         CP 4                       ; HL < 400h ?
+         JR NC,L1390                ; jump if >= 400h
+
+	LD A,22H
+	LD (L00D0),A		; IORESULT = 22H = Assign to std files
+				; not allowed
+
+SetUserError62:
+         LD A,62
+         LD (ErrorNumber),A         ; set user error 62
+         RET
+
+L1390:
+         ; HL = address of FIB
+         LD A,(L00E8)
+         OR A                       ; text or untyped/typed ?
+         JR Z,L13A0                 ; jump if untyped/typed file
+
+         ; text file
+         CALL L13B6                 ; search for device name at L00D2
+	JR NZ,L13A0		; jump if not found, normal file name
+
+         ; A = read/write flags for this device
+
+	LD HL,(L00E2)
+	LD (HL),A		; save read/write flag of device name in FIB
+	RET
+
+L13A0:
+         LD HL,(L00E2)              ; HL = FIB address
+         OFF_HL 0 DOS_FCB           ; offset to handle/FCB
+         EX DE,HL
+         LD HL,(L00D2)
+         INC HL                     ; skip length of string
+         LD A,' '
+         LD B,A
+         LD C,A
+         CALL ParseName
+
+;         CALL L03F2                 ; parse filename at address in L00D2 without
+;                                    ; wildcards to FCB at L005C
+
+	LD HL,(L00E2)		; HL = FIB, byte 0
+	LD (HL),0		; reset flags byte
+
+;         OFF_HL 0 FIB_FCB
+;	 LD DE,FIB_FCB		 ; offset to FCB
+;	 ADD HL,DE		 ; HL = first byte of FCB
+
+;         EX DE,HL
+;         LD HL,L005C
+;         LD BC,FCB_LEN              ; length of FCB
+;         LDIR                       ; fill FIB with FCB data of address L005CH
+
+         RET
+
+L13B6:	; searches for a device name 'KBD:' or 'CON:' etc..
+	; in:	L00D2 contains address to string that may start with
+	;	a device name
+	; out:	Z-flag set if a device name was found
+	;	and A = read/write flags for this device
+	; changes: BC,DE,HL
+	LD B,6			; B = 6 entries in table
+	LD HL,L13E6		; HL = table address
+L13BB:	PUSH BC
+	PUSH HL
+
+	LD B,3			; compare 3 characters
+	LD DE,(L00D2)
+L13C3:	INC DE
+	LD A,(DE)
+	CP ' '
+	JR Z,L13C3		; skip spaces
+
+L13C9:	LD A,(DE)
+	CALL L04A6		; upcase
+	SUB (HL)
+	JR Z,L13DA		; compare next letter if equal
+
+	POP HL
+	POP BC
+	LD DE,4
+	ADD HL,DE		; HL = address of next
+	DJNZ L13BB
+	OR A			; return A <> 0 and Z-flag reset if not found
+	RET
+
+L13DA:	INC HL
+	INC DE
+	DJNZ L13C9
+
+	; device name found
+	POP BC			; clean stack
+	POP BC
+
+	LD A,(DE)
+	CP ':'
+	RET NZ			; return with next character after three
+				; characters and Z-flag reset for not found
+
+	LD A,(HL)		; return A = read/write flags and Z-flag set
+				; if device name correct ended with a ':'
+	RET
+
+L13E6:	DB 'CON',0C1H              ; device 1 = input/output
+	DB 'TRM',0C1H              ; device 1 = input/output
+	DB 'KBD',82H  ;0C1H        ; device 2 = input only
+	DB 'LST',43H  ;0C1H        ; device 3 = output only and read semaphore
+	DB 'AUX',0C4H ;0C1H        ; device 4 = input/output
+	DB 'USR',0C5H              ; device 5 = input/output
+
+	GLOBALS L13FE
+L13FE:   ; rewrite (text file);
+         ; HL = file pointer
+         DB 3Eh
+;         LD A,0AFH                  ; LIB, write
+;         JP L1400
+
+	GLOBALS L13FF
+L13FF:   ; reset (text file);
+         ; HL = file pointer
+         XOR A                      ; LIB, read
+
+;L1400:
+         LD (L00E8),A               ; 0 = reset, NZ = rewrite
+
+         CALL L1469                 ; close a text file
+	LD A,(L00D0)		; read IORESULT
+	OR A
+	RET NZ			; quit if an error occurred
+	LD HL,(L00E2)		; HL = FIB, byte 0
+	RES 5,(HL)		; reset write semaphore bit
+	LD A,(HL)
+	AND 0FH
+	RET NZ			; return if not a disk file type
+	CALL L1430		; open or create file
+	LD A,(L00D0)		; read IORESULT
+	OR A
+	RET NZ			; quit if an error occurred
+
+	LD HL,(L00E2)		; HL = FIB, byte 0
+
+	LD A,(L00E8)
+	OR A
+	LD BC,8080H		; buffer pointer at 128 and read only
+	JR Z,L142B
+
+	LD BC,0040H		; buffer pointer at 0 and write only
+
+L142B:	LD (HL),C		; set flags byte
+         OFF_HL 0 DOS_PTR
+;	 INC HL
+;	 INC HL			 ; FIB_PTR
+	LD (HL),B		; set sector buffer pointer
+         INC HL
+         LD (HL),0                  ; high byte is 0
+
+         LD BC,0080H
+         OFF_HL DOS_PTR+1 DOS_REC
+         LD (HL),C
+         INC HL
+         LD (HL),B
+	RET
+
+L1430:   ; 33e CALL L145A                 ; clear FCB first
+	LD HL,(L00E2)
+         OFF_HL 0 DOS_FCB
+;	 LD DE,FIB_FCB		 ; offset to FCB
+;	 ADD HL,DE
+;         EX DE,HL
+;         LD A,(L00E8)               ; reset or rewrite ?
+;         OR A
+;         LD BC,010FH                ; C = file open (0FH), B = error 1
+;         JR Z,L144E                 ; jump if reset
+
+;         PUSH DE
+;         LD C,13H                   ; C = file delete
+;         CALL MSXDOS
+;         POP DE
+;         LD BC,0F116H               ; C = file create (16H), B = error F1
+;L144E:   PUSH BC
+;         CALL MSXDOS
+;         POP BC
+;         INC A
+;         RET NZ                     ; quit if no error, A = 0
+;         LD A,B
+;         LD (L00D0),A               ; IORESULT = 001H = File does not exist
+				; IORESULT = 0F1H = Directory is full
+
+;         RET
+
+;L145A:   ; resets the FCB
+;         LD HL,(L00E2)
+;         OFF_HL 0 DOS_FCB
+;	 LD DE,FIB_FCB+12 	 ; offset to first byte after name in FCB
+;	 ADD HL,DE
+
+;         LD B,FCB_LEN-12            ; clear rest of FCB
+;L1463:   LD (HL),0
+;         INC HL
+;         DJNZ L1463
+;         RET
+
+; 33e
+         LD D,H
+         LD E,L
+         INC HL
+         LD A,(L00E8)
+         OR A
+         JR NZ,L1A3B                ; jump if rewrite
+
+         LD A,' '
+         LD B,A
+         LD C,A
+         CALL OpenFile              ; 33e, TODO OpenFile
+         RET Z
+         LD A,1
+         LD (L00D0),A               ; IORESULT = 1
+         RET
+
+L1A3B:
+         LD A,' '
+         LD B,A
+         LD C,A
+         CALL CreateFile ; L2C4A             ; 33e, TODO CreateFile
+         RET Z
+         LD A,0F1H
+         LD (L00D0),A               ; IORESULT = 0F1H
+         RET
+; 33e
+
+	GLOBALS L1469
+L1469:	; LIB
+	; PROCEDURE Close(VAR F: FILE);
+	; closes a text file
+         ; in:    HL = FIB address
+
+	LD (L00E2),HL		; save FIB address
+	LD A,(HL)
+	AND 0FH
+	RET NZ			; quit if it is a device
+
+	BIT 6,(HL)
+	JR Z,L147E		; jump if no output allowed
+
+	LD A,1AH
+	CALL L16C6		; write a ^Z to end the text file
+         CALL L170C                 ; flush buffer
+	JR L1481 		; close file
+
+L147E:	BIT 7,(HL)
+	RET Z			; return if no input allowed
+
+L1481:	; closes a file
+	LD HL,(L00E2)
+	PUSH HL
+         OFF_HL 0 DOS_FCB
+;	 LD DE,FIB_FCB		 ; offset to FCB
+;	 ADD HL,DE
+
+         LD B,H
+         LD C,L
+         CALL CloseFile              ; 33e, L2DB4, CloseFile
+;         EX DE,HL                   ; DE = FCB address
+;         LD C,10H                   ; file close
+;         CALL MSXDOS
+	POP HL
+;         INC A
+         JR Z,L1498                 ; jump if file closed normally
+
+	LD A,0FFH
+	LD (L00D0),A		; IORESULT = 0FFH, File disappeared
+
+L1498:	LD (HL),0		; always resets the FIB
+	RET
+
+ENDIF	; USELIB
+
+	GLOBALS L149B
+L149B:	; LIB
+	; sets current FIB address to standard output (OUTPUT)
+	; in:	HL = FIB address
+	; out:	-
+	EX (SP),HL		; LIB, for search ???
+         LD (L00E4),HL              ; save return address
+	EX (SP),HL
+	PUSH HL
+         LD HL,OUTPUT
+	LD (L00E2),HL
+	POP HL
+	RET
+
+	GLOBALS L14A9
+L14A9:	; LIB
+	; sets current FIB address and checks if it is open for input
+	; in:	HL = FIB address
+	EX (SP),HL
+	LD (L00E4),HL
+	EX (SP),HL
+	LD (L00E2),HL		; save FIB address
+
+	BIT 7,(HL)		; open for input ?
+	RET NZ			; yes, quit
+
+         LD A,2
+	LD (L00D0),A		; IORESULT = 2, File not open for input
+	RET
+
+	GLOBALS L14BA
+L14BA:	; LIB
+	; sets current FIB address and checks if it is open for output
+	; in:	HL = FIB address
+	; out:	-
+	EX (SP),HL
+	LD (L00E4),HL
+	EX (SP),HL
+	LD (L00E2),HL		; save FIB address
+	BIT 6,(HL)		; open for output ?
+	RET NZ			; yes, quit
+	LD A,3
+	LD (L00D0),A		; IORESULT = 3, File not open for output
+	RET
+
+
+IFDEF USELIB
+
+	GLOBALS L14CB
+L14CB:   ; LIB, readln from console
+         LD A,0AFH
+
+         JR L14CD
+
+	GLOBALS L14CC
+L14CC:   ; LIB, read from console
+         XOR A
+
+L14CD:   EX (SP),HL
+	LD (L00E4),HL
+	EX (SP),HL
+	PUSH HL
+         LD HL,OUTPUT
+	LD (L00E2),HL
+	RES 5,(HL)
+	PUSH AF
+
+         LD A,(RedirectionFlag)
+         LD B,A
+         CALL L14EA                 ; do real read
+
+         POP AF
+	OR A
+	JR Z,L14E6		; jump if not readln
+
+         LD A,(RedirectionFlag)
+         OR A
+         CALL Z,L01E1               ; print CR, LF if no input redirection
+
+L14E6:	POP HL
+	RET
+
+ENDIF	; USELIB
+
+
+L14E8:   LD B,0                     ; ^Z is ignored when typed in
+
+L14EA:   LD HL,BUFLEN
+	LD A,(HL)
+	CP 7FH			; < 127
+	JR C,L14F4		; jump if < 127
+
+	LD A,7EH 		; trunc to a length of 126 characters
+L14F4:	LD C,A
+         LD (HL),7EH
+
+         LD HL,(L00D2)
+	LD (L00D4),HL
+
+L14FD:   LD D,0
+
+L14FF:	CALL L03E1		; A = character from console
+	LD (HL),A
+
+	LD E,1
+	CP 8			; backspace ?
+         JR Z,L153F
+         CP 7FH                     ; delete ?
+	JR Z,L153F
+
+	DEC E			; E = 0
+	CP 18H			; insert ?
+	JR Z,L153F
+	CP 1BH			; escape ?
+	JR Z,L153F
+
+	CP 1AH			; ctrl-z ?
+	JR Z,L1550		; jump to quit with ^Z
+
+	CP 0DH			; return ?
+	JR Z,L1556
+
+	CP ' '                     ; space ?
+	JR NC,L1533
+	CP 3			; ctrl-break ?
+	JR NZ,L14FF
+	LD A,(CBREAK)
+	OR A
+	JR Z,L14FF		; ignore character if no CBREAK handler
+	LD IX,(L00E4)		; IX = return address
+	JP L2016 		; force userbreak
+
+L1533:	LD A,C
+	CP D
+	JR Z,L14FF
+
+         INC D
+
+         LD A,(RedirectionFlag)
+         OR A                       ; Zero if no input redirection
+
+         LD A,(HL)
+	INC HL
+
+         CALL Z,L03C9               ; print character, if no input redirection
+	JR L14FF
+
+L153F:   ; E = 1 if backspace or delete
+         ; E = 0 if insert or escape
+         DEC D
+	JP M,L14FD
+	DEC HL
+
+         CALL L0200
+	DB 8,' ',8,0               ; backspace, space, backspace
+	DEC E
+	JR Z,L14FF
+
+         JR L153F
+
+L1550:   ; ^Z typed in
+         INC B
+	DEC B
+         JR Z,L14FF                 ; ignore ^Z if B = 0
+
+         JR L155A                   ; quit with ^Z
+
+L1556:	INC B
+	DEC B
+	JR NZ,L155E		; jump if quit with 0DH,0Ah
+
+L155A:	; quit with ^Z
+	LD (HL),1AH
+	JR L1566 		; quit
+
+L155E:	CALL L01E1		; print CR, LF
+	LD (HL),0DH
+	INC HL
+	LD (HL),0AH
+L1566:	INC HL
+         LD (L00D6),HL              ; save end address
+	RET
+
+L156B:   ; read character from current file or device
+	; out:	A = character read
+	LD HL,(L00E2)
+	LD A,(L00D0)		; read IORESULT
+	OR A
+	JR NZ,L15ED		; jump if error occurred, return EOF
+
+	LD A,(HL)
+	BIT 5,A
+         JP NZ,L15E9                ; jump if pre-read character present
+
+	AND 0FH
+         JP NZ,L15AB                ; jump if device
+
+	; read character from text file
+         OFF_HL 0 DOS_PTR
+;	 INC HL
+;	 INC HL
+         LD A,(HL)                  ; A = DOS_PTR
+	OR A
+	JP P,L1597		; < 128 ?
+
+; 33e
+         PUSH HL
+
+         OFF_HL DOS_PTR DOS_REC
+         LD E,(HL)
+         INC HL
+         LD D,(HL)
+         PUSH DE                    ; save record length
+
+         OFF_HL DOS_REC+1 DOS_FCB   ; HL = handle/FCB address
+
+         PUSH HL                    ; save HL
+
+         OFF_HL DOS_FCB DOS_BUF     ; HL = address of buffer
+         LD D,H
+         LD E,L
+
+         POP BC                     ; BC = handle/FCB address
+         POP HL                     ; HL = number of bytes to read
+
+         CALL ReadFile              ; 33e, TODO ReadFile
+         LD B,H                     ; BC = number of bytes read
+         LD C,L
+
+         POP HL                     ; HL = DOS_PTR
+         JR Z,L1594
+
+          PUSH HL                    ; save HL = DOS_PTR
+;         OFF_HL DOS_PTR DOS_BUF
+;         LD (HL),26
+
+; 33e
+;         ; read next FIB_BUF
+;         LD C,14H                   ; sequential read
+;         PUSH HL
+;         CALL L19BA                 ; sequential read from current position
+;                                    ; to FIB_BUF
+;         POP HL
+;         JR Z,L1594                 ; jump if no error
+
+	; error occurred, fill first byte of FIB_BUF with ^Z (end of file)
+
+         OFF_HL DOS_PTR DOS_BUF
+;	 LD DE,2EH
+;	 ADD HL,DE
+L1590:
+	LD (HL),1AH
+         POP HL                     ; restore to FIB_PTR
+         JR L1596                   ; 33e, TODO L1BB8
+
+L1594:
+         LD DE,128
+         LD A,D
+         CP B
+         JR NZ,L1595
+         LD A,E
+         CP C
+         JR Z,L1596
+
+L1595:
+         PUSH HL
+         ADD HL,BC                  ; HL += number of bytes read
+         LD BC,DOS_BUF - DOS_PTR
+         ADD HL,BC
+         JR L1590
+
+L1596:
+         XOR A
+	LD (HL),A		; FIB_PTR = 0
+
+L1597:	INC (HL)
+         ADD A,DOS_BUF - DOS_PTR    ; 33e, 4F ; 2EH
+	LD E,A
+	LD D,0
+	ADD HL,DE
+	LD A,(HL)
+	CP 1AH			; first character = ^Z (eof)
+         JP NZ,L15E0
+
+	LD HL,(L00E2)
+         OFF_HL 0 DOS_PTR
+;	 INC HL
+;	 INC HL
+	DEC (HL) 		; FIB_PTR does not move beyond ^Z
+         JP L15E0
+
+L15AB:	DEC A			; device = 1, 'CON:' ?
+	JR NZ,L15C9		; jump if not 'CON:'
+
+         LD HL,(L00D4)              ; start address of buffer
+         LD DE,(L00D6)              ; end address of buffer
+	OR A
+	SBC HL,DE
+	JR C,L15BF		; read from buffer until current = end address
+
+         LD B,0FFH                  ; do not ignore ^Z
+	CALL L14EA
+
+L15BF:	LD HL,(L00D4)		; HL = data pointer
+	LD A,(HL)		; A = data byte
+	INC HL
+	LD (L00D4),HL		; save new data pointer
+	JR L15E0 		; put character in FIB_CHR
+
+L15C9:	DEC A			; device = 2, 'KBD:' ?
+	JR NZ,L15D2		; jump if not 'KBD:'
+
+	CALL CONINPTR
+	LD A,L
+	JR L15E0 		; put character in FIB_CHR
+
+L15D2:	DEC A			; skip 'LST:' (output device)
+	DEC A			; device = 4, 'AUX:' ?
+	JR NZ,L15DC		; jump if not 'AUX:', then device = 'USR:'
+
+	CALL AUXINPTR
+	LD A,L
+	JR L15E0 		; put character in FIB_CHR
+
+L15DC:	CALL USRINPTR
+	LD A,L
+
+L15E0:	LD HL,(L00E2)		; HL = address of FIB
+	SET 5,(HL)		; set write semaphore
+				; pre-read character ready
+	OFF_HL 0 FIB_CHR
+;	 INC HL
+	LD (HL),A		; put character in character buffer
+	OFF_HL FIB_CHR 0
+;	 DEC HL
+	RET
+
+L15E9:	OFF_HL 0 FIB_CHR
+;	 INC HL
+	LD A,(HL)		; read pre-read from character buffer
+	OFF_HL FIB_CHR 0
+;	 DEC HL
+	RET
+
+L15ED:	LD A,1AH
+	RET
+
+L15F0:	PUSH HL
+	LD HL,(L00E2)		; HL = address of FIB
+	LD A,(HL)		; A = flags byte
+	AND 0FH
+
+	CP 6			; device 6 = used for 'val'
+	JR Z,L1622		; quit immediately is device = 6
+
+L15FB:	CALL L156B		; read character from file or device
+	CP 21H
+	JR NC,L160A
+	CP 1AH
+	JR Z,L160A
+	RES 5,(HL)
+	JR L15FB
+
+L160A:	LD DE,L005D
+	LD B,1EH
+L160F:	PUSH BC
+	PUSH DE
+	CALL L156B		; read character from file or device
+	POP DE
+	POP BC
+	CP 21H
+	JR C,L1620
+	RES 5,(HL)
+	LD (DE),A
+	INC DE
+	DJNZ L160F
+L1620:	XOR A
+	LD (DE),A
+L1622:	POP HL
+	RET
+
+L1624:	; in:	-
+	; out:	B = 0 and IX = L005D --> no '-' found
+	;	B = 1 and IX = L005E --> a '-' found
+	;	Zero --> end of string reached
+	LD IX,L005D
+	LD A,(IX+0)
+	OR A
+	RET Z			; quit if zero
+
+	LD B,0			; assume positive
+	CP '-'                     ; minus sign ?
+	RET NZ			; quit with NonZero of something else
+
+	INC B			; no, negative number
+	INC IX			; next character
+	; quit with NonZero (INC B)
+	RET
+
+L1636:	; checks a correct termination of the parsed string
+	; in:	IX = position of character after parsed string
+	;	Carry flag --> IORESULT = 10H
+	; out:	NonCarry if '\0' found at (IX), A not changed
+	;	Carry if no '\0' found at (IX), A changed
+	; changes: AF, IORESULT
+
+	JR C,L163D
+
+	INC (IX+0)		; string correct ended ?
+	DEC (IX+0)
+	RET Z			; yes, quit
+
+L163D:	LD A,10H
+	LD (L00D0),A		; IORESULT = 10H, Error in numeric format
+	SCF
+	RET
+
+
+IFDEF USELIB
+
+	GLOBALS L1644
+L1644:   ; READ (VAR F: TEXT; VAR C: CHAR);
+         PUSH HL                    ; LIB
+	CALL L156B		; read character from file or device
+	RES 5,(HL)
+	POP HL
+	LD (HL),A
+	RET
+
+	GLOBALS L164D
+L164D:   ; READ (VAR F: TEXT; VAR B: BYTE);
+         ; store as BYTE
+	LD A,1			; store as BYTE
+	JR L164F
+
+ENDIF	; USELIB
+
+
+	GLOBALS L164E
+L164E:   ; READ (VAR F: TEXT; VAR I: INTEGER);
+         ; store as INTEGER
+	XOR A			; store as INTEGER
+
+L164F:	; in:	HL = destination address for INTEGER value
+	;	IX = address of first ASCII character
+	;	C = 0, store as INTEGER
+	;	C = > 0, store as BYTE
+	; out:	HL = INTEGER value
+	;	DE = destination address + 1
+	LD C,A
+	PUSH BC
+	CALL L15F0
+	POP BC
+	CALL L1624		; read an optional sign
+	RET Z			; quit if end of ASCII-text
+
+	; B = 0, no sign
+	; B = 1, a sign
+	PUSH BC
+	PUSH HL			; save destination address
+
+	CALL L07F7		; convert hexadecimal or decimal to HL
+
+	POP DE			; DE = destination address
+	POP BC			; B = sign flag
+	; Carry if error at conversion
+
+	CALL L1636		; conversion ended correct ?
+	RET C			; quit if error
+
+	DEC B			; B = 1 ?, a sign read ?
+	CALL Z,L0783		; Zero --> negate HL
+
+	EX DE,HL 		; HL = destination address
+				; DE = INTEGER value
+	LD (HL),E		; store low-byte
+
+	INC C			; byte ?
+	DEC C
+	JR NZ,L1670		; yes, only low-byte stored
+
+	INC HL
+	LD (HL),D		; store high-byte
+
+L1670:	EX DE,HL
+	RET
+
+	GLOBALS L1671
+L1671:   ; READ (VAR F: TEXT; VAR L: LONGINT);
+         ; LIB
+	; in:	HL = destination address for LONGINT value
+	;	IX = address of first ASCII character
+	; out:	DE:HL = LONGINT value
+	CALL L15F0
+
+	CALL L1624		; read an optional sign
+	RET Z
+
+	; B = 0, no sign
+	; B = 1, a sign
+	PUSH HL			; save destination address
+	PUSH BC			; save sign flag
+
+	CALL A2L 		; convert hexadecimal or decimal to DE:HL
+
+	POP BC			; B = sign flag
+
+	PUSH AF
+	DEC B
+	CALL Z,L_NEG		; Zero --> negate LONGINT DE:HL
+	POP AF
+
+	POP BC			; BC = destination address
+	; Carry if error at conversion
+
+	CALL L1636		; conversion ended correct ?
+	RET C			; quit if error
+
+	PUSH BC			; save destination address
+	LD B,H			; BC = low-word
+	LD C,L
+	POP HL			; HL = destination address
+
+	LD (HL),C		; store low-word
+	INC HL
+	LD (HL),B
+	INC HL
+
+	LD (HL),E		; store high-word
+	INC HL
+	LD (HL),D
+	LD H,B			; restore low-word
+	LD L,C
+	; return DE:HL
+	RET
+
+IFDEF USELIB
+
+	GLOBALS L1672
+L1672:   ; READ (VAR F: TEXT; VAR R: REAL);
+         CALL L15F0                 ; LIB
+	CALL L1624
+	RET Z
+
+         PUSH BC
+	PUSH HL
+
+         CALL L11A3                 ; convert ascii to HLDEBC
+
+         EXX
+	POP HL
+	POP BC
+
+         CALL L1636
+	RET C
+
+         DEC B
+
+         EXX
+	CALL Z,L0A8F
+	EXX
+	JP L05D1 		; PUTFLT
+
+	GLOBALS L168E
+L168E:   ; READ (VAR F: TEXT; VAR S: STRING);
+         PUSH HL                    ; LIB
+	EX DE,HL
+	LD C,0
+L1692:	PUSH BC
+	PUSH DE
+	CALL L156B		; read character from file or device
+	POP DE
+	POP BC
+	CP 0DH
+	JR Z,L16A8
+	CP 1AH
+	JR Z,L16A8
+	RES 5,(HL)
+	INC C
+	INC DE
+	LD (DE),A
+	DJNZ L1692
+L16A8:	POP HL
+	LD (HL),C
+	RET
+
+	GLOBALS L16AB
+L16AB:   ; READLN (VAR F: TEXT);
+         ; LIB
+	CALL L156B		; read character from file or device
+	CP 1AH
+	JR Z,L16C5		; quit if ^Z
+
+         RES 5,(HL)                 ; no pre-read character
+
+	CP 0AH
+         JR Z,L16C5                 ; quit if linefeed
+
+	CP 0DH
+	JR NZ,L16AB		; repeat while not return
+
+
+	CALL L156B		; read character from file or device
+	CP 0AH
+         JR NZ,L16C5                ; jump if not linefeed
+                                    ; this character will be read the next time
+
+         ; 0Dh, 0Ah found, carriage return and linefeed found
+
+         RES 5,(HL)                 ; no pre-read character
+
+L16C5:   RET
+
+ENDIF	; USELIB
+
+
+L16C6:	; in:	A = character
+	; out:	character printed to a device or a file
+	LD HL,(L00E2)		; HL = FIB address
+	LD C,A			; C = character data
+
+	LD A,(L00D0)		; read IORESULT
+	OR A
+	RET NZ			; quit if an error occurred
+	LD A,(HL)
+	AND 0FH
+	JR NZ,L16E4		; jump if device
+
+         OFF_HL 0 DOS_PTR
+;	 INC HL
+;	 INC HL			 ; offset to FIB_PTR
+	PUSH HL
+	LD A,(HL)		; A = low byte of FIB_PTR
+         ADD A,DOS_BUF-DOS_PTR      ; 2EH, distance between FIB_PTR and FIB_BUF
+	LD E,A
+	LD D,0
+	ADD HL,DE
+	LD (HL),C		; write character
+	POP HL
+	INC (HL) 		; increase FIB_PTR
+	RET P			; quit if < 128
+	JR L170C 		; write buffer if FIB_PTR = 128
+				; why not directly to 'LD (HL),0' ???
+
+L16E4:	CP 6
+	JR Z,L16FD		; what kind of a device is this ????
+
+	POP HL			; pop return address
+	LD B,0
+	PUSH BC			; push BC = character data
+	PUSH HL			; push return address
+
+	DEC A			; 1: device = 'CON:' ?
+	JP Z,CONOUTPTR
+	DEC A
+	DEC A			; 3: device = 'LST:' ?
+	JP Z,LSTOUTPTR
+	DEC A			; 4: device = 'AUX:' ?
+	JP Z,AUXOUTPTR
+	JP USROUTPTR		; 5: device = 'USR:' ?
+
+L16FD:	LD HL,(L00E8)
+	LD A,(L00EA)
+	CP (HL)
+	RET Z
+	INC (HL)
+	LD E,(HL)		; DE = index
+	LD D,0
+	ADD HL,DE
+	LD (HL),C		; write character in buffer
+	RET
+
+L170C:	; flushes the buffer to disk if it is not empty
+	LD HL,(L00E2)
+         OFF_HL 0 DOS_PTR
+;	 INC HL
+;	 INC HL
+         LD A,(HL)                  ; A = low byte of DOS_PTR
+	OR A
+	RET Z			; quit if nothing written
+         LD (HL),0                  ; reset to start of DOS_BUF
+
+         LD E,A                     ; DE = number of bytes in buffer
+         LD D,0
+         PUSH DE                    ; save DE
+
+         OFF_HL DOS_PTR DOS_FCB     ; HL = handle/FCB address
+
+         PUSH HL                    ; save HL
+
+         OFF_HL DOS_FCB DOS_BUF     ; HL = address of buffer
+         LD D,H                     ; DE = address of buffer
+         LD E,L
+         POP BC                     ; BC = handle/FCB address
+         POP HL                     ; HL = number of bytes to write
+         CALL WriteFile             ; 33e, L2D8E WriteFile
+
+         LD B,H                     ; BC = number of bytes read
+         LD C,L
+
+;         LD C,15H                   ; sequential write 128 bytes
+;         CALL L19BA                 ; write FIB_BUF to current position
+	RET Z			; quit if no error
+	LD A,0F0H
+	LD (L00D0),A		; IORESULT = 0F0H, Disk write error
+	RET
+
+
+IFDEF USELIB
+
+	GLOBALS L1722
+L1722:   ; WRITE (VAR F: TEXT; C: CHAR);
+         LD A,L                     ; LIB
+	JP L16C6
+
+ENDIF	; USELIB
+
+	GLOBALS L1726
+L1726:   ; WRITE (VAR F: TEXT; I: INTEGER);
+         ; LIB, print INTEGER
+	; in:	value to print is pushed on stack
+	;	HL = size in characters
+	;	(L00D2) destination address for ASCII result
+	; out:	-
+	POP BC			; LIB
+	POP DE
+	PUSH BC
+	LD IX,(L00D2)
+	BIT 7,H
+	JR Z,L1737		; jump if size = positive
+
+	; print INTEGER as unsigned
+	CALL L0783		; negate HL (size)
+	EX DE,HL 		; HL = value, DE = size
+	JR L1745
+
+L1737:	EX DE,HL 		; HL = value, DE = size
+	BIT 7,H
+	JR Z,L1745		; jump if value = positive
+
+	CALL L0783		; negate HL
+	LD (IX+0),'-'              ; print minus sign
+	INC IX
+
+L1745:	PUSH DE			; push size
+
+	CALL L07C6		; unsigned INTEGER to ASCII
+
+L1749:	; print string from character buffer (L00D2) with leading spaces if
+	; pushed size > characters written in buffer
+	; in:	total size wanted is pushed
+	POP HL			; size, ( WRITELN(int : size) )
+
+	CALL L04C8		; int to byte
+	; A = size
+
+	LD DE,(L00D2)		; DE = start of ASCII buffer
+	PUSH IX
+	POP HL
+	OR A
+	SBC HL,DE
+	LD C,L			; C = characters written in buffer
+
+	EX DE,HL 		; HL = start of ASCII buffer
+
+L1759:	; in:   HL = start of ASCII buffer
+	;	C = characters written in buffer
+	SUB C			; size - characters written
+	JR C,L176A		; jump if size is less, no spaces first
+	JR Z,L176A		; jump if size is equal, no spaces first
+
+	LD B,A			; B = number of spaces to add
+	PUSH HL			; save start of ASCII buffer
+
+L1760:	LD A,' '
+	PUSH BC
+	CALL L16C6		; write space character
+	POP BC
+	DJNZ L1760		; repeat
+
+	POP HL			; HL = start of ASCII buffer
+
+L176A:	LD B,C			; B = characters in ASCII buffer
+	INC B
+
+L176C:	DEC B
+	RET Z			; quit if all printed (or empty)
+
+	LD A,(HL)		; A = chacacter to print
+	PUSH BC
+	PUSH HL
+	CALL L16C6		; print character
+	POP HL
+	POP BC
+	INC HL			; next one
+	JR L176C
+
+	GLOBALS L1779
+L1779:   ; WRITE (VAR F: TEXT; R: REAL);
+         ; LIB, print REAL
+	; in:	push REAL
+	;	push size
+	;	HL = number of digits after decimal point
+	POP BC			; return address
+
+	POP DE			; DE = size of real
+
+	EXX
+	POP HL			; HLDEBC = REAL to be printed
+	POP DE
+	POP BC
+	EXX
+
+	PUSH BC			; return address
+
+	LD IX,(L00D2)		; IX = destination address for ASCII
+	PUSH DE			; push size
+
+	CALL L1027		; convert REAL to ASCII
+
+	JR L1749
+
+	GLOBALS PRT_LONG
+PRT_LONG:
+         ; WRITE (VAR F: TEXT; L: LONGINT);
+	; LIB, print LONG
+	; in:	value to print is pushed on stack
+	;	HL = size in characters
+	;	(L00D2) destination address for ASCII result
+	; out:	-
+	POP IX			; LIB
+	POP BC			; BC = low-word
+	POP DE			; DE = high-word
+	PUSH IX
+
+	LD IX,(L00D2)
+	BIT 7,H
+	JR Z,PRT_LONG1		; jump if size = positive
+
+	; print LONG as unsigned
+	CALL L0783		; negate HL (size)
+	JR PRT_LONG2
+
+PRT_LONG1:
+	; print LONG as signed
+	PUSH BC
+	EX (SP),HL		; HL = low-word, (SP) = size
+
+         ; DE:HL = value
+         BIT 7,D
+	JR Z,PRT_LONG11		; jump if value = positive
+
+	CALL L_NEG		; negate DE:HL
+	LD (IX+0),'-'              ; print minus sign
+	INC IX
+
+PRT_LONG11:
+	EX (SP),HL		; HL = size, (SP) = low-word
+	POP BC			; BC = low-word
+
+PRT_LONG2:
+
+	; DE:BC = LONG
+	;    HL = size
+	PUSH HL			; push size
+
+         LD H,B
+         LD L,C
+	CALL L2A 		; unsigned LONG to ASCII
+
+	JR L1749
+
+IFDEF USELIB
+
+	GLOBALS L178B
+L178B:   ; WRITE (VAR F: TEXT; B: BOOLEAN);
+         ; LIB, print BOOLEAN
+	POP BC			; LIB
+	POP DE
+	PUSH BC
+	CALL L04C8		; int to byte
+	BIT 0,E
+	LD HL,L17A1		; HL = 'TRUE' text
+	LD C,4			;  C = 4 characters
+	JR NZ,L1759
+	LD HL,L17A5		; HL = 'FALSE' test
+	LD C,5			;  C = 5 characters
+	JR L1759
+
+L17A1:	DB 'TRUE'
+L17A5:	DB 'FALSE'
+
+	GLOBALS L17AA
+L17AA:   ; WRITE (VAR F: TEXT; S: STRING);
+         ; LIB
+         CALL L04C8                 ; int to byte
+	LD HL,2
+	ADD HL,SP
+
+	LD C,(HL)
+	INC HL
+
+         CALL L1759
+
+         POP DE                     ; DE = return address
+
+         LD SP,HL                   ; remove string from stack
+
+         PUSH DE                    ; jump to return address
+	RET
+
+	GLOBALS L17BA
+L17BA:   ; WRITE (VAR F: TEXT; CONSTANT STRING);
+         POP HL                     ; LIB
+	LD A,(HL)
+	INC HL
+	OR A
+	JR Z,L17CC
+	LD B,A
+
+L17C1:	LD A,(HL)
+	PUSH BC
+	PUSH HL
+	CALL L16C6
+	POP HL
+	POP BC
+	INC HL
+	DJNZ L17C1
+
+L17CC:   JP (HL)                    ; jump to return address
+
+	GLOBALS L17CD
+L17CD:   ; WRITELN (VAR F: TEXT);
+         LD A,0DH                   ; LIB, prints CR LF codes
+	CALL L16C6
+	LD A,0AH
+	JP L16C6
+
+	GLOBALS L17D7
+L17D7:	; FUNCTION SeekEoln(VAR F: TEXT): BOOLEAN;
+         LD DE,010DH                ; D = 1 (repeat), search 0Dh
+	JR L17E9
+
+	GLOBALS L17DC
+L17DC:	; FUNCTION Eoln(VAR F: TEXT): BOOLEAN;
+         LD DE,0DH                  ; D = 0 (no repeat), test if 0Dh
+	JR L17E9
+
+	GLOBALS L17E1
+L17E1:	; LIB
+         ; FUNCTION SeekEof(VAR F: TEXT): BOOLEAN;
+         LD DE,011AH                ; D = 1 (repeat), search 1Ah
+	JR L17E9
+
+	GLOBALS L17E6
+L17E6:	; LIB
+         ; FUNCTION Eof(VAR F: TEXT): BOOLEAN;
+         LD DE,1AH                  ; D = 0 (no repeat), test if 1Ah
+
+L17E9:	; in:	HL = FIB address
+	LD (L00E2),HL		; save FIB address
+	BIT 7,(HL)
+	JR Z,L180C		; jump if no input allowed, return False
+
+L17F0:	PUSH DE
+	CALL L156B		; read character from file or device
+	POP DE
+	CP E			; character found
+	JR Z,L1808
+	CP 1AH			; ^Z ?
+	JR Z,L1808		; jump if found, return True
+         CP 21H                     ; >= 33 ? '!'
+	JR NC,L180C		; jump if >= 31, return False
+	INC D
+	DEC D
+	JR Z,L180C		; jump if eof called, return False
+
+	; repeat for seek
+	RES 5,(HL)		; no pre-read character
+	JR L17F0
+
+L1808:	LD HL,1			; return TRUE
+	RET
+
+L180C:	LD HL,0
+	RET			; return FALSE
+
+	GLOBALS L1810
+L1810:	; LIB
+	; PROCEDURE Rewrite(VAR F: FILE OF TYPE);
+	LD A,0AFH		; LIB, LD A,XOR A
+	JP L1812
+
+	GLOBALS L1811
+L1811:	; LIB
+	; PROCEDURE Reset(VAR F: FILE OF TYPE);
+	XOR A			; LIB
+
+L1812:	; in:	HL = FIB address
+	;	DE = record length
+         LD (L00E8),A               ; 0 = reset, NZ = rewrite
+
+         LD (L00E6),DE              ; save record length of typed file
+
+	CALL L187A		; close a typed file
+	LD A,(L00D0)		; read IORESULT
+	OR A
+	RET NZ			; quit if an error occurred
+
+	CALL L1430		; open or create file
+	LD A,(L00D0)		; read IORESULT
+	OR A
+	RET NZ			; quit if an error occurred
+
+	; watch it !!, A = 0
+	LD HL,(L00E2)
+	LD (HL),0D0H		; bit 7 = '1', input allowed
+				; bit 6 = '1', output allowed
+				; bit 5 = '0', no data written to buffer
+				; bit 4 = '1', contents is undefined
+
+         XOR A
+         OFF_HL 0 DOS_PTR
+         LD (HL),A                  ; DOS_PTR = 0
+         INC HL
+         LD (HL),A
+
+         OFF_HL DOS_PTR+1 DOS_CUR
+;	 LD DE,6
+;	 ADD HL,DE
+	LD (HL),A		; FIB_CUR = 0
+	INC HL
+	LD (HL),A
+         INC HL
+         LD (HL),A
+         INC HL
+         LD (HL),A
+
+;         OFF_HL FIB_CUR+1 FIB_FCB+21H ; offset to position in FCB
+;;         LD DE,0024H
+;;         ADD HL,DE
+;         LD (HL),A
+;         INC HL
+;         LD (HL),A
+
+         OFF_HL DOS_CUR+3 DOS_NUM
+;         OFF_HL FIB_FCB+21H+1 FIB_NUM ; offset to FIB_NUM
+;	 LD DE,-42
+;	 ADD HL,DE
+
+	LD A,(L00E8)		; reset or rewrite ?
+	OR A
+	JR NZ,L1864		; jump if rewrite
+
+         OFF_HL DOS_NUM DOS_FCB
+
+         LD B,H                     ; BC = handle/FCB address
+         LD C,L
+         CALL FileSize              ; 33e, TODO L2D22
+
+         PUSH DE
+         PUSH HL
+
+         PUSH DE
+         PUSH HL
+         LD HL,(L00E6)              ; DE:HL = record length
+         LD DE,0
+
+         CALL L_MOD
+         LD A,L
+         OR H
+         OR E
+         OR D
+
+         POP HL
+         POP DE
+         JP NZ,L1860                ; 33e, TODO L1F28
+
+         PUSH DE
+         PUSH HL
+         LD HL,(L00E6)
+         LD DE,0
+         CALL L_DIV                 ; 33e, TODO L0B18
+
+         PUSH DE
+         EX DE,HL
+
+         LD HL,(L00E2)
+         LD BC,DOS_NUM
+         ADD HL,BC
+
+         LD (HL),E
+         INC HL
+         LD (HL),D
+         INC HL
+         POP DE
+         LD (HL),E
+         INC HL
+         LD (HL),D
+         INC HL                     ; HL = address of DOS_REC
+
+         LD DE,(L00E6)
+         LD (HL),E
+         INC HL
+         LD (HL),D
+         RET
+
+
+;         LD BC,FIL_HDR              ; data length
+;         XOR A
+;         CALL L1909                 ; read data, fill FIB_NUM and FIB_
+
+;         POP HL                     ; restore address to FIB_NUM
+
+;         OFF_HL FIB_NUM FIB_REC
+;	 INC HL
+;	 INC HL
+;         LD C,(HL)                  ; BC = record length from file reset
+;         INC HL
+;         LD B,(HL)
+
+;         LD HL,(L00E6)
+;         OR A
+;         SBC HL,BC                  ; file record length = typed length equal
+;         RET Z                      ; record length equal ?
+
+
+L1860:
+	LD A,90H
+	LD (L00D0),A		; IORESULT = 90H, Record length mismatch
+         LD A,3DH
+         LD (ErrorNumber),A         ; 33e, TODO 2BA3
+	RET
+
+L1864:
+; 33e    PUSH HL
+
+	XOR A			; FIB_NUM = 0
+	LD (HL),A
+	INC HL
+	LD (HL),A
+         INC HL
+         LD (HL),A
+         INC HL
+         LD (HL),A
+
+         OFF_HL DOS_NUM+3 DOS_REC
+;	 INC HL
+	LD DE,(L00E6)		; DE = record length
+
+	LD (HL),E		; write record length
+	INC HL
+	LD (HL),D
+         RET
+
+;         POP HL
+;         LD BC,FIL_HDR
+;         LD A,3
+;         JP L1909                   ; write data, FIB_NUM and FIB_REC to file
+
+	GLOBALS L187A
+L187A:	; LIB
+         ; PROCEDURE Close(VAR F: FILE OF TYPE);
+	; closes a typed file
+	; in:	HL = FIB address
+	LD (L00E2),HL		; save FIB address
+	LD A,(HL)
+	AND 0C0H 		; quit if input/output not allowed
+	RET Z
+         JP L1481                   ; CloseFile
+
+;         CALL L19AE                 ; write buffer to current record in FCB
+;                                    ; position unchanged
+;         LD HL,(L00E2)
+;         OFF_HL 0 FIB_FCB+21H
+;;         LD DE,FIB_FCB+21H          ; 002DH, offset to first byte of file pos.
+;;         ADD HL,DE
+;         XOR A
+;         LD (HL),A                  ; reset current file position
+;         INC HL
+;         LD (HL),A
+;
+;         OFF_HL FIB_FCB+21H+1 FIB_PTR
+;;         LD DE,FIB_PTR-(FIB_FCB+21H+1) ; -44
+;	 ADD HL,DE
+;         LD (HL),A                  ; reset sector buffer pointer
+;         OFF_HL FIB_PTR FIB_NUM
+;;         INC HL
+;;         INC HL                     ; HL = address of number of records
+;         LD BC,FIL_HDR              ; 0004
+;         LD A,1
+;         CALL L1909                 ; write data
+;         CALL L19AE                 ; write buffer to current record in FCB
+;                                    ; position unchanged
+;         JP L1481                   ; close file
+
+ENDIF	; USELIB
+
+	GLOBALS L18A4
+L18A4:   EX (SP),HL
+	LD (L00E4),HL
+	EX (SP),HL
+	LD (L00E2),HL
+	LD A,(HL)
+	AND 0C0H 		; read or write flags set?
+	RET NZ			; yes, quit
+
+L18B0:	LD A,4
+	LD (L00D0),A		; IORESULT = 4, File not open
+	RET
+
+         DW 0                       ; ????
+
+IFDEF USELIB
+
+	GLOBALS L18B6
+L18B6:   ; READ (VAR F: FILE OF TYPE)
+         ; in:    HL = destination address for record to read
+	LD A,(L00D0)		; LIB, read IORESULT
+	OR A
+	RET NZ			; quit if an error occurred
+
+         LD BC,1
+         EX DE,HL
+         LD A,21H
+
+L18C0:
+         LD HL,L00F0                ; 33e, TODO L01C2
+         LD (L00E6),HL
+         LD HL,(L00E2)
+         JP L1AFD                   ; 33e, TODO L21A6
+
+;         PUSH HL
+;         CALL L1A5A                 ; HL = number of records
+;                                    ; DE = current record
+;                                    ; BC = record length
+;         EX DE,HL
+;         OR A
+;         SBC HL,DE                  ; current >= number of records ?
+;         POP HL
+;         JR NC,L18D6                ; jump if Unexpected end-of-file
+;         XOR A
+;         CALL L1909                 ; read data
+;
+L18CA:
+;         LD HL,(L00E2)              ; HL = FIB address
+;         OFF_HL 0 FIB_CUR
+;;         LD DE,0008
+;;         ADD HL,DE
+;         INC (HL)                   ; increase low byte of current record
+;         RET NZ
+;         INC HL
+;         INC (HL)                   ; increase high byte of current record
+;         RET
+
+L18D6:	LD A,99H
+	LD (L00D0),A		; IORESULT = 99H, Unexpected end-of-file
+         LD A,0C7H
+         LD (ErrorNumber),A         ; 33e, TODO L2BA3
+	RET
+
+	GLOBALS L18DC
+L18DC:   ; WRITE (VAR F: FILE OF TYPE)
+         ; in:    HL = source address of record to write
+         ; LIB
+	LD A,(L00D0)		; read IORESULT
+	OR A
+	RET NZ			; quit if an error occurred
+         LD BC,1
+         EX DE,HL
+         LD A,22H
+         JP L18C0
+
+;         PUSH HL
+;         CALL L1A5A                 ; HL = number of records
+;                                    ; DE = current record
+;                                    ; BC = record length
+;         OR A
+;         SBC HL,DE                  ; number = current ?
+;         LD A,1                     ; write data
+;         JR NZ,L18FC                ; jump if not equal
+;
+;         ; increase the number of records
+;         LD HL,(L00E2)
+;         OFF_HL 0 FIB_NUM
+;;         LD DE,0004
+;;         ADD HL,DE
+;         INC (HL)                   ; increase low-byte of position
+;         JR NZ,L18FA
+;         INC HL
+;         INC (HL)                   ; increase high-byte of position
+;         JR Z,L1902                 ; jump if File size overflow
+;
+;L18FA:   LD A,3                     ; write data + append ?
+;
+;L18FC:   POP HL
+;         CALL L1909                 ; write data
+;         JR L18CA                   ; jump to increase the current record
+;
+;L1902:   POP HL
+;         LD A,0F2H
+;         LD (L00D0),A               ; IORESULT = 0F2H, File size overflow
+;         RET
+;
+;L1909:   ; in:    HL = destination/source address for data
+;         ;        A, bit 0 = '1' for copy data from HL to buffer
+;         ;        A, bit 0 = '0' for copy data from buffer to HL
+;         LD (L00E9),A
+;         EX DE,HL                   ; DE = address FIB_NUM
+;
+;L190D:   LD HL,(L00E2)              ; HL = FIB address
+;         BIT 4,(HL)
+;         JR Z,L1943                 ; jump if buffer contents is defined
+;
+;         RES 4,(HL)
+;         LD A,(L00E9)
+;         BIT 0,A
+;         JR Z,L1935                 ; jump if to copy data from the buffer
+;
+;         OFF_HL 0 FIB_PTR
+;;         INC HL
+;;         INC HL
+;         LD A,(HL)                  ; A = low byte of sector buffer pointer
+;         OFF_HL FIB_PTR 0
+;;         DEC HL
+;;         DEC HL
+;         OR A
+;         JR NZ,L1935                ; jump if buffer not empty
+;
+;         LD A,(L00E9)
+;         BIT 1,A
+;         JR NZ,L1943
+;         LD A,B
+;         OR A
+;         JR NZ,L1943
+;         LD A,C
+;         OR A
+;         JP M,L1943
+;
+;L1935:   PUSH BC
+;         PUSH DE
+;         LD C,21H
+;         CALL L19BA                 ; random read from current position
+;                                    ; to FIB_BUF
+;         POP DE
+;         POP BC
+;         JR NZ,L1991                ; jump if Unexpected end-of-file
+;         LD HL,(L00E2)              ; HL = FIB address
+;
+;L1943:   LD A,(L00E9)
+;         BIT 0,A
+;         JR Z,L194C
+;         SET 5,(HL)                 ; data has been written to the buffer
+;
+;L194C:   OFF_HL 0 FIB_PTR
+;;         INC HL
+;;         INC HL
+;         LD A,(HL)                  ; A = low byte sector buffer pointer
+;         ADD A,FIB_BUF-FIB_PTR      ; 2EH
+;         PUSH DE
+;         LD E,A
+;         LD D,0
+;         ADD HL,DE                  ; HL = address within buffer
+;         POP DE                     ; DE = address FIB_NUM
+;         SUB 2EH
+;         CALL L199A                 ; swap HL,DE if L00E9,0 = 1
+;
+;         ; BC = number of byte to copy, (mostly 4 = FIL_HDR)
+;L195C:   LDI                        ; copy from FIB_NUM to buffer or <-->
+;IFDEF MSX
+;         JP PO,L1966                ; jump if BC = 0, PO
+;ELSE
+;         JP C,L1966                 ; jump if BC = 0, PO
+;ENDIF
+;         INC A                      ; increase current pointer
+;         JP P,L195C
+;         DEC A
+;L1966:   INC A
+;
+;         CALL L199A                 ; swap HL,DE if L00E9,0 = 1
+;         LD HL,(L00E2)
+;         OFF_HL 0 FIB_PTR
+;;         INC HL
+;;         INC HL
+;         AND 7FH                    ; modulo 128
+;         LD (HL),A                  ; write new sector buffer pointer
+;         JR NZ,L198A
+;
+;         ; write complete buffer to disk if sector buffer pointer wrapped around
+;         PUSH BC
+;         PUSH DE
+;         PUSH HL
+;         CALL L19AE                 ; write buffer to current record in FCB
+;                                    ; position unchanged
+;         POP HL
+;         POP DE
+;         POP BC
+;         JR NZ,L1994                ; jump if write error
+;
+;         PUSH DE
+;         OFF_HL FIB_PTR FIB_FCB+21H ; offset to first byte of file position
+;;         LD DE,002BH
+;;         ADD HL,DE
+;         POP DE
+;         INC (HL)                   ; increase low byte
+;         JR NZ,L198A
+;         INC HL
+;         INC (HL)                   ; increase high byte
+;
+;L198A:   LD A,B
+;         OR C
+;         JP NZ,L190D                ; repeat until BC = 0
+;         EX DE,HL
+;         RET
+;
+;L1991:   LD A,99H                   ; IORESULT = 99H, Unexpected end-of-file
+;
+;IFDEF MSX
+;         DB 1                       ; opcode of 'LD BC,', eats 'LD A,0F0H'
+;ELSE
+;;!       jmp near ptr L1996
+;ENDIF
+;
+;L1994:   LD A,0F0H
+;L1996:   LD (L00D0),A               ; IORESULT = 0F0H, Disk write error
+;         RET
+;
+;L199A:   PUSH AF
+;         LD A,(L00E9)
+;         BIT 0,A
+;         JR Z,L19A3
+;         EX DE,HL
+;L19A3:   POP AF
+;         RET
+
+	GLOBALS L19A5
+L19A5:   ; FLUSH (VAR F: FILE OF TYPE)
+         RET
+;         LD (L00E2),HL              ; LIB
+;         CALL L19AE                 ; write buffer to current record in FCB
+;                                    ; position unchanged
+;         RET Z                      ; return if no error
+;         JR L1994
+
+; 33e MARK START 1F93
+L19AE:	; random write a changed buffer to the current position
+	; according to the FCB
+	LD C,22H 		; random write
+	LD HL,(L00E2)
+	SET 4,(HL)		; read semaphore = 1, buffer undefined
+	BIT 5,(HL)		; write semephore = 1 ?
+	RET Z			; return if no data was written in buffer
+	; some data was written to the buffer
+	RES 5,(HL)
+
+ENDIF	; USELIB
+
+L19BA:	; write FIB_BUF to current position according to FCB
+	LD HL,(L00E2)		; HL = address of FIB
+	PUSH HL
+	PUSH BC			; save record to write
+
+         OFF_HL 0 DOS_BUF
+;	 LD DE,FIB_BUF		 ; offset to BUFFER
+;	 ADD HL,DE
+	EX DE,HL
+	LD C,1AH 		; C = set dma at FIB buffer
+	CALL MSXDOS
+
+	POP BC
+	POP HL
+         OFF_HL 0 DOS_FCB
+;         LD DE,DOS_FCB              ; offset to FCB
+;	 ADD HL,DE
+	EX DE,HL
+	CALL MSXDOS
+	OR A
+	RET
+; 33e MARK END 1FBE
+
+IFDEF USELIB
+
+	GLOBALS L19D5
+L19D5:   ; SEEK (VAR F: FILE OF TYPE; Pos: INTEGER);
+         ; LIB
+	; seek typed file
+	; in:	FIB address at stack
+	;	HL = position to seek to
+
+         JP L1B6F                   ; 33e TODO L21C8, SeekFile
+
+;         POP BC
+;         POP DE
+;         LD (L00E2),DE              ; save FIB address
+;         PUSH BC
+;         PUSH HL                    ; save position
+;
+;         CALL L1A5A                 ; HL = number of records
+;                                    ; DE = current record
+;                                    ; BC = record length
+;
+;         POP DE                     ; restore DE = position
+;
+;         OR A
+;         SBC HL,DE                  ; number - position
+;         JR C,L1A26                 ; jump if Seek beyond end-of-file
+;
+;         LD HL,(L00E2)
+;         LD BC,FIB_REC              ; offset to record length
+;         ADD HL,BC
+;         LD C,(HL)                  ; BC = record length
+;         INC HL
+;         LD B,(HL)
+;         INC HL
+;         LD (HL),E                  ; set new positon
+;         INC HL
+;         LD (HL),D
+
+	CALL L1A2C		; DE:HL = DE (current) * BC (length)
+
+	LD BC,FIL_HDR		; DE:HL = DE:HL + length of file header
+	ADD HL,BC
+	JR NC,L19FE
+	INC DE
+L19FE:	LD A,L			; A = byte units
+	AND 7FH
+
+	ADD HL,HL		; DE:HL * 2
+	EX DE,HL
+	ADC HL,HL
+	EX DE,HL
+
+	LD D,E			; DE = 128 bytes record number
+	LD E,H
+
+	LD HL,(L00E2)
+	OFF_HL 0 FIB_PTR
+;	 INC HL
+;	 INC HL
+	LD (HL),A		; set new FIB_PTR
+
+	OFF_HL FIB_PTR FIB_FCB+21H
+;	 LD BC,FIB_FCB-FIB_PTR + 21H; 002BH, low byte of file position in FCB
+;	 ADD HL,BC
+	LD C,(HL)		; BC = previous file position
+	INC HL
+	LD B,(HL)
+	EX DE,HL 		; HL = new position
+				; DE = address of high byte of file pos
+	OR A
+	SBC HL,BC		; previous == new position ?
+;!	pushf
+	ADD HL,BC		; restore
+;!	popf
+	RET Z			; yes, quit
+
+	PUSH DE
+	PUSH HL
+	CALL L19AE		; update current record in FCB
+				; position unchanged
+	POP DE
+	POP HL			; HL = address of high byte of file pos.
+	LD (HL),D		; write new file position
+	DEC HL
+	LD (HL),E
+	RET
+
+ENDIF	; USELIB
+
+
+L1A26:	LD A,91H
+	LD (L00D0),A		;  IORESULT = 91H, Seek beyond end-of-file
+	RET
+
+
+IFDEF USELIB
+
+L1A2C:	; in:	DE = current record
+	;	BC = record length
+	; out:	DE:HL = DE * BC
+	PUSH DE
+	EXX
+	POP HL			; HL' = current record
+	EXX
+	LD HL,0000
+	LD D,H
+	LD E,L
+	LD A,10H
+L1A37:	ADD HL,HL
+	EX DE,HL
+	ADC HL,HL
+	EX DE,HL
+	EXX
+	ADD HL,HL
+	EXX
+	JR NC,L1A45
+	ADD HL,BC
+	JR NC,L1A45
+	INC DE
+
+L1A45:	DEC A
+	JR NZ,L1A37
+	RET
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L1A49
+L1A49:   ; LIB
+	; typed and untyped files
+	; FUNCTION Eof(VAR F: FILE): BOOLEAN;
+	; in:	HL = FIB address
+
+         PUSH HL
+         CALL L1A5D
+         POP BC
+
+         PUSH DE                    ; push number of records: DE:HL
+         PUSH HL
+
+         LD H,B
+         LD L,C
+
+         CALL L1A55                 ; get current record number: DE:HL
+
+         PUSH BC
+         CALL L_CMP
+         POP BC
+         JP L0682
+
+         GLOBALS L1A55
+L1A55:	; LIB
+	; typed file
+	; FUNCTION FilePos(VAR F: FILE OF TYPE): INTEGER;
+         ; FUNCTION FilePos(VAR F: FILE): INTEGER;
+
+         ; in:     HL = FIB address
+         ; out:    BC = record length
+         ;      DE:HL = current record
+
+         OFF_HL 0 DOS_REC
+
+         LD C,(HL)
+         INC HL
+         LD B,(HL)
+         INC HL
+         LD E,(HL)
+         INC HL
+         LD D,(HL)
+         INC HL
+         LD A,(HL)
+         INC HL
+         LD H,(HL)
+         LD L,A
+         EX DE,HL
+
+         RET
+
+L1A5A:   LD HL,(L00E2)              ; address of FIB
+
+         GLOBALS L1A5D
+L1A5D:	; LIB
+	; FUNCTION FileSize(VAR F: FILE OF TYPE): INTEGER;
+         ; FUNCTION FileSize(VAR F: FILE): INTEGER;
+
+         ; in:     HL = FIB address
+         ; out:    BC = record length
+         ;      DE:HL = number of records
+
+         OFF_HL 0 DOS_REC+1
+
+         LD B,(HL)
+         DEC HL
+         LD C,(HL)
+         DEC HL
+         LD D,(HL)
+         DEC HL
+         LD E,(HL)
+         DEC HL
+         LD A,(HL)
+         DEC HL
+         LD L,(HL)
+         LD H,A
+
+         RET
+
+;         CALL L1A5D                 ; HL = number of records
+;                                    ; DE = current record
+;                                    ; BC = record length
+;
+;         OR A
+;         SBC HL,DE                  ; total records == current record ?
+;
+;         LD HL,0000                 ; assume FALSE
+;         RET NZ                     ; return if false
+;
+;         INC HL                     ; return TRUE
+;         RET
+
+;         GLOBALS L1A55
+;L1A55:   ; LIB
+;         ; typed file
+;         ; FUNCTION FilePos(VAR F: FILE OF TYPE): INTEGER;
+;         ; FUNCTION FilePos(VAR F: FILE): INTEGER;
+;         CALL L1A5D                 ; HL = number of records
+;                                    ; DE = current record
+;                                    ; BC = record length
+;         EX DE,HL                   ; return HL = current record
+;         RET
+;
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+;L1A5A:   LD HL,(L00E2)              ; address of FIB
+;
+;         GLOBALS L1A5D
+;L1A5D:   ; LIB
+;         ; FUNCTION FileSize(VAR F: FILE OF TYPE): INTEGER;
+;         ; FUNCTION FileSize(VAR F: FILE): INTEGER;
+;         ; in:    HL = address of FIB
+;         ; out:   HL = number of records
+;         ;        DE = current record
+;         ;        BC = record length
+;         OFF_HL 0 FIB_NUM
+;;         LD DE,FIB_NUM              ; offset to number of records
+;;         ADD HL,DE
+;         LD E,(HL)                  ; DE = number of records
+;         INC HL
+;         LD D,(HL)
+;         OFF_HL FIB_NUM+1 FIB_REC
+;;         INC HL
+;         PUSH DE                    ; push number of records
+;
+;         LD C,(HL)                  ; BC = record length
+;         INC HL
+;         LD B,(HL)
+;         OFF_HL FIB_REC+1 FIB_CUR
+;;         INC HL
+;
+;         LD E,(HL)                  ; DE = current record
+;         INC HL
+;         LD D,(HL)
+;
+;         POP HL                     ; HL = number of records
+;         RET
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L1A6F
+L1A6F:	; LIB
+	; PROCEDURE Rewrite(VAR F: FILE);
+	; rewrites an untyped file
+	LD A,0AFH
+	JP L1A71
+
+	GLOBALS L1A70
+L1A70:	; LIB
+	; PROCEDURE Reset(VAR F: FILE);
+	; resets an untyped file
+	XOR A
+
+L1A71:   ; in:    HL = record size
+         ;        FIB address on stack
+	LD (L00E8),A
+         LD (L00E6),HL              ; save record size
+
+         POP IY
+         POP HL                     ; HL = FIB address
+         PUSH IY
+
+	CALL L1AB0		; close an untyped file
+	LD A,(L00D0)		; read IORESULT
+	OR A
+	RET NZ			; quit if an error occurred
+
+	CALL L1430		; open or create file
+	LD A,(L00D0)		; read IORESULT
+	OR A
+	RET NZ			; quit if an error occurred
+
+	LD HL,(L00E2)
+	LD (HL),0C0H		; input and output allowed
+;         PUSH HL
+
+         OFF_HL 0 DOS_PTR
+         LD (HL),0
+         INC HL
+         LD (HL),0
+
+         OFF_HL DOS_PTR+1 DOS_BLEN
+         LD (HL),128
+         INC HL
+         LD (HL),0
+
+         OFF_HL DOS_BLEN+1 DOS_NUM
+         PUSH HL                    ; save position of number of records
+
+         OFF_HL DOS_NUM DOS_FCB
+         LD B,H
+         LD C,L
+         CALL FileSize              ; 33e, L2D22 FileSize ?
+
+         PUSH DE                    ; push filesize: DE:HL
+         PUSH HL
+
+         LD HL,(L00E6)              ; DE:HL = record size
+         LD DE,0
+         CALL L_DIV
+         LD B,H
+         LD C,L
+
+         POP HL                     ; HL = address of DOS_NUM
+         LD (HL),C
+         INC HL
+         LD (HL),B
+         INC HL
+         LD (HL),E
+         INC HL
+         LD (HL),D
+
+         OFF_HL DOS_NUM+3 DOS_REC
+
+         LD DE,(L00E6)              ; DE = record size
+         LD (HL),E
+         INC HL
+         LD (HL),D
+
+         OFF_HL DOS_REC+1 DOS_CUR
+;         XOR A                     ; 33e, TODO error ?
+         LD (HL),A
+         INC HL
+         LD (HL),A
+         INC HL
+         LD (HL),A
+         INC HL
+         LD (HL),A
+
+         RET
+
+;         OFF_HL 0 FIB_FCB
+;;         LD DE,000CH                ; length of FIB header
+;;         ADD HL,DE
+;         EX DE,HL
+;         LD C,23H                   ; C = get file size
+;         CALL MSXDOS
+;         POP HL
+;
+;         OFF_HL 0 FIB_FCB+21H       ; offset to first byte of file size
+;;         LD DE,FIB_FCB+21H          ; 002DH, offset to first byte of file pos.
+;;         ADD HL,DE
+;         XOR A
+;         LD C,(HL)                  ; BC = file size and reset file pos.
+;         LD (HL),A
+;         INC HL
+;         LD B,(HL)
+;         LD (HL),A
+;
+;         OFF_HL FIB_FCB+21H+1 FIB_NUM
+;;         LD DE,-42
+;;         ADD HL,DE
+;         LD (HL),C                  ; write file size in FIB_NUM
+;         INC HL
+;         LD (HL),B
+;
+;         OFF_HL FIB_NUM+1 FIB_REC
+;;         INC HL
+;         LD (HL),80H                ; FIB_REC = 128 bytes per record
+;         INC HL
+;         LD (HL),A
+;
+;         OFF_HL FIB_REC+1 FIB_CUR
+;;         INC HL
+;         LD (HL),A                  ; FIB_CUR = 0
+;         INC HL
+;         LD (HL),A
+;         RET
+;
+	GLOBALS L1AB0
+L1AB0:	; LIB
+	; PROCEDURE Close(VAR F: FILE);
+	; closes an untyped file
+	; in:	HL = FIB address
+	LD (L00E2),HL		; save FIB address
+	LD A,(HL)
+	AND 0C0H 		; input/output allowed ?
+	RET Z			; return if not allowed
+
+	JP L1481 		; close file
+
+	GLOBALS L1ABA
+L1ABA:	; PROCEDURE BlockWrite(VAR F: FILE; VAR Dest: Type; Num: INTEGER);
+	LD A,22H
+	JR L1AC0
+
+	GLOBALS L1ABE
+L1ABE:	; PROCEDURE BlockRead(VAR F: FILE; VAR Dest: Type; Num: INTEGER);
+	LD A,21H
+
+L1AC0:	LD B,H			; BC = Num parameter
+	LD C,L
+	LD HL,L00F0		; dummy address for result parameter
+	LD (L00E6),HL
+
+         XOR A
+         LD (L00D0),A
+
+	POP IX			; return address
+	POP DE			; DE = destination address
+	POP HL			; HL = address of FIB
+	PUSH IX			; restore return address
+
+	PUSH BC			; save Num
+	CALL L1AFD		; perform real blockread
+	POP BC
+         RET NZ
+
+	LD A,(L00D0)		; read IORESULT
+	OR A
+	RET NZ			; quit if an error occurred
+
+	LD HL,(L00F0)
+	SBC HL,BC
+	RET Z
+
+	LD A,(L00E9)		; 21H = random read, 22H = random write
+	CP 21H
+
+;         LD A,99H                   ; IORESULT = 99H, Unexpected end-of-file
+         JP Z,L18D6
+
+	LD A,0F0H		; IORESULT = 0F0H, Disk write error
+
+L1AE9:	LD (L00D0),A		; set IORESULT
+	RET
+
+; 33e, used ????
+L20FD:
+         CALL L0A1A
+         LD A,H
+         OR L
+         RET Z
+         PUSH BC
+         EX DE,HL
+         LD B,H
+         LD C,L
+         LD HL,0
+
+L210A:
+         ADD HL,BC
+         DEC DE
+         LD A,D
+         OR E
+         JR NZ,L210A
+
+         POP BC
+         RET
+
+L2112:
+         PUSH DE                    ; save FIB address
+
+         OFF_HL 0 DOS_REC
+
+         LD A,(HL)                  ; HL = record size
+         INC HL
+         LD H,(HL)
+         LD L,A
+
+         POP DE
+
+         JP L20FD
+
+L2121:   PUSH HL                    ; HL = FIB address
+
+         PUSH DE
+
+         EX DE,HL
+         LD HL,DOS_FCB
+         ADD HL,DE
+         EX DE,HL
+
+         PUSH DE
+
+         LD D,B
+         LD E,C
+
+         CALL L2112
+
+         POP BC
+         POP DE
+         CALL L218B                 ; 33e, TODO L218B
+
+         EX DE,HL
+
+         POP HL                     ; HL = FIB address
+
+         RET NZ
+
+         PUSH HL                    ; HL = FIB address
+
+         LD BC,0
+         PUSH BC
+         PUSH DE
+
+         OFF_HL 0 DOS_REC
+
+         LD E,(HL)                  ; DE = record length
+         INC HL
+         LD D,(HL)
+
+         EX DE,HL
+         LD DE,0
+
+         CALL L_DIV
+
+         LD B,H
+         LD C,L
+
+         POP HL                     ; HL = FIB address
+
+         OFF_HL 0 DOS_CUR
+
+         PUSH BC
+         PUSH HL
+
+         LD A,(HL)
+         ADD A,C
+         LD (HL),A
+         INC HL
+
+         LD A,(HL)
+         ADC A,B
+         LD (HL),A
+         INC HL
+
+         LD A,(HL)
+         ADC A,0
+         LD (HL),A
+         INC HL
+
+         LD A,(HL)
+         ADC A,0
+         LD (HL),A
+
+         POP DE
+
+         LD A,(L00E9)
+         CP 21H
+         JR Z,L2188
+
+         EX DE,HL
+
+         OFF_HL DOS_CUR DOS_NUM+3
+
+         LD BC,4
+L2178:
+         LD A,(DE)
+         CP (HL)
+         JR C,L2188
+         JR NZ,L2185
+
+         DEC DE
+         DEC HL
+         DEC C
+         JR NZ,L2178
+         JR L2188
+
+L2185:   EX DE,HL
+         LDDR
+
+L2188:
+         POP HL
+         XOR A
+         RET
+
+L218B:   LD A,(L00E9)
+         CP 21H
+         JP Z,ReadFile              ; 33e, TODO L2D62
+         JP WriteFile               ; 33e, TODO L2D8E
+
+; 33e
+
+	GLOBALS L1AED
+L1AED:	; PROCEDURE BlockWrite(VAR F: FILE; VAR Dest: Type; Num: INTEGER;
+	;		     VAR Result: INTEGER);
+	LD A,22H
+	JR L1AF3
+
+	GLOBALS L1AF1
+L1AF1:	; PROCEDURE BlockRead(VAR F: FILE; VAR Dest: Type; Num: INTEGER;
+	;		    VAR Result: INTEGER);
+	LD A,21H
+
+L1AF3:	LD (L00E6),HL		; save address of result parameter
+	POP IX
+	POP BC			; BC = Num parameter
+	POP DE			; DE = destination/source address
+	POP HL			; HL = FIB address
+	PUSH IX
+
+L1AFD:	; in:	HL = FIB address
+	;	DE = destination/source address
+	;	BC = number of records of 128 bytes to read
+	LD (L00E9),A		; 21H = random read, 22H = random write
+         LD (L00E2),HL              ; save FIB address
+	LD A,(HL)
+	AND 0C0H 		; read or write flags set ?
+	JP Z,L18B0		; jump if both are not set, File not open
+				; input and/or output allowed
+
+	LD HL,(L00E6)		; HL = address of read record count
+	XOR A
+	LD (HL),A		; zero records read
+	INC HL
+	LD (HL),A
+
+         LD HL,(L00E2)
+         CALL L2121
+         RET NZ
+
+         EX DE,HL
+         LD HL,(L00E6)
+         LD (HL),E
+         INC HL
+         LD (HL),D
+         RET
+
+; hier ben ik
+
+;L1B10:   LD A,B
+;         OR C
+;         JR Z,L1B4D                 ; quit if count = 0
+;
+;         PUSH BC
+;         PUSH DE
+;
+;         LD C,1AH                   ; C = set dma
+;         CALL MSXDOS
+;         LD HL,(L00E2)
+;         OFF_HL 0 FIB_FCB
+;;         LD DE,FIB_FCB              ; length of FIB header
+;;         ADD HL,DE
+;
+;         EX DE,HL                   ; DE = address of FIB
+;         LD A,(L00E9)               ; random read/write
+;         LD C,A
+;         CALL MSXDOS
+;
+;         POP DE
+;         POP BC
+;         OR A
+;         JR NZ,L1B4D                ; jump if error
+;
+;         PUSH DE
+;         LD HL,(L00E2)
+;         OFF_HL 0 FIB_FCB+21H
+;;         LD DE,FIB_FCB+21H          ; 002DH, offset to first byte of file pos.
+;;         ADD HL,DE
+;         INC (HL)                   ; increase low byte
+;         JR NZ,L1B3C
+;         INC HL
+;         INC (HL)                   ; increase high byte
+;
+;L1B3C:   POP DE
+;         LD HL,128                  ; next DMA address
+;         ADD HL,DE
+;         EX DE,HL
+;
+;         LD HL,(L00E6)              ; increase number of records read
+;         INC (HL)                   ; low byte
+;         JR NZ,L1B4A
+;         INC HL
+;         INC (HL)                   ; high byte
+;
+;L1B4A:   DEC BC                     ; decrease records to go
+;         JR L1B10
+;
+;L1B4D:   LD HL,(L00E2)
+;         OFF_HL 0 FIB_FCB+21H
+;;         LD DE,FIB_FCB+21H          ; 002DH, offset to first byte of file pos.
+;;         ADD HL,DE
+;         LD C,(HL)                  ; BC = updated current record in FCB
+;         INC HL
+;         LD B,(HL)
+;
+;         OFF_HL FIB_FCB+21H+1 FIB_CUR
+;;         LD DE,FIB_CUR-(FIB_FCB+21H+1) ; -38, HL = address of current record
+;;         ADD HL,DE
+;         LD (HL),C                  ; copy to the FIB current record
+;         INC HL
+;         LD (HL),B
+;
+;         OFF_HL FIB_CUR+1 FIB_NUM+1
+;;         LD DE,FIB_NUM-FIB_CUR      ; -4, HL = address of number of records
+;	 ADD HL,DE
+;         LD D,(HL)
+;         DEC HL
+;         LD E,(HL)
+;         EX DE,HL                   ; HL = number of records
+;         OR A
+;         SBC HL,BC                  ; current record <= number of records ?
+;         RET NC                     ; return and don't increase it
+;         EX DE,HL
+;         LD (HL),C                  ; update to a new number of records
+;         INC HL
+;         LD (HL),B
+;         RET
+
+	GLOBALS L1B6F
+L1B6F:   ; SEEK (VAR F: FILE; Pos: INTEGER);
+         ; LIB
+	; seek untyped file
+	; in:	FIB address at stack
+         ;        DE:HL = position to seek to
+         POP IX
+         POP BC
+         LD (L00E2),BC              ; save FIB address
+         PUSH IX
+
+         PUSH DE
+	PUSH HL
+
+         PUSH DE
+         PUSH HL
+
+         CALL L1A5A                 ; FileSize
+
+         PUSH BC
+         CALL L_CMP                 ; Pos > FileSize ?
+         POP BC
+
+         JR C,L1B72
+         JR NZ,L2212
+
+L1B72:
+         POP DE
+         LD H,B
+         LD L,C
+         EX (SP),HL
+         PUSH DE
+         LD B,H
+         LD C,L
+
+         LD HL,(L00E2)              ; HL = FIB address
+         OFF_HL 0 DOS_CUR+3
+
+         POP DE
+         LD (HL),D
+         DEC HL
+         LD (HL),E
+         DEC HL
+         LD (HL),B
+         DEC HL
+         LD (HL),C
+
+         LD HL,0
+         EX (SP),HL
+         PUSH HL
+
+         LD H,B
+         LD L,C
+
+         CALL L_MUL
+
+         PUSH HL                    ; save low-word
+
+         LD HL,(L00E2)
+         LD BC,DOS_FCB
+         ADD HL,BC
+         LD B,H
+         LD C,L
+
+         POP HL                     ; restore low-word
+
+         CALL FileSeek              ; L2CCD
+
+         RET
+
+; 33e 2212
+L2212:
+         POP HL
+         POP DE
+         JP L1A26
+
+;         CALL L1A5A                 ; HL = number of records
+;                                    ; DE = current record
+;                                    ; BC = record length
+;         POP DE
+;         OR A
+;         SBC HL,DE
+;         JP C,L1A26                 ; jump if Seek beyond end-of-file
+;
+;         LD HL,(L00E2)
+;         LD BC,FIB_CUR
+;         ADD HL,BC                  ; offset to current record
+;         LD (HL),E                  ; set new position
+;         INC HL
+;         LD (HL),D
+;
+;         LD BC,FIB_FCB+21H-(FIB_CUR+1); 0024H, address of file position in FCB
+;         ADD HL,BC
+;         LD (HL),E                  ; set new position in FCB, 128 byte records
+;         INC HL
+;         LD (HL),D
+;         RET
+
+; 33e 2217
+	GLOBALS L1B93
+L1B93:	; LIB
+	; PROCEDURE Erase(VAR F: FILE);
+	CALL L1C4C		; check on a logical device
+	RET NZ			; return if it is a logical device
+
+         OFF_HL 0 DOS_FCB+1         ; address of filename
+
+         EX DE,HL
+         CALL DeleteFile
+;	 LD DE,000CH		 ; length of FIB header
+;	 ADD HL,DE
+;         EX DE,HL
+;         LD C,13H                   ; C = file delete
+;         CALL MSXDOS
+;         INC A
+         RET Z                      ; return if no error
+
+         JP L1BE4                   ; jump if error, File does not exist
+
+; 33e 2229
+         GLOBALS RenameFile_LIB
+RenameFile_LIB:
+         ; PROCEDURE RenameFile(OldName: STRING; NewName: STRING);
+         POP IY                     ; IY = return address
+
+         LD HL,(L00D2)              ; TEMP address for NewName
+         LD B,63                    ; maximum string length
+         CALL L05E2                 ; pop NewName from stack
+         XOR A
+         LD (DE),A                  ; make ASCIIZ string
+         LD HL,(L00D2)
+         LD DE,64
+         ADD HL,DE
+         LD B,63                    ; maximum string length
+         CALL L05E2                 ; pop OldName from stack
+         XOR A
+         LD (DE),A                  ; make ASCIIZ string
+
+         PUSH IY                    ; restore return address
+
+         LD DE,(L00D2)              ; DE = (L00D2)
+         LD HL,64
+         ADD HL,DE                  ; HL = (L00D2) + 64
+         INC HL
+         INC DE
+         EX DE,HL                   ; DE = old Drive/path/file ASCIIZ string
+                                    ; HL = new filename ASCIIZ string
+         JP RenameFile
+
+; 33e 2253
+	GLOBALS L1BA5
+L1BA5:	; LIB
+	; rename(var F: file; Name: string);
+	POP IY			; IY = return address
+         LD HL,(L00D2)              ; HL = destination address of string
+         LD B,63                    ; maximum of 63 bytes
+         CALL L05E2                 ; LIB, pop string from stack
+	XOR A
+	LD (DE),A		; zero byte direct after string
+
+	POP HL			; HL = FIB address
+	PUSH IY			; restore return address
+
+	CALL L1C4C		; check on a logical device
+	RET NZ			; return if it is a logical device
+
+         OFF_HL 0 DOS_FCB+1         ; HL = address of filename in handle/FCB
+         EX DE,HL                   ; DE = address of old filename
+
+         LD HL,(L00D2)
+         INC HL                     ; HL = address of new filename
+
+         CALL RenameFile
+         RET Z                      ; quit if succeeded
+
+         JP L1BE4                   ; set IORESULT = 1
+
+;         PUSH HL
+;
+;         CALL L03F2                 ; parse filename at address in L00D2 without
+;                                    ; wildcards to FCB at L005C
+;
+;         POP HL
+;         PUSH HL
+;         OFF_HL 0 FIB_FCB+16        ; fill second half of FCB with new name
+;;         LD DE,001CH
+;;         ADD HL,DE
+;         EX DE,HL
+;         LD HL,L005C
+;         LD BC,12                   ; drive, name and extension
+;         LDIR                       ; copy new name to second half at FIB_FCB
+;         POP HL
+;         OFF_HL 0 FIB_FCB
+;;         LD DE,FIB_FCB              ; offset to FCB
+;;         ADD HL,DE
+;         PUSH HL
+;
+;         EX DE,HL
+;         LD C,17H                   ; C = file rename
+;         CALL MSXDOS
+;         POP DE
+;         INC A
+;         JR Z,L1BE4                 ; jump if error, File does not exist
+;
+;         LD HL,L005C
+;         LD BC,FCB_LEN
+;         LDIR                       ; copy FCB with new name to FIB_FCB address
+;         RET
+
+; 33e, 2278
+
+L1BE4:	LD A,1			; IORESULT = 1, File does not exist
+
+L1BE6:	LD (L00D0),A
+	RET
+
+	GLOBALS L1BEA
+L1BEA:	; PROCEDURE Execute(VAR F: FILE);
+	LD A,0AFH		; LIB, LD A,XOR A
+	JR L1BEC
+
+	GLOBALS L1BEB
+L1BEB:	; PROCEDURE Chain(F: FILE);
+	XOR A			; LIB
+
+L1BEC:	LD (L00E8),A		; 0 = Chain, NonZero = Execute
+
+	CALL L1C4C		; check on a logical device
+	RET NZ			; return if it is a logical device
+
+;         LD A,(L00D8)               ; running from compiler memory mode ?
+;         OR A
+;         LD A,21H                   ; IORESULT = 21H, Not Allowed in direct mode
+;         JR Z,L1BE6
+
+	LD HL,(L00E2)
+         OFF_HL 0 DOS_FCB+1
+
+         LD DE,(L00D2)
+         LD A,' '
+         LD BC,' '*256 + ' '
+         CALL OpenFile
+         JP NZ,L1BE4                ; IORESULT = 1, File does not exist
+
+         LD B,H
+         LD C,L
+         CALL FileSize
+
+         LD DE,L0100
+         LD A,(L00E8)
+         OR A
+         JR NZ,L1C2D                ; nonzero, do Execute
+         LD DE,(L0101)
+
+L1C2D:
+         CALL ReadFile
+
+;;         LD DE,FIB_FCB              ; length of FIB header
+;;         ADD HL,DE
+;         LD DE,005CH                ; !!!
+;         LD BC,FCB_LEN              ; 37 bytes for a FCB !!!
+;         LDIR
+;         XOR A
+;         LD (DE),A                  ; reset 4th byte of file position
+;         LD DE,005CH                ; !!!
+;         LD C,0FH                   ; C = file open
+;         CALL MSXDOS
+;         INC A
+;         JR Z,L1BE4                 ; jump if error, File does not exist
+;IFDEF MSX
+;         LD HL,1
+;         LD (006AH),HL              ; FCB + 14 = record size
+;ENDIF
+;         LD HL,L1C33
+;         LD DE,00B0H                ; load code at some neutral address
+;                                    ; at least outside the program
+;                                    ; AUXINPTR+1
+;         LD BC,L1C33_A-L1C33        ; maximum of 100H-0B0H bytes !!!
+;         LDIR
+;
+;         LD DE,L0100                ; assume load from 100H, Execute
+;         LD A,(L00E8)
+;         OR A
+;         JR NZ,L1C2D                ; jump if Execute
+;
+;; L22B0
+;         LD DE,(L0101)              ; load direct after runtime library
+;
+;L1C2D:
+         LD SP,L0100
+IFDEF MSX
+         JP L0100
+;         JP 00B0H                   ; some address outside the running program
+				; AUXINPTR+1	        ; ???
+ENDIF
+
+L1C33:	PUSH DE
+	LD C,1AH 		; C = set dma
+	CALL MSXDOS
+
+IFDEF MSX
+	LD HL,(006CH)		; HL = file length, read the complete file
+ENDIF
+	LD DE,005CH		; !!!
+	LD C,27H
+	CALL MSXDOS
+
+;	 LD DE,L005C
+;	 LD C,14H		 ; C = sequential read
+;	 CALL MSXDOS
+;	 POP DE
+;	 LD HL,0080H
+;	 ADD HL,DE
+;	 EX DE,HL
+;	 OR A
+;	 JR Z,L1C33
+IFDEF MSX
+	JP 100H
+ENDIF
+L1C33_A:
+
+; 33e 22D1
+L1C4C:	LD (L00E2),HL		; save address of FIB
+	LD A,(HL)
+	AND 0FH			; a logical device ?
+	RET Z			; quit if not a logical device
+
+         LD A,0C1H
+         LD (ErrorNumber),A         ; 33e, TODO 2BA3
+	LD A,20H
+	LD (L00D0),A		; IORESULT = 20H, Operation not allowed on
+				; a logical device
+	RET
+
+;         GLOBALS L1C59
+;L1C59:   LD A,255                   ; OverlayLoadOnly = TRUE
+;         JP RUNOVERLAY
+
+OverlayCompareID:
+         ; in:    HL = address of low-byte of ID in info-block
+         ;        BC:DE = position to compare it with
+         ; out:   HL = address of low-byte of ID in info-block (unchanged)
+         ;        NonZero if not equal
+         ;        Zero if equal
+; 33e 22E3
+         ; new position equals current position ?
+         PUSH HL
+
+         LD A,(HL)
+         CP C                       ; byte 0
+         JR NZ,OverlayCompareIDEnd  ; quit if not equal
+
+         INC HL
+         LD A,(HL)
+         CP B                       ; byte 1
+         JR NZ,OverlayCompareIDEnd  ; jump if not equal
+
+         INC HL
+         LD A,(HL)
+         CP E                       ; byte 2
+         JR NZ,OverlayCompareIDEnd  ; jump if not equal
+
+         INC HL
+         LD A,(HL)
+         CP D                       ; byte 3
+         JR Z,OverlayCompareIDEnd   ; jump if equal, run the program
+
+OverlayCompareIDEnd:
+         POP HL
+         RET
+
+OverlaySaveParams:
+         LD (OVERLAYDATALEN),BC     ; save length
+
+         LD (OVERLAYPOS),HL         ; save low-word of position
+         LD (OVERLAYPOS+2),DE       ; save high-word of position
+         RET
+
+         GLOBALS OverlayRec1
+OverlayRec1:
+         PUSH HL                    ; save address of overlay-info block
+
+         LD DE,OverlayPos           ; destination address
+         LD BC,6                    ; restore 6 bytes from heap
+         CALL L0522                 ; heap de-alloc
+
+         POP HL                     ; HL = address of overlay-info block
+
+         LD (OverlayInfoAddress),HL
+
+         POP DE
+         LD (L00E2),DE              ; save return address
+         PUSH DE
+
+         LD BC,(OverlayPos)
+         LD DE,(OverlayPos+2)
+
+         EXX
+         PUSH BC
+         PUSH DE
+         PUSH HL
+         EXX
+
+         LD A,255                   ; OverlayLoadOnly = TRUE
+         CALL LoadOrRunOverlay
+
+         EXX
+         POP HL
+         POP DE
+         POP BC
+
+         RET
+
+; 33e 2330
+         GLOBALS LoadRunOverlayRec
+LoadRunOverlayRec:
+         ; recursive overlay loader and runner
+
+         EXX
+
+         LD BC,6                    ; save 6 bytes on heap
+         POP HL                     ; HL = address of position in
+                                    ;      overlay-info block
+         LD (L00E2),HL              ; save address if an error would occur
+         PUSH HL
+         CALL L0508                 ; heap alloc
+
+         EXX
+
+;         GLOBALS L1C59
+;L1C59:
+         GLOBALS LoadRunOverlay
+LoadRunOverlay:
+         ; non-recursive overlay loader and runner
+
+         ; in:    DEHL = position in file to read from
+         ;        BC = length in bytes to read from file
+
+         XOR A                      ; OverlayLoadOnly = FALSE
+
+         CALL OverlaySaveParams
+
+         LD B,H                     ; BC = HL = low-word position
+         LD C,L
+
+         POP HL
+         LD (L00E2),HL              ; save address of overlay-info block
+         LD (OverlayInfoAddress),HL
+
+LoadOrRunOverlay:
+         ; in:    DEBC = position in file to read from
+         ;        HL = address of overlay-info block
+
+         BIT 7,D                    ; negative position ?
+         RET NZ                     ; quit if negative
+
+         LD (OverlayLoadOnly),A     ; 0 = FALSE, NonZero = TRUE
+
+         PUSH HL
+         EXX
+         POP HL
+         LD BC,21
+         ADD HL,BC
+         EXX
+
+         LD A,D
+         CP 40H
+
+         EXX
+         JR Z,RUNOVERLAY_PROGRAM1
+         EXX
+
+         CALL OverlayCompareID
+
+         LD A,(OverlayLoadOnly)
+
+         JR Z,RUNOVERLAY_PROGRAM    ; jump if equal, run the program
+
+         LD (HL),C
+         INC HL
+         LD (HL),B
+         INC HL
+         LD (HL),E
+         INC HL
+         LD (HL),D
+         INC HL                     ; HL = address of overlay data length
+
+         LD A,(OverlayLoadOnly)
+         PUSH AF
+         EXX
+         PUSH HL
+
+         PUSH HL                    ; push Address of data
+         EXX
+
+         PUSH DE                    ; push high-word first
+         PUSH BC                    ; push low-word second
+                                    ; Position pushed
+
+         LD DE,(OVERLAYDATALEN)
+         LD (HL),E
+         INC HL
+         LD (HL),D
+         INC HL                     ; HL = address of overlay number
+         PUSH DE                    ; DataLen pushed
+
+         LD A,(HL)
+         INC HL
+         LD B,0
+         LD C,A
+         PUSH BC                    ; save overlay number
+
+         PUSH HL                    ; save adress of file name string as
+                                    ; var string
+         INC HL                     ; HL = address of ASCIIZ-string
+
+         CALL OverlayLoad
+
+         POP HL                     ; run address for overlay code
+
+         POP AF                     ; OverlayLoadOnly flag
+
+
+RUNOVERLAY_PROGRAM:
+
+         OR A
+         RET NZ                     ; quit if it should not be executed
+
+; 33e 2391
+RUNOVERLAY_PROGRAM1:
+
+;L1CCA:
+         ; run the overlay program
+;         LD HL,(OverlayInfoAddress)
+;         LD DE,21 ; 19 ; 17 ; 13
+;         ADD HL,DE
+	JP (HL)
+
+OverlayLoad:
+
+         GLOBALS OverlayLoadPTR
+OverlayLoadPTR:
+         JP OverlayLoadDefault
+
+OverlayLoadDefault:
+         ; (Address: INTEGER; DataLength: INTEGER; FilePos: LONGINT;
+         ;  OverlayNumber: BYTE; VAR Name: STRING);
+
+;         ; in:    HL = address of ASCIIZ-string (filename)
+
+         ; overlay drive/path must be added if DOS 2
+         ; overlay drive name must be added if DOS 1
+
+         POP DE                     ; DE = return address
+
+         POP HL                     ; HL = VAR STRING
+         INC HL
+
+         PUSH DE                    ; restore return address
+
+         LD DE,L005C                ; address of 64 byte buffer
+         LD A,' '                   ; default extension of '   '
+         LD B,A
+         LD C,A
+         CALL OpenFile
+         JP NZ,L1CD2                ; jump: Overlay file not found
+
+         LD B,H                     ; BC = handle/FCB address
+         LD C,L
+
+         POP DE                     ; DE = return address
+
+         POP HL                     ; remove OverlayNumber
+
+         POP HL
+         LD (OverlayDataLen),HL     ; save OverlayDataLen
+
+         EX DE,HL
+         POP DE                     ; DE = low-word of Position
+         EX (SP),HL                 ; push return address
+                                    ; pop high-word in HL
+         EX DE,HL                   ; DE:HL = position
+
+;         LD HL,(OVERLAYPOS)
+;         LD DE,(OVERLAYPOS+2)
+         CALL FileSeek              ; set new file position
+
+         POP HL                     ; HL = return address
+         POP DE                     ; DE = Address of data
+         PUSH HL                    ; restore return address
+
+
+;         LD HL,(OverlayInfoAddress) ; HL = address of overlay-info block
+;         LD DE,2+2+2+2+13           ; length of overlay-info block
+;         ADD HL,DE
+;         EX DE,HL                   ; DE = destination address for overlay code
+         LD HL,(OverlayDataLen)     ; HL = length in bytes
+
+         ; BC = handle/FCB address
+         CALL ReadFile
+;        JP NZ,$$$$                 ; jump if error reading overlay file
+
+         ; BC = handle/FCB address
+         JP CloseFile               ; Close the File
+
+L1CD2:   LD IX,(L00E2)              ; IX = runtime error address
+	LD A,0F0H		; r.error 0F0H: Overlay file not found
+	JP L2029
+
+	GLOBALS L1CDB
+L1CDB:   ; PROCEDURE OvrDrive(Drive: INTEGER);
+         CALL L04C8                 ; LIB, int to byte
+	CP 11H
+	RET NC
+         LD (L00DC),A               ; set new overlay drive
+	RET
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+; 33e 23D4
+	GLOBALS L1CE5
+L1CE5:   ; PROCEDURE New(VAR P: POINTER);
+         ; in:    HL = size
+         LD (L00F0),HL              ; LIB
+         EX DE,HL                   ; DE = size
+
+         POP HL                     ; HL = return address
+	EX (SP),HL
+
+         ; HL = pointer address
+         ; return address on stack
+         LD (L00F2),HL
+	INC DE
+	INC DE
+	INC DE
+	LD A,E
+	AND 0FCH
+	LD E,A
+	LD HL,L00DE
+	LD (L00F8),HL
+	LD IX,(L00DE)
+L1CFF:	LD L,(IX+2)
+	LD H,(IX+3)
+	LD A,L
+	OR H
+	JR Z,L1D51
+	SBC HL,DE
+	JR NC,L1D1C
+	LD L,(IX+0)
+	LD H,(IX+1)
+	PUSH HL
+	LD (L00F8),IX
+	POP IX
+	JR L1CFF
+
+L1D1C:	JR NZ,L1D28
+	LD E,(IX+0)
+	LD D,(IX+1)
+	PUSH IX
+	JR L1D43
+
+L1D28:	LD C,L
+	LD B,H
+	LD L,(IX+0)
+	LD H,(IX+1)
+L1D30:	PUSH IX
+	ADD IX,DE
+	LD (IX+0),L
+	LD (IX+1),H
+	LD (IX+2),C
+	LD (IX+3),B
+	PUSH IX
+	POP DE
+L1D43:	LD HL,(L00F8)
+	LD (HL),E
+	INC HL
+	LD (HL),D
+	POP DE
+	LD HL,(L00F2)
+	LD (HL),E
+	INC HL
+	LD (HL),D
+	RET
+
+L1D51:	PUSH IX
+	POP HL
+	ADD HL,DE
+	LD (HEAPPTR),HL
+	LD HL,(L00F0)
+	LD BC,0004
+	ADD HL,BC
+	PUSH IX
+	POP BC
+	ADD HL,BC
+	JP C,L1D75
+	LD BC,(RECURPTR)
+	SBC HL,BC
+	LD BC,0000
+	LD HL,0000
+	JP C,L1D30
+
+L1D75:	LD A,0FFH		; r.error 0FFH: Heap/stack collision
+	JP L2027 		; Run-time error
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L1D7A
+L1D7A:	EX DE,HL 		; LIB
+	POP HL
+	EX (SP),HL
+	LD A,(HL)
+	INC HL
+	LD H,(HL)
+	LD L,A
+	INC DE
+	INC DE
+	INC DE
+	LD A,E
+	AND 0FCH
+	LD E,A
+	EX DE,HL
+	LD (L00F0),HL
+	LD HL,(L00DE)
+	PUSH HL
+	POP IX
+	OR A
+	SBC HL,DE
+	JR NC,L1DE9
+
+L1D97:	LD L,(IX+0)
+	LD H,(IX+1)
+	PUSH HL
+	OR A
+	SBC HL,DE
+	JR NC,L1DA7
+	POP IX
+	JR L1D97
+
+L1DA7:	POP HL
+	PUSH DE
+	POP IY
+	LD BC,(L00F0)
+	LD (IY+2),C
+	LD (IY+3),B
+	LD (IY+0),L
+	LD (IY+1),H
+	LD (IX+0),E
+	LD (IX+1),D
+	PUSH IX
+	POP HL
+	LD C,(IX+2)
+	LD B,(IX+3)
+	CALL L1E04
+	JR Z,L1DD8
+	LD E,(IX+0)
+	LD D,(IX+1)
+	PUSH DE
+	POP IX
+
+L1DD8:	PUSH IX
+	POP HL
+	LD C,(IX+2)
+	LD B,(IX+3)
+	LD E,(IX+0)
+	LD D,(IX+1)
+	JR L1E04
+
+L1DE9:	LD HL,(L00DE)		; ----
+	LD (L00DE),DE
+	PUSH DE
+	POP IX
+	LD (IX+0),L
+	LD (IX+1),H
+	LD BC,(L00F0)
+	LD (IX+2),C
+	LD (IX+3),B
+	EX DE,HL
+
+L1E04:	ADD HL,BC
+	OR A
+	SBC HL,DE
+	RET NZ
+	PUSH DE
+	POP IY
+	LD HL,(HEAPPTR)
+	OR A
+	SBC HL,DE
+	JR Z,L1E2F
+	LD A,(IY+0)
+	LD (IX+0),A
+	LD A,(IY+1)
+	LD (IX+1),A
+	LD L,(IY+2)
+	LD H,(IY+3)
+	ADD HL,BC
+	LD (IX+2),L
+	LD (IX+3),H
+	XOR A
+	RET
+
+L1E2F:	PUSH IX
+	POP HL
+	LD (HEAPPTR),HL
+	LD B,4
+L1E37:	LD (HL),0
+	INC HL
+	DJNZ L1E37
+	RET
+
+ENDIF	; USELIB
+
+
+
+IFDEF USELIB
+
+	GLOBALS L1E3D
+L1E3D:	; FUNCTION MemAvail: INTEGER;
+	CALL L1E4B		; LIB
+	LD HL,(L00F4)		; return MemAvail
+	RET
+
+	GLOBALS L1E44
+L1E44:	; FUNCTION MaxAvail: INTEGER;
+	CALL L1E4B		; LIB
+	LD HL,(L00F6)		; return MaxAvail
+	RET
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+L1E4B:	; info for: MemAvail, MaxAvail
+	LD HL,0000
+	LD (L00F4),HL		; MemAvail = 0
+	LD (L00F6),HL		; MaxAvail = 0
+
+	LD IX,(L00DE)
+L1E58:	LD C,(IX+2)
+	LD B,(IX+3)
+	LD A,C
+	OR B
+	JR Z,L1E80
+
+	LD HL,(L00F4)		; MemAvail += BC
+	ADD HL,BC
+	LD (L00F4),HL
+
+	LD HL,(L00F6)		; MaxAvail
+	OR A
+	SBC HL,BC
+	JR NC,L1E75
+	LD (L00F6),BC
+
+L1E75:	LD L,(IX+0)		; get pointer to next Block
+	LD H,(IX+1)
+	PUSH HL
+	POP IX
+	JR L1E58
+
+L1E80:	LD HL,(RECURPTR)
+	LD BC,-5
+	ADD HL,BC
+	LD DE,(HEAPPTR)
+	OR A
+	SBC HL,DE
+	RET C
+	EX DE,HL
+	LD HL,(L00F4)		; MemAvail += DE
+	ADD HL,DE
+	LD (L00F4),HL
+	LD HL,(L00F6)		; MaxAvail
+	OR A
+	SBC HL,DE
+	RET NC
+	LD (L00F6),DE
+	RET
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L1EA3
+L1EA3:	LD DE,(HEAPPTR)		; LIB
+	LD (HL),E
+	INC HL
+	LD (HL),D
+	RET
+
+	GLOBALS L1EAB
+L1EAB:	LD E,(HL)		; LIB
+	INC HL
+	LD D,(HL)
+	EX DE,HL
+
+L1EAF:	LD (HEAPPTR),HL
+	LD (L00DE),HL
+	LD B,4			; clear top 4 bytes of new HEAPPTR
+L1EB7:	LD (HL),0
+	INC HL
+	DJNZ L1EB7
+	RET
+
+         GLOBALS L1EBC
+L1EBC:   ; LIB, print LONG
+         LD A,2
+         JR L1EBF
+
+         GLOBALS L1EBD
+L1EBD:   ; LIB, print REAL
+         LD A,1
+	JR L1EBF
+
+	GLOBALS L1EBE
+L1EBE:   ; LIB, print INTEGER
+	XOR A			; LIB
+
+L1EBF:   LD C,A
+	LD (L00E8),HL
+	XOR A
+	LD (HL),A
+	LD (L00D0),A		; reset IORESULT
+	LD A,B
+         LD (L00EA),A               ; save destination string length
+	LD HL,(L00E2)		; HL = current device pointer
+	LD (L00ED),HL		; save old device pointer
+	LD HL,L1F46		; device 6
+	LD (L00E2),HL
+	POP HL
+	LD (L00E4),HL
+	POP HL
+
+         DEC C                      ; REAL ?
+         JR Z,L1EE6                 ; jump to print REAL
+
+         DEC C                      ; LONG ?
+         JR Z,L1EE5                 ; jump to print LONG
+
+         CALL L1726                 ; print INTEGER
+	JR L1EE9 		; restore device and continue
+				; add saved return address
+
+L1EE5:   CALL PRT_LONG
+         JR L1EE9
+
+L1EE6:	CALL L1779		; call print REAL
+
+L1EE9:	; restore to old device
+	; and jumps to address in L00E4
+	LD HL,(L00ED)		; HL = old device pointer
+	LD (L00E2),HL		; restore to old device
+
+	LD HL,(L00E4)		; HL = return address
+	JP (HL)			; continue
+
+	GLOBALS L1EF2
+L1EF2:	; val(S: string; var L: longint; var P: integer);
+	LD A,2			; LIB, ascii to LONGINT
+	JR L1EF5
+
+	GLOBALS L1EF3
+L1EF3:	; val(S: string; var R: real; var P: integer);
+	LD A,1			; LIB, ascii to REAL
+	JR L1EF5
+
+	GLOBALS L1EF4
+L1EF4:	; val(S: string; var I,P: integer);
+	XOR A			; LIB, ascii to INTEGER
+
+L1EF5:	LD (L00EC),A		; flag for conversion
+				; 0 = to INTEGER
+				; 1 = to REAL
+				; 2 = to LONGINT
+	LD (L00E8),HL		; save optional address P
+
+	LD HL,(L00E2)		; HL = current device pointer
+	LD (L00ED),HL		; save old device pointer
+	LD HL,L1F46		; device 6
+	LD (L00E2),HL
+
+	POP HL
+	LD (L00E4),HL		; save return address
+
+	POP HL
+	LD (L00EA),HL		; save address resulting REAL,
+				; INTEGER, BYTE or LONGINT
+
+	LD HL,L005C		; HL = destination address of string
+	LD B,1EH 		; maximum of 30 bytes
+	CALL L05E2		; LIB, pop string from stack
+	XOR A
+	LD (DE),A		; end string with a '\0'
+
+	LD HL,(L00EA)		; destination address for real / integer
+
+	LD A,(L00EC)		; conversion flag
+	OR A
+	JR Z,L1F26		; jump if conversion to INTEGER
+	DEC A
+	JR Z,L1F27		; jump if conversion to REAL
+
+	CALL L1671		; conversion to LONGINT
+	JR L1F2A
+
+L1F26:	CALL L164E		; conversion to INTEGER
+	JR L1F2A
+
+L1F27:	CALL L1672		; conversion to REAL
+
+L1F2A:	; IX = last read character or position of the error
+	LD HL,L00D0
+	LD A,(HL)		; read IORESULT
+	LD (HL),0		; reset IORESULT
+	OR A
+	LD H,A			; HL = 0
+	LD L,A
+	JR Z,L1F3D		; jump if no error occurred
+
+	; watch it!, stil NonCarry
+	PUSH IX
+	POP HL
+	LD DE,L005D-1
+	SBC HL,DE		; calculate position of the error
+
+L1F3D:	EX DE,HL
+	LD HL,(L00E8)		; HL = address of error position
+	LD (HL),E		; save position
+	INC HL
+	LD (HL),D
+
+	JR L1EE9 		; restore device and continue
+				; add saved return address
+
+L1F46:	DB 0C6H,0		; device 6
+
+	GLOBALS L1F48
+L1F48:	; randomize
+	LD A,R
+	LD (L00CB),A		; random waarde ?
+	RET
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L1F4E
+L1F4E:	EX DE,HL 		; LIB
+	POP IX
+	POP BC
+	POP HL
+	LD A,B
+	OR C
+	JR Z,L1F62
+	LD (HL),E
+	DEC BC
+	LD A,B
+	OR C
+	JR Z,L1F62
+	LD D,H
+	LD E,L
+	INC DE
+L1F60:	LDIR
+L1F62:	JP (IX)
+
+	GLOBALS L1F64
+L1F64:	; LIB
+	LD B,H			; LIB
+	LD C,L
+	POP IX
+	POP DE
+	POP HL
+	LD A,B
+	OR C
+	JR Z,L1F62
+	SBC HL,DE
+	ADD HL,DE
+	JR NC,L1F60
+	DEC BC
+	ADD HL,BC
+	EX DE,HL
+	ADD HL,BC
+	EX DE,HL
+	INC BC
+	LDDR
+	JP (IX)
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	GLOBALS L1F7D
+L1F7D:	; FUNCTION ParamStr(N: INTEGER): STRING;
+	LD D,L			; LIB
+	INC D
+	DEC D
+	JR Z,L1F85
+	CALL L1F9D
+
+L1F85:	POP IX
+	LD C,A
+	LD B,0
+	CPL
+	LD L,A
+	LD H,0FFH
+	ADD HL,SP
+	LD SP,HL
+	LD (HL),C
+	INC HL
+	EX DE,HL
+	INC C
+	DEC C
+	JR Z,L1F99
+	LDIR
+L1F99:	JP (IX)
+
+	GLOBALS L1F9B
+L1F9B:	; FUNCTION ParamCount: INTEGER;
+	LD D,0			; LIB
+
+L1F9D:   LD HL,L0080
+	LD A,1FH
+	LD B,(HL)
+	CP B
+	JR NC,L1FA8
+	LD B,1FH
+L1FA8:	INC HL
+	LD C,0
+
+L1FAB:	INC B
+	DEC B
+	JR Z,L1FBC
+	LD A,(HL)
+	CP 20H
+	JR Z,L1FB8
+	CP 9
+	JR NZ,L1FBC
+L1FB8:	INC HL
+	DEC B
+	JR L1FAB
+
+L1FBC:	LD E,L
+L1FBD:	INC B
+	DEC B
+	JR Z,L1FCE
+	LD A,(HL)
+	CP 20H
+	JR Z,L1FCE
+	CP 9
+	JR Z,L1FCE
+	INC HL
+	DEC B
+	JR L1FBD
+
+L1FCE:	LD A,L
+	SUB E
+	JR Z,L1FD6
+	INC C
+	DEC D
+	JR NZ,L1FAB
+L1FD6:	LD L,C
+	LD H,0
+	LD D,H
+	RET
+
+ENDIF	; USELIB
+
+
+	GLOBALS L1FDB
+L1FDB:	; LIB
+	; in:	X pushed on stack
+	;	L = Y
+	POP DE			; gotoxy(x,y)
+	POP BC			; C = Y
+	PUSH DE
+	DEC L			; L = X - 1
+	LD H,C
+	DEC H			; H = Y - 1
+	JP L02A2
+
+
+IFDEF USELIB
+
+	GLOBALS L1FE4
+L1FE4:	LD A,L			; LIB
+	CALL L04A6		; upcase
+	LD L,A
+	RET
+
+	GLOBALS L1FEA
+L1FEA:	LD HL,(0001)		; LIB
+	ADD HL,DE
+	ADD HL,DE
+	ADD HL,DE
+	JP (HL)
+
+	GLOBALS L1FF1
+L1FF1:	; FUNCTION IOresult: BYTE; ; LIB
+	LD HL,L00D0		; HL = address of IORESULT value
+	LD A,(HL)
+	LD (HL),0
+
+L1FF2:
+         LD L,A
+	LD H,0
+	RET
+
+         GLOBALS GetError_LIB
+GetError_LIB:
+         XOR A
+         LD (L00D0),A
+         JP GetError
+;         INC L
+;         DEC L
+;         RET NZ                     ; quit with error if there was one
+;
+;         LD A,(GIOSOK)
+;         OR A
+;         RET Z                      ; quit if GIOS not present
+;                                    ; and return 0 for no error
+;
+;         LD A,75
+;         JP RUNGIOS                 ; call GIOS function 75 (GetError)
+
+ENDIF	; USELIB
+
+
+IFDEF USELIB
+
+	; LIB, CBREAK handler
+L1FFB:	CALL L0316		; keypressed
+	LD A,H
+	OR L
+	RET Z			; quit if not
+	LD A,(CBREAK)
+	PUSH AF			; save previous CBREAK
+	XOR A
+	LD (CBREAK),A
+	CALL L0320		; read character with CBREAK off
+	POP AF
+	LD (CBREAK),A		; restore CBREAK
+
+	LD A,L
+	CP 3
+	RET NZ			; quit if CBREAK not pressed
+
+	POP IX			; IX = return address
+
+ENDIF	; USELIB
+
+
+L2016:	LD DE,0001		; user break, D = 0 with error code = 1
+	JR L202C
+
+	GLOBALS L201B
+L201B:	; I/O error
+	LD A,(L00D0)		; read IORESULT
+	OR A
+	RET Z			; quit if no error
+	POP IX
+	LD E,A			; E = IORESULT error code
+	LD D,1			; I/O error
+	JR L202C
+
+L201C:   ; error: 0AAH throug 0AEH
+         LD A,0AAH
+L201D    EQU $-1
+
+L2027:   ; Run-time error
+         POP IX                     ; return address of original call
+
+L2029:	LD E,A			; E = error code
+	LD D,2			; Run-time rror
+
+L202C:	; in:	D = 0, user break
+	;	D = 1, I/O error, E = error number
+	;	D = 2, Run-time error	E = error number
+         ;        IX = return address of original call
+
+	XOR A
+         LD (CBREAK),A
+
+         PUSH IX
+         POP HL
+
+         LD A,(ErrorExitOK)
+         OR A
+         JP NZ,ErrorHandlerReturn
+
+         LD (L00CE),HL
+         LD (ErrorStack),SP
+
+         PUSH DE                    ; save error type and code
+
+	PUSH DE
+         PUSH HL                    ; address where error occurred
+         CALL ERRORPTR              ; ErrorHandler(DE = type, HL = address)
+
+         POP DE                     ; restore error type and code
+
+L2054:	LD A,D
+	OR A
+	JR NZ,L206C
+	CALL L0200		; D = 0 >> User Break
+	DB '^C',0DH,0AH
+	DB 'User break',0
+	JR L2097
+
+L206C:	DEC A
+	JR NZ,L207A
+	CALL L0200		; D = 1 >> I/O error
+L2075	EQU $+3
+	DB 0DH,0AH,'I/O',0
+	JR L2088
+
+L207A:	CALL L0200		; D = 2 >> Run-time error
+	DB 0DH,0AH,'Run-time',0
+
+L2088:	CALL L0200
+	DB ' error ',0
+
+L2093:	LD A,E
+	CALL L04B4
+
+L2097:   PUSH DE
+         CALL L0200
+	DB ', PC=',0
+         LD HL,(L00CE)
+	CALL L04AF
+         POP DE
+
+IFDEF MessagesForTilburg
+         LD A,E
+         CP 0AAH
+         JR C,L20BD                 ; jump if < 0AAH
+         CP 0AEH+1
+         JR NC,L20BD                ; jump if > 0AEH
+
+         CALL L0200
+         DB 13,10,0
+
+         LD HL,GIOSMessages
+         SUB 0AAH - 1
+         LD B,A                     ; 1 = 0AAH, 2 = 0ABH etc.
+
+GIOSMessageLoop:
+         DEC B
+         JR Z,GIOSMessageFound
+
+GIOSMessageScan:
+         LD A,(HL)
+         INC HL
+
+         OR A
+         JR NZ,GIOSMessageScan
+
+         JR GIOSMessageLoop
+
+GIOSMessageFound:
+         ; Do something
+         CALL L01D0
+
+ENDIF    ; MessagesForTilburg
+
+         JR L20BD
+
+L20A8:   CALL L0200
+	DB 'Not enough memory',0
+
+L20BD:   CALL L0200
+	DB 0DH,0AH,'Program aborted',0DH,0AH,0
+
+	GLOBALS L20D4
+L20D4:
+;         CALL GotoTextMode
+
+;         LD A,(L00D8)
+;         OR A
+;	 JP Z,L278E
+	LD C,0
+	CALL MSXDOS
+
+IFDEF MessagesForTilburg
+GIOSMessages:
+         DB 18,'MemMan not present',0   ; 0AAH
+         DB 20,'Wrong MemMan version',0 ; 0ABH
+         DB 20,'GIOS-tsr not present',0 ; 0ACH
+         DB 16,'GIOS not present',0     ; 0ADH
+         DB 18,'Wrong GIOS version',0   ; 0AEH
+ENDIF    ; MessageForTilburg
+
+L20DE:
+         CALL GotoTextMode
+
+         POP HL
+	POP DE
+	POP DE
+
+ErrorHandlerReturn:
+         JP (HL)
+
+         GLOBALS ErrorExit
+ErrorExit:
+         EXX
+         LD HL,ErrorExitOK
+         LD A,(HL)
+         OR A
+         EXX
+         RET Z                      ; quit if no ErrorExit
+
+         EXX
+
+         LD (HL),0
+
+         LD SP,(ErrorStack)
+
+         LD HL,(L00CE)              ; HL = return address of original call
+         PUSH HL
+
+         EXX
+         RET
+
+         GLOBALS DOSErrorHandlerOn
+DOSErrorHandlerOn:
+         JP SetErrorHandler
+
+         GLOBALS DOSErrorHandlerOff
+DOSErrorHandlerOff:
+         JP ResErrorhandler
+
+GotoTextMode:
+         LD A,(0FCAFH)
+         CP 2
+         RET C                      ; quit if screen number < 2
+
+         LD HL,0
+
+         LD A,(GIOSOK)
+         OR A
+         JR NZ,GotoTextMode1        ; jump if GIOS present
+
+         ADD HL,SP                  ; HL = SP
+
+         LD DE,8000H+300
+         EX DE,HL
+         OR A
+         SBC HL,DE                  ; 8000H+300 - SP
+         RET NC                     ; quit if not enough space on stack left
+
+         ; A = 0
+         DW 0F7H
+         DW 05FH                    ; SCREEN 0
+         RET
+
+GotoTextMode1:
+         PUSH HL
+         LD A,8
+         CALL RUNGIOS               ; call GIOS function 8 (SCREEN)
+                                    ; must be a call because of return address
+         RET
+
+

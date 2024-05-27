@@ -1,0 +1,55 @@
+Turbo Assembler	 Version 3.2	    03/19/99 20:08:29	    Page 1
+msx_asm\rtl_end.ASM
+
+
+
+      1	    0000				  .model small
+      2	    0000				  .code
+      3						  .486 ; .8086
+      4
+      5						  GLOBAL L20E2:NEAR
+      6						  GLOBAL _L20E2:NEAR
+      7
+      8					 ; _L20E2   EQU	L20E2
+      9
+     10						  ALIGN	2
+     11
+     12	    0000  00				  DB 0
+     13
+     14	    0001			 _L20E2:
+     15	    0001			 L20E2:
+     16
+     17						  end
+Turbo Assembler	 Version 3.2	    03/19/99 20:08:29	    Page 2
+Symbol Table
+
+
+
+
+Symbol Name			  Type	 Value
+
+??DATE				  Text	 "03/19/99"
+??FILENAME			  Text	 "rtl_end "
+??TIME				  Text	 "20:08:29"
+??VERSION			  Number 0314
+@32BIT				  Text	 0
+@CODE				  Text	 _TEXT
+@CODESIZE			  Text	 0
+@CPU				  Text	 1F1FH
+@CURSEG				  Text	 _TEXT
+@DATA				  Text	 DGROUP
+@DATASIZE			  Text	 0
+@FILENAME			  Text	 RTL_END
+@INTERFACE			  Text	 00H
+@MODEL				  Text	 2
+@STACK				  Text	 @STACK
+@WORDSIZE			  Text	 4
+L20E2				  Near	 _TEXT:0001
+_L20E2				  Near	 _TEXT:0001
+
+Groups & Segments		  Bit Size Align  Combine Class
+
+DGROUP				  Group
+  _DATA				  16  0000 Word	  Public  DATA
+_TEXT				  16  0001 Word	  Public  CODE
+

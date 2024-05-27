@@ -1,0 +1,1626 @@
+
+;M       .model small
+;M       .code
+;M       .486
+
+;!       .model small
+;!       .code
+;!       .486
+;!       include pcmacros.inc
+;!       include pcsim.inc
+
+IFNDEF MAKEPC
+MSX:
+ENDIF
+
+IFDEF MSX
+MSXDOS EQU 5
+USELIB:
+ENDIF
+
+         INCLUDE fileio.inc
+
+         INCLUDE macros.inc
+
+; InitFileIO:
+         ; in:    -
+         ; out:   DOS2Present set
+
+; ParseName:
+         ; in:    HL = source filename string, preceding spaces or tabs allowed
+         ; DOS 1: DE = address of FCB - block to be filled with filename and
+         ;             drive number, 0 = default, 1 = 'A:', 2 = 'B:'
+         ; DOS 2: DE+1 = destination for drive/path/file string
+         ;        ABC = default filename extension, A='P', B='A', C='S'
+
+         ; out:   DE = parsed filename string
+         ;        HL = address direct after drive/path/file string
+         ;        BC = address of last item
+	;	A = 0,	if no error occurred
+	;		otherwise:
+	;			0DBH, Invalid drive
+         ;                          0DAH, Invalid filename
+         ;                          0D9H, Invalid pathname
+         ;                                  wild cards used when not permitted
+	; changes: only AF, BC, DE and HL
+
+; SetExtension:
+         ; in:    HL = address of filename
+         ;        ABC = new extension
+         ;        Carry set if extension is to be overruled
+         ;        Carry clear if extension is not to be overruled
+         ; out:   A, HL, BC unchanged
+
+; CreateFile:
+         ; in:    HL = address of file name
+         ;        DE = address of handle or unopened FCB
+         ;        ABC = default extension
+         ; out:   HL = address of handle or unopened FCB
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+; OpenFile:
+         ; in:    HL = address of file name
+         ;        DE = address of handle or unopened FCB
+         ;        ABC = default extension
+         ; out:   HL = address of handle or unopened FCB
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+; FileSeek:
+         ; in:    BC = handle/FCB address
+         ;        DEHL = new file position
+         ; out:   DEHL = new file position
+         ;        BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+; FilePos:
+         ; in:    BC = handle/FCB address
+         ; out:   DEHL = current file position
+         ;        BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+; FileSize:
+         ; in:    BC = handle/FCB address
+         ; out:   DEHL = file size
+         ;        BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+; ReadFile:
+         ; in:    BC = handle/FCB address
+         ;        DE = destination address for data
+         ;        HL = number of bytes to read
+         ; out:   HL = number of bytes actually read
+         ;        BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+; WriteFile:
+         ; in:    BC = handle/FCB address
+         ;        DE = source address for data
+         ;        HL = number of bytes to write
+         ; out:   HL = number of bytes actually written
+         ;        BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+; CloseFile:
+         ; in:    BC = handle/FCB address
+         ; out:   BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+; DeleteFile: or subdirectory under DOS 2
+         ; in:    DE = Drive/path/file ASCIIZ string
+         ; out:    A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+; DeleteFileHandle:
+         ; in:    DE = handle/FCB address
+         ; out:    A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+; RenameFile: or subdirectory under DOS 2
+         ; in:    DE = old Drive/path/file ASCIIZ string
+         ;        HL = new filename ASCIIZ string
+         ; out:    A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+; GetCurrentDirectory:
+         ; in:     B = drive number, 0 = default, 1 = A: etc.
+         ;        DE = address where to put drive/path string
+         ;             without a trailing backslash
+         ; out:    A = DOS 2 error code, 0 on succes
+         ;             flags are set on A
+
+TEMPFileName:
+         DS 64+1  ; used by Open/Create File to setup default extension
+                  ; used by Delete File
+
+
+DOS2Present:      DB 0              ; 0 = not present, NonZero = present
+                                    ; default no DOS 2
+
+ErrorHandlerPresent:DB 0            ; 0 = not present, NonZero = present
+
+OldErrorVector:   DW 0
+OldAbortVector:   DW 0
+
+InitFileIO:
+         ; in:    -
+         ; out:   DOS2Present set
+         LD C,6FH
+         CALL FILE_MSXDOS           ; get dos version
+         OR A
+         JR NZ,InitFileIO_1         ; jump with no carry if DOS 1
+
+         LD A,B
+         CP 2
+         CCF                        ; Carry if >= 2
+
+InitFileIO_1:
+         LD A,0
+         ADC A,A                    ; Add 1 if DOS 2
+         LD (DOS2Present),A         ; 0 = not present, NonZero = present
+         RET
+
+CheckDrive:
+	; in:  A = drive number, 0=default, 1='A:', 2='B:' etc.
+	; out: A = drive number, 1='A:', 2='B:' etc. default filled in
+         ;           carry set if drive number was illegal
+	; changes: AF
+
+         PUSH HL
+	PUSH DE
+	PUSH BC
+	OR A
+         JR Z,CheckDriveGetDefault  ; default drive
+
+IFDEF MSX
+         PUSH AF
+	LD C,24
+         CALL FILE_MSXDOS           ; get login vector
+	POP AF
+	; in A, 1='A:', 2='B:' enz.
+	CP 9			; must be lower than 9
+	CCF			; NC = correct
+         JR C,CheckDriveQuit        ; quit with carry set if not correct
+
+         LD B,A
+CheckDriveLoop:
+         RR L
+         DJNZ CheckDriveLoop
+	CCF			; complement >> NC = correct, anders fout
+ELSE
+         OR A                       ; set NC, always approve
+                                    ; any drive on a PC
+ENDIF    ; MAKEPC
+
+
+CheckDriveQuit:
+         POP BC
+	POP DE
+	POP HL
+	RET
+
+CheckDriveGetDefault:
+         LD C,25
+         CALL FILE_MSXDOS           ; Get Default Drive Name
+	INC A			; convert to 1=A, 2=B etc.
+	OR A			; NC >> cannot make errors
+         JR CheckDriveQuit
+
+; ParseName
+; Deze routine vormt de naam gegeven vanaf HL om tot een naam
+; die direct in een FCB geplaatst kan worden. Deze naam moet
+; afgesloten zijn door een spatie.
+; Het doel address van de naam is DE.
+; carry gezet >> fout
+
+LastItem:
+L1081:   DW 0
+
+PathStart:
+L1083:   DW 0
+
+L1085:   DW 0
+
+;LastItem:
+;         DW 0                       ; 33e, 1081
+;
+;         DW 0                       ; new 33e, 1083
+;
+;PathStart:
+;         DW 0                       ; 33e, 1085
+
+ParseName:
+         ; in:    HL = source filename string, preceding spaces or tabs allowed
+         ; DOS 1: DE = address of FCB - block to be filled with filename and
+         ;             drive number, 0 = default, 1 = 'A:', 2 = 'B:'
+         ; DOS 2: DE+1 = destination for drive/path/file string
+         ;        ABC = default filename extension, A='P', B='A', C='S'
+
+         ; out:   DE = parsed filename string
+         ;        HL = address direct after drive/path/file string
+         ;        BC = address of last item
+	;	A = 0,	if no error occurred
+	;		otherwise:
+	;			0DBH, Invalid drive
+         ;                          0DAH, Invalid filename
+         ;                          0D9H, Invalid pathname
+         ;                                  wild cards used when not permitted
+         ; changes: only AF, AF', BC, DE and HL
+
+;         PUSH DE
+;         PUSH HL
+;
+;         OR A                       ; clear carry, no overruling
+;         CALL SetExtension
+;
+;         POP HL
+;         POP DE
+
+         EX AF,AF'
+
+         LD A,(DOS2Present)
+         OR A
+         JP Z,ParseNameDOS1         ; jump if DOS 1
+
+         EX AF,AF'
+
+ParseNameDOS2:
+         PUSH BC                    ; push last characters of default extension
+         PUSH AF                    ; push first character of default extension
+
+         INC DE                     ; reserve first byte for file handle
+
+         LD (L1083),DE              ; 33e, LD (PathStart),DE
+
+         PUSH DE                    ; save destination address
+
+         CALL L7D92                 ; skip spaces and tabs
+
+         PUSH HL                    ; save source address
+
+         LD (L1081),HL              ; 33e, LD (LastItem),HL
+         EX DE,HL                   ; DE = drive/path/file string address
+         LD BC,5BH                  ; B = 0 (no volume name), C = function
+         CALL FILE_MSXDOS           ; Parse PathName
+
+         ; HL = address of last item
+         ; DE = first character after drive/path/file string
+
+L10A6:
+         PUSH BC
+         PUSH HL
+         LD BC,(L1081)              ; 33e, LD BC,(LastItem)
+         OR A
+         SBC HL,BC                  ; - start of original drive/path/file
+         LD BC,(L1083)              ; 33e, LD BC,(PathStart)
+         ADD HL,BC
+         LD (L1085), HL ; 33e, LD (LastItem),HL ; address of last item in copied path
+         POP HL
+         POP BC
+
+         PUSH AF
+         EX DE,HL
+         CALL GoBack                ; go back if there where special characters
+                                    ; at the end
+         EX DE,HL
+         POP AF
+
+         POP HL                     ; HL = start address of parsed string
+
+         OR A
+         JR NZ,ParseNameDOS2_invalid; jump if error occurred
+                                    ; invalid file name
+
+         LD A,0D9H                  ; assume: error code = invalid pathname
+         INC B
+         DEC B
+         JR Z,ParseNameDOS2_invalid ; jump if error occurred
+                                    ; nothing parsed --> invalid file name
+
+         LD A,B                     ; A = parse flags
+
+         POP BC                     ; BC = destination address
+
+         PUSH AF                    ; save parse flags
+
+ParseNameDOS2_Loop:
+         LD A,H                     ; address of termination character reached ?
+         CP D
+         JR NZ,ParseNameDOS2_1
+         LD A,L
+         CP E
+         JR Z,ParseNameDOS2_2       ; jump if end found
+
+ParseNameDOS2_1:
+         LD A,(HL)
+         LD (BC),A                  ; copy character
+         INC HL
+         INC BC
+         JR ParseNameDOS2_Loop
+
+ParseNameDOS2_2:
+
+         POP AF                     ; A = parse flags
+
+         BIT 3,A
+         JR Z,ParseNameDOS2_invalid1; jump if no main filename specified
+
+         BIT 4,A
+         JR Z,ParseNameDOS2_4       ; jump if filename extension not specified
+
+         POP AF                     ; dump pushed
+         POP AF                     ;   default filename extension
+
+ParseNameDOS2_3:
+         XOR A                      ; return no errors
+         LD (BC),A                  ; mark end of ASCIIZ string
+         EX DE,HL                   ; HL = address after parsed string
+         LD BC,(L1085)              ; 33e, LD BC,(LastItem)
+         RET
+
+ParseNameDOS2_4:
+         LD A,'.'
+         LD (BC),A                  ; add '.'
+         INC BC
+         POP AF
+         POP HL
+
+         CP ' '
+         JR Z,ParseNameDOS2_3       ; quit if first character = ' '
+
+         LD (BC),A                  ; first character of default extension
+         INC BC
+         LD A,H
+         LD (BC),A                  ; second character of default extension
+         INC BC
+         LD A,L
+         LD (BC),A                  ; third character of default extension
+         INC BC
+         JR ParseNameDOS2_3
+
+ParseNameDOS2_invalid:
+         POP BC                     ; destination address
+         JR ParseNameDOS2_invalid2
+
+
+
+
+ParseNameDOS2_invalid1:
+         LD A,0D9H                  ; error code = Invalid pathname
+
+ParseNameDOS2_invalid2:
+         POP BC                     ; first character of default extension
+         POP BC                     ; last 2 characters of default extension
+
+         OR A
+         RET
+
+
+
+
+ParseNameDOS1:
+         EX AF,AF'                  ; A = first character of default extension
+
+         PUSH BC                    ; new 33e
+         PUSH AF                    ; new 33e
+
+         INC DE
+         LD (L1083),DE              ; 33e, LD (LastItem),DE
+         PUSH HL
+         LD HL,2 + 12 + 1           ; drive + 8 spaces, dot, 3 spaces, \0
+         ADD HL,DE
+         EX DE,HL                   ; DE = address for FCB
+         POP HL
+
+;         LD A,8                     ; no wild cards
+;                                    ; don't init: ext
+;                                    ; init: name, drive
+;                                    ; disable '='
+	PUSH DE
+	EX DE,HL
+	LD (HL),0		; init as default drive
+         INC HL
+         CALL L7D12                 ; fill name with spaces (8 spaces)
+
+         LD (HL),A                  ; first character of default extension
+         INC HL
+         LD (HL),B                  ; second character
+         INC HL
+         LD (HL),C                  ; third character
+         INC HL
+
+         XOR A
+         LD (HL),A                  ; make zero
+	INC HL
+         LD (HL),A                  ; make zero
+	INC HL
+         LD (HL),A                  ; make zero
+	INC HL
+         LD (HL),A                  ; make zero
+	EX DE,HL
+	POP DE
+
+;         BIT 0,A
+;         JR Z,L7C9A
+;
+;         CALL L7D92                 ; skip spaces and tabs
+;         CALL L7DBE                 ; starts with '=', ';' or ','
+;         JR NZ,L7C9D
+;
+;         INC HL                     ; yes, skip over '=', ';' or ','
+
+         CALL L7D92                 ; skip spaces and tabs
+
+         LD (L1081),HL              ; 33e
+         LD (L1085),HL              ; 33e
+
+         LD C,0                     ; 33e
+         CALL L7D9B                 ; 33e
+	JR C,L7CC1		; < space
+	JR Z,L7CC1		; jump first character is one of
+                                    ; ':."[]{}/+=;,', TAB or space
+         LD B,A                     ; C = first capital
+	INC HL
+	LD A,(HL)
+	DEC HL
+         CP ':'                     ; first capital followed by ':' (drive name)
+         LD A,B                     ; A = first capital
+	JR NZ,L7CC1		; jump if it wasn't a drive name
+
+; 33e
+         INC HL
+	INC HL			; point to first character after ':'
+	SUB 'A'
+	JR C,L7CBB		; jump illegal, < 'A'
+	INC A
+         CALL CheckDrive
+	JR NC,L7CC0		; jump if correct drive
+
+L7CBB:	LD A,0DBH		; return A = Illegal drive
+         JR ParseNameDOS2_invalid2
+
+; 33e: 115D
+; 33e
+
+L7CC0:   LD (L1085),HL              ; 33e
+         LD (DE),A                  ; 1 = 'A:', 2 = 'B:' etc.
+L7CC1:	INC DE
+; 33e    LD C,0                     ; flag for no wildcards used yet
+	LD B,8			; for 8 letters in filename
+	CALL L7CD6		; parse filename
+	LD A,(HL)
+         CP '.'                     ; is there an extension ?
+	JR NZ,L7CD4		; no, quit
+
+         SET 4,C
+
+         INC HL                     ; yes, skip extension
+	LD B,3
+	CALL L7CDD		; parse extension
+
+L7CD4:   EX DE,HL
+         LD HL,(L1083)
+         PUSH HL
+         LD HL,(L1081)
+         PUSH HL
+         LD HL,(L1085)
+         LD B,C
+         XOR A
+         JP L10A6
+
+;         PUSH BC
+;         PUSH HL
+;
+;         LD HL,(LastItem)
+;         LD DE,14
+;         ADD HL,DE
+;         LD DE,(LastItem)
+;
+;         LD BC,8
+;
+;Part1:   LD A,(HL)
+;         CP ' '
+;         JR Z,Part2
+;         LD (DE),A
+;         INC HL
+;         INC DE
+;         DEC C
+;         JR NZ,Part1
+;
+;Part2:
+;         ADD HL,BC
+;         LD BC,3
+;
+;         LD A,(HL)
+;         CP ' '
+;         JR Z,Part3
+;
+;         LD A,'.'
+;         LD (DE),A
+;         INC DE
+;
+;Part3:   LD A,(HL)
+;         CP ' '
+;         JR Z,Part4
+;         LD (DE),A
+;         INC HL
+;         INC DE
+;         DEC C
+;         JR NZ,Part3
+;
+;Part4:   XOR A
+;         LD (DE),A                  ; end the ASCIIZ-string
+;
+;         POP HL
+;         POP BC
+;         LD A,C                     ; return flag for wildcards
+;                                    ; 0: no wildcards used
+;                                    ; 1: wildcards used
+;
+;         LD BC,(LastItem)
+;         XOR A                      ; return with no errors
+;         RET
+
+L7CD6:	CALL L7D9B
+	JR C,L7CFD		; < space ? quit and increase DE with B
+	JR Z,L7CFD		; special ? quit and increase DE with B
+
+         SET 3,C
+
+L7CDD:	CALL L7D9B
+	JR Z,L7D03		; jump if special character
+	JR C,L7D03		; < space
+	INC HL
+	INC B
+	DEC B
+	JR Z,L7CDD		; if B = 0 skip all until special of < space
+
+         CP '*'                     ; asterisk
+	JR Z,L7CF6		; fill rest with '?'
+
+	LD (DE),A
+	INC DE
+	DEC B
+         CP '?'                     ; was this a wildcard
+	JR Z,L7CF9
+
+	JR L7CDD
+
+L7CF6:	CALL L7D0C		; fill rest with '?'
+
+L7CF9:
+;         LD C,1                     ; wildcard used = true
+         JR L7CDD                   ; continue
+
+
+                                    ; 33e 11AC
+L7CFD:   LD A,E                     ; increase DE with letters left, from 8
+	ADD A,B
+	LD E,A
+	RET NC
+	INC D
+	RET
+
+                                    ; 33e 11B2
+L7D03:   INC B                      ; stil letters to go ?
+	DEC B
+	RET Z			; no, quit
+         LD A,' '                   ; yes, fill rest of letters with spaces
+	JR L7D0E
+
+L7D0A:   LD B,11                    ; 33e 11B9
+
+L7D0C:   LD A,'?'                   ; fill with wildcards
+
+L7D0E:   LD (DE),A
+	INC DE
+	DJNZ L7D0E
+	RET
+
+L7D12:   PUSH BC                    ; 33e 11C2
+         LD C,8
+L7D13:   LD (HL),20H                ; fill with spaces
+	INC HL
+	DEC C
+	JR NZ,L7D13
+         POP BC
+         RET
+
+L7D92:   LD A,(HL)                  ; 33e 11CD
+	INC HL
+	CALL L7DC7
+	JR Z,L7D92
+	DEC HL
+	RET
+
+L7D9B:   LD A,(HL)                  ; 33e 11D6
+         CP 'a'                     ; < 'a' ?
+	JR C,L7DA6		; yes, no lower
+         CP 'z'+1                   ; > 'z' ?
+	JR NC,L7DA6		; yes, no lower
+
+         SUB 20H                    ; make capital
+
+L7DA6:   CP 20H                     ; < spatie ?
+         JR C,L7DA7
+
+         PUSH BC
+         PUSH HL
+         LD HL,SeparatorTable
+         LD BC,SeparatorTableLength
+         CPIR
+         POP HL
+         POP BC
+         RET
+
+L7DA7:   XOR A                      ; return Zero
+         RET
+
+SeparatorTable:
+         DB ' .,;:=/+"[]<>{}'
+SeparatorTableLength EQU $-SeparatorTable
+
+L7DC7:   CP 9
+	RET Z
+
+         CP ' '
+	RET
+
+GoBack:  DEC HL
+         LD A,(HL)
+         CP '.'
+         JR Z,GoBackQuit            ; jump to leave '.' where it is
+
+         CALL L7DA6                 ; special character ?
+         JR Z,GoBack                ; yes,
+
+GoBackQuit:
+         INC HL
+         RET
+
+SetExtension:
+         ; in:    HL = address of filename
+         ;        ABC = new extension
+         ;        Carry set if extension is to be overruled
+         ;        Carry clear if extension is not to be overruled
+         ; out:   A, HL, BC unchanged
+
+         PUSH AF                    ; save Carry
+         PUSH BC
+         PUSH HL                    ; save address of filename
+
+         LD D,-1
+         DEC HL
+SetExtension1:
+         INC D
+         INC HL
+         LD A,(HL)
+         OR A
+         JR NZ,SetExtension1        ; repeat until HL = address of '\0'
+
+         PUSH HL                    ; save address of '\0'
+
+         INC D
+         DEC D
+         JR Z,SetExtensionNoDot     ; jump if string was empty
+
+         LD B,4
+
+SetExtension2:
+         DEC HL
+         LD A,(HL)
+         CP '.'
+         JR Z,SetExtensionDotPresent; jump if '.' found
+
+         CP 5CH                     ; \\
+         JR Z,SetExtensionNoDot     ; jump if name delimiter found
+
+         CP ':'
+         JR Z,SetExtensionNoDot     ; jump if drivename delimiter found
+
+         DEC D
+         JR Z,SetExtensionNoDot     ; jump if no '.' found in first 3 chars
+
+         DJNZ SetExtension2
+         JP SetExtensionNoDot
+
+SetExtensionDotPresent:
+         POP DE                     ; throw address of '\0' away
+
+         POP DE                     ; DE = filename address
+                                    ; HL = address of dot
+
+         EX DE,HL                   ; HL = filename address
+
+         POP BC
+         POP AF
+
+         RET NC                     ; quit if not to be overruled
+
+         EX DE,HL
+
+SetExtension5:
+         LD (HL),'.'
+         INC HL
+         LD (HL),A
+         INC HL
+         LD (HL),B
+         INC HL
+         LD (HL),C
+         INC HL
+         LD (HL),0
+         EX DE,HL
+         RET
+
+SetExtensionNoDot:
+         POP DE                     ; DE = address of '\0'
+         POP HL                     ; HL = filename address
+
+         POP BC                     ; pop extension
+         POP AF
+
+         EX DE,HL                   ; HL = address of '\0'
+                                    ; DE = filename address
+         JR SetExtension5
+
+         ; FUNCTION GetError: BYTE; EXTERNAL $F9CB;
+GetError:; pascal function
+         ; in:    ErrorNumber
+         ; out:   HL = contents of ErrorNumber
+         LD A,(ErrorNumber)
+	LD L,A
+	LD H,0
+	XOR A
+         LD (ErrorNumber),A         ; clear for next disk action
+         RET
+
+SetErrorHandler:
+         PUSH AF
+         PUSH BC
+         PUSH DE
+         PUSH HL
+
+         LD HL,ErrorHandlerPresent
+         LD A,(HL)
+         OR A
+         JR NZ,ErrorHandlerQuit     ; quit if already on
+
+         LD (HL),255                ; set error handler on
+
+         XOR A
+         LD (ErrorNumber),A         ; clear for next disk action
+         LD (FatalError),A
+
+IFDEF MSX
+         LD HL,(0F323H)
+         LD (OldErrorVector),HL
+
+         LD HL,ErrorVector
+         LD (0F323H),HL             ; set new error vector
+
+         LD A,(DOS2Present)
+         OR A
+         JR Z,SetErrorHandler1      ; jump if DOS 1
+
+         LD HL,(0F325H)
+         LD (OldAbortVector),HL
+
+         LD HL,AbortVector
+         LD (0F325H),HL
+
+         JR ErrorHandlerQuit
+
+SetErrorHandler1:
+
+         LD HL,(0F1E6H)
+         LD (OldAbortVector),HL
+
+         LD HL,(AbortVector)
+         LD (0F1E6H),HL             ; set new abort vector
+
+ENDIF    ; MSX
+
+ErrorHandlerQuit:
+         POP HL
+         POP DE
+         POP BC
+         POP AF
+	RET
+
+ResErrorHandler:
+         PUSH AF
+         PUSH BC
+         PUSH DE
+         PUSH HL
+
+         LD HL,ErrorHandlerPresent
+         LD A,(HL)
+         OR A
+         JR Z,ErrorHandlerQuit      ; quit if already restored
+
+         LD (HL),0                  ; set error handler off
+
+IFDEF MSX
+         LD HL,(OldErrorVector)
+         LD (0F323H),HL             ; restore DOS 1/2 error vector
+
+         LD HL,(OldAbortVector)
+
+         LD A,(DOS2Present)
+         OR A
+         JR Z,ResErrorHandler1      ; jump if DOS 1
+
+         LD (0F325H),HL             ; restore DOS 2 abort vector
+         JR ErrorHandlerQuit
+
+ResErrorHandler1:
+         LD (0F1E6H),HL             ; restore DOS 1 abort vector
+ENDIF    ; MSX
+
+         JR ErrorHandlerQuit
+
+DOSSTCK: DW 0
+
+FILE_MSXDOS:
+         PUSH AF
+         LD (DOSSTCK),SP            ; stack pointer as if CALL was made !!
+	LD A,C
+         LD (DosFunction),A
+	POP AF
+
+         PUSH IX
+         PUSH IY
+         CALL MSXDOS
+         POP IY
+         POP IX
+         OR A
+         LD (ErrorNumber),A
+         RET Z                      ; quit if no error
+
+         CALL Abort
+         LD (ErrorNumber),A
+	OR A
+	RET
+
+ErrorNumber:      DB 0              ; DOS 2 error of last 'DosFunction'
+DosFunction:      DB 0
+DriveNumber:      DB 0
+ErrorDOS1:        DB 0
+ErrorDOS2:        DB 0
+ErrorDOS2_Sec:    DB 0
+FatalError:       DB 0              ; 0 = no fatal error, NonZero = fatal
+
+ErrorVector:      DW ErrorRoutine
+AbortVector:      DW AbortRoutine
+
+ErrorRoutine:
+         LD (DriveNumber),A         ; save
+         LD A,C
+         LD (ErrorDOS1),A
+         EX AF,AF'
+         LD (ErrorDOS2),A
+         EX AF,AF'
+         LD A,B
+         LD (ErrorDOS2_Sec),A
+
+         LD A,255
+         LD (FatalError),A
+
+         LD C,2            ; Abort
+         RET
+
+AbortRoutine:
+;         POP AF                     ; 12
+
+         LD A,(DOS2Present)
+         OR A
+         JR Z,AbortRoutine1         ; jump if DOS 1
+
+         LD A,(ErrorDOS2)
+         OR A
+         RET
+
+AbortRoutine1:
+         LD SP,(DOSSTCK)            ; quit via own stack saving
+         RET
+
+Abort:   ; in:    A = error code
+         ; out:   A = always a DOS 2 error code
+
+         LD A,(DOS2Present)
+         OR A
+         JR NZ,AbortDOS2            ; jump if DOS 2
+
+         ; DOS 1
+         LD A,(FatalError)
+         OR A
+         JP NZ,ConvertFatalDOS1Code ; jump if FatalError
+
+         JP ConvertDOS1Code
+
+AbortDOS2:
+         LD A,(FatalError)
+         OR A
+         JP Z,AbortDOS2_1           ; jump if no FatalError
+ 
+         LD A,(ErrorNumber)
+         CP 9DH
+         JR C,AbortDOS2_1
+         CP 9FH+1
+         JR NC,AbortDOS2_1
+
+         ; return second code
+         LD A,(ErrorDOS2_Sec)
+         RET
+
+AbortDOS2_1:
+         LD A,(ErrorNumber)
+         RET
+
+ConvertFatalDOS1Code:
+         ; converts DOS 1 error code to DOS 2 error code
+	; bits 1-3
+	;	0 - Write protected disk
+	;	2 - Drive not ready
+	;	4 - Data (CRC) error
+	;	6 - Seek error
+	;	8 - Record not found
+         ;       10 - Write fault (verify error)
+         ;       12 - Other error
+	; rest of the bits are ignored
+         ; out:   A = equivalent DOS 2 error code
+         PUSH BC
+         PUSH HL
+         LD A,(ErrorDOS1)
+	RRCA
+	AND 7
+	LD C,A
+	LD B,0
+	LD HL,FATALTAB
+	ADD HL,BC
+	LD A,(HL)		; maak van DOS 1 nummer een DOS 2 nummer
+         POP HL
+         POP BC
+	RET
+
+FATALTAB:
+	; tabel for converting a DOS1 error code for a fatal error to
+	; a corresponding DOS2 error code
+         DB 0F8H                    ; 0, Write protected
+         DB 0FCH                    ; 2, Not Ready, no disk in drive
+         DB 0FAH                    ; 4, Data error, CRC error
+         DB 0F3H                    ; 6, Seek error, track not found
+         DB 0F9H                    ; 8, Sector not found
+         DB 0FEH                    ; A, Write error
+         DB 0FDH                    ; C, Disk error, unknown error
+
+ConvertDOS1Code:
+         ; in:    -
+         ; out:   A = DOS 2 error code
+
+         PUSH BC
+         PUSH HL
+         LD HL,ERRORTAB
+         LD A,(DosFunction)
+	LD C,A			; C = number of last DOS-call
+
+ConvertDOS1Code1:
+	LD A,(HL)		; A = DOS-call number
+         INC HL
+	OR A
+         JR Z,ConvertDos1Code2      ; quit with error 255 if not found
+
+	CP C			; DOS-call number found in tabel?
+         JR Z,ConvertDOS1Code2      ; yes, quit loop
+
+         INC HL                     ; point to next DOS-call number
+         JR ConvertDOS1Code1        ; repeat until end of tabel
+
+ConvertDOS1Code2:
+         LD A,(HL)                  ; return DOS 2 error
+         POP HL
+         POP BC
+         RET
+
+ERRORTAB:
+	; tabel for converting DOS1 non-fatal errors to a corresponding
+	; DOS2 error code
+         ;                            DOS1-call         if error then
+
+         DB 0FH, 0D7H               ; open file,        file not found
+         DB 10H, 0BAH               ; close file,       file handle disappeared
+         DB 11H, 0D7H               ; search first,     file not found
+         DB 12H, 0D7H               ; search next,      file not found
+         DB 13H, 0D7H               ; delete file,      file not found
+         DB 16H, 0D5H               ; create file,      root directory full
+         DB 17H, 0D3H               ; rename file,      duplicate filename
+         DB 26H, 0D4H               ; rand.block write, disk full
+         DB 27H, 0C7H               ; rand.block read,  end of file
+         DB 2BH, 0BEH               ; set date,         invalid date
+         DB 2DH, 0BDH               ; set time,         invalid time
+         DB 0  , 0FDH               ; quit if not found with error
+
+; -------------------------------------------------------------
+
+CreateFile:
+         ; in:    HL = address of file name
+         ;        DE = address of handle or unopened FCB
+         ;        ABC = default extension
+         ; out:   HL = address of handle or unopened FCB
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+         LD (OpenCreateDefault),A
+         LD (OpenCreateDefault+1),BC
+
+         LD A,(DOS2Present)
+         OR A
+
+         LD C,44H                   ; DOS 2 create file
+         JR NZ,OpenCreateFileDOS2
+
+         ; DOS 1
+         LD C,16H                   ; DOS 1 create file
+         JR OpenCreateFileDOS1
+
+OpenCreateDefault:
+         DS 3
+
+OpenFile:
+         ; in:    HL = address of file name
+         ; DOS 1: DE = address of handle followed by drive/path/filename
+         ; DOS 2: DE = address of FCB
+         ;        ABC = default extension
+         ; out:   HL = address of handle or unopened FCB
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+         LD (OpenCreateDefault),A
+         LD (OpenCreateDefault+1),BC
+
+         LD A,(DOS2Present)
+         OR A
+
+         LD C,43H                   ; DOS 2 open file
+         JR NZ,OpenCreateFileDOS2
+
+         ; DOS 1
+         LD C,0FH                   ; DOS 1 open file
+
+OpenCreateFileDOS1:
+         PUSH BC                    ; save DOS 1 function
+         PUSH DE                    ; save FCB address
+
+         LD A,(OpenCreateDefault)
+         LD BC,(OpenCreateDefault+1); ABC = default extension
+         CALL ParseName             ; parse file name at HL to FCB at DE+16
+
+;         LD HL,L005C
+;         POP DE                     ; restore FCB address
+;         PUSH DE
+;         LD BC,FCB_LEN
+;         LDIR                       ; copy filled in FCB to its destination
+
+         POP HL                     ; HL = address of FCB
+
+         POP BC                     ; C = DOS 1 function call
+
+         PUSH HL
+
+         OFF_HL 0 16
+         PUSH HL
+
+         OFF_HL 0 FCB_RECSIZE       ; goto extent byte
+         LD (HL),0                  ; clear the FCB
+
+         POP DE
+         PUSH DE
+
+         CALL FILE_MSXDOS
+
+         POP HL                     ; HL = FCB address
+         PUSH HL
+
+         PUSH AF                    ; save error + corresponding flags
+
+         OFF_HL 0 FCB_RECSIZE       ; goto record size
+         LD (HL),1                  ; record size = 1
+         INC HL
+         XOR A
+         LD (HL),A
+
+         OFF_HL FCB_RECSIZE+1 FCB_FILEPOS ; current file position
+         LD (HL),A                  ; file position = 0
+         INC HL
+         LD (HL),A
+         INC HL
+         LD (HL),A
+         INC HL
+         LD (HL),A
+
+         POP AF                     ;  A = error code
+
+         POP HL                     ; HL+16
+         POP HL                     ; HL = FCB address
+
+	RET
+
+OpenCreateFileDOS2:
+
+         PUSH DE                    ; save address of handle
+
+         PUSH BC                    ; save function number
+
+         ;LD DE,TEMPFileName
+         LD A,(OpenCreateDefault)
+         LD BC,(OpenCreateDefault+1); ABC = default extension
+         CALL ParseName             ; parse file name at HL to FCB at DE
+
+         POP BC
+
+         POP DE
+         PUSH DE
+
+;         EX DE,HL                   ; DE = address of filename
+;         LD DE,TEMPFileName+1
+         INC DE                     ; parsename placed the filename after
+                                    ; the file handle
+         XOR A                      ; no special permissions
+         LD B,A
+
+         CALL FILE_MSXDOS
+
+         POP HL                     ; HL = address of handle
+         RET NZ                     ; quit if not succeeded
+
+         LD (HL),B                  ; save handle
+	XOR A			; return with NO_ERROR
+	RET
+
+FileSeek:
+         ; in:    BC = handle/FCB address
+         ;        DEHL = new file position
+         ; out:   DEHL = new file position
+         ;        BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+         PUSH BC                    ; save for return
+
+         LD A,(DOS2Present)
+         OR A
+         JR NZ,FileSeekDOS2
+
+         ; DOS 1
+         PUSH DE                    ; save high-word
+         PUSH HL                    ; save low-word
+
+         LD H,B                     ; HL = handle/FCB address
+         LD L,C
+         OFF_HL 0 FCB_FILEPOS+16 ; 33e +14    ; current file position
+         POP BC                     ; BC = low-word
+         LD (HL),C                  ; set low-word
+         INC HL
+         LD (HL),B
+         INC HL
+         POP DE                     ; DE = high-word
+         LD (HL),E                  ; set high-word
+         INC HL
+         LD (HL),D
+         LD H,B                     ; HL = high-word, DEHL complete again
+         LD L,C
+
+         POP BC                     ; BC = handle/FCB address
+         XOR A                      ; return with no errors
+         RET
+
+FileSeekDOS2:
+         LD A,(BC)                  ; A = handle
+	LD B,A
+         LD C,4AH                   ; DOS 2 FileSeek function
+	XOR A			; mode 0, relative to the file beginning
+         CALL FILE_MSXDOS                ; Move File Handle Pointer, mode 0
+
+         POP BC
+         RET
+
+FilePos:
+         ; in:    BC = handle/FCB address
+         ; out:   DEHL = current file position
+         ;        BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+         PUSH BC
+
+         LD A,(DOS2Present)
+         OR A
+         JR NZ,FilePosDOS2
+
+         LD H,B                     ; HL = handle/FCB address
+         LD L,C
+         OFF_HL 0 FCB_FILEPOS+16    ; 33e, +14
+
+FilePos_FileSizeDOS1:
+         LD C,(HL)                  ; BC = low-word
+         INC HL
+         LD B,(HL)
+         INC HL
+         LD E,(HL)                  ; DE = high-word
+         INC HL
+         LD D,(HL)
+
+         LD H,B                     ; HL = low-word
+         LD L,C
+
+         POP BC                     ; BC = handle/FCB address
+         XOR A                      ; return with no errors
+         RET
+
+FilePosDOS2:
+         LD DE,0
+	LD HL,0
+         LD A,(BC)
+         LD B,A                     ; B = handle
+	LD C,4AH
+         LD A,1                     ; mode 1, relative to current position
+         CALL FILE_MSXDOS           ; Get File Handle Pointer, mode 1
+
+         POP BC                     ; BC = handle/FCB address
+         RET
+
+FileSize:
+         ; in:    BC = handle/FCB address
+         ; out:   DEHL = file size
+         ;        BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+         LD A,(DOS2Present)
+         OR A
+         JR NZ,FileSizeDOS2
+
+         PUSH BC
+
+         LD H,B                     ; HL = handle/FCB address
+         LD L,C
+         OFF_HL 0 FCB_FILESIZE+16   ; 33e, +14
+
+         JP FilePos_FileSizeDOS1
+
+FileSizeTEMP:
+         DS 4
+
+FileSizeDOS2:
+         CALL FilePos               ; get curent file position
+         LD (FileSizeTEMP),HL       ; save current file position
+         LD (FileSizeTEMP+2),DE
+
+         PUSH BC
+         LD DE,0
+	LD HL,0
+         LD A,(BC)
+         LD B,A                     ; B = handle
+	LD C,4AH
+	LD A,2			; mode 2, relative to then end of the file
+         CALL FILE_MSXDOS           ; Get file size, mode 2, changes position
+         POP BC
+
+         PUSH DE                    ; save file size on stack
+         PUSH HL
+
+         LD HL,(FileSizeTEMP)        ; get current file position
+         LD DE,(FileSizeTEMP+2)
+         CALL FileSeek              ; restore old file position
+
+         POP HL
+         POP DE
+         RET
+
+ReadFile:
+         ; in:    BC = handle/FCB address
+         ;        DE = destination address for data
+         ;        HL = number of bytes to read
+         ; out:   HL = number of bytes actually read
+         ;        BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+         PUSH BC                    ; save handle/FCB address
+
+         LD A,(DOS2Present)
+         OR A
+         JR NZ,ReadFileDOS2
+
+         PUSH HL                    ; save number of bytes to read
+
+         LD C,1AH
+         CALL FILE_MSXDOS           ; set DMA-address
+
+         POP HL                     ; HL = number of bytes to read
+
+         POP DE                     ; DE = handle/FCB address
+
+         PUSH DE                    ; 33e, save handle/FCB address
+
+         EX DE,HL
+         LD BC,16                   ; 33e, 14
+         ADD HL,BC                  ; 33e, DE += 14
+         EX DE,HL
+
+; 33e    PUSH DE
+
+         LD C,27H                   ; DOS 1 random read
+         CALL FILE_MSXDOS
+
+ReadFileQuit:
+         CP 0C7H
+         JR NZ,ReadFileQuit1
+
+         XOR A
+
+ReadFileQuit1:
+         OR A
+         POP BC                     ; BC = handle/FCB address
+         RET
+
+ReadFileDOS2:
+         LD A,(BC)
+         LD B,A                     ; B = handle
+
+         LD C,48H                   ; DOS 2 read file handle
+         CALL FILE_MSXDOS
+
+         JR ReadFileQuit
+
+WriteFile:
+         ; in:    BC = handle/FCB address
+         ;        DE = source address for data
+         ;        HL = number of bytes to write
+         ; out:   HL = number of bytes actually written
+         ;        BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+
+         PUSH BC                    ; save handle/FCB address
+
+         LD A,(DOS2Present)
+         OR A
+         JR NZ,WriteFileDOS2
+
+         PUSH HL
+
+         LD C,1AH
+         CALL FILE_MSXDOS           ; set DMA-address
+
+         POP HL                     ; HL = number of bytes to write
+
+         POP DE                     ; DE = handle/FCB address
+         PUSH DE                    ; save handle/FCB adress
+
+         EX DE,HL
+         LD BC,16                   ; 33e, 14
+         ADD HL,BC                  ; 33e, DE += 14
+         EX DE,HL
+
+; 33e    PUSH DE
+
+         LD C,26H                   ; DOS 1 random write
+         CALL FILE_MSXDOS
+
+         POP BC                     ; BC = handle/FCB address
+         RET
+
+WriteFileDOS2:
+         LD A,(BC)
+         LD B,A                     ; B = handle
+
+         LD C,49H                   ; DOS 2 write file handle
+         CALL FILE_MSXDOS
+
+         POP BC                     ; BC = handle address
+         RET
+
+
+CloseFile:
+         ; in:    BC = handle/FCB address
+         ; out:   BC = handle/FCB address
+         ;         A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+         PUSH BC
+
+         LD A,(DOS2Present)
+         OR A
+         JR NZ,CloseFileDOS2
+
+         LD H,B
+         LD L,C
+         OFF_HL 0 16                ; 33e, 14
+         EX DE,HL                   ; DE = FCB address
+
+         LD C,10H                   ; DOS 1 close file
+         CALL FILE_MSXDOS
+
+         POP BC
+         RET
+
+CloseFileDOS2:
+         LD A,(BC)
+         LD B,A                     ; B = handle
+         LD C,45H                   ; DOS 2 close file
+         CALL FILE_MSXDOS
+
+         POP BC
+         RET
+
+DeleteFile:
+         ; in:    DE = Drive/path/file ASCIIZ string
+         ; out:    A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+         LD A,(DOS2Present)
+         OR A
+         JR NZ,DeleteFileDOS2
+
+         EX DE,HL
+         LD DE,TEMPFileName
+         LD A,' '
+         LD B,A
+         LD C,A                     ; ABC = default extension = '   '
+         CALL ParseName             ; parse filename at HL to FCB at DE
+
+         LD DE,TEMPFileName + 16    ; 33e
+         LD C,13H                   ; DOS 1 delete file
+         JP FILE_MSXDOS
+
+DeleteFileDOS2:
+         LD C,4DH                   ; DOS 2 delete file
+         JP FILE_MSXDOS
+
+DeleteFileHandle:
+         LD A,(DOS2Present)
+         OR A
+         JR NZ,DeleteFileHandleDOS2
+
+         LD HL,16
+         ADD HL,DE
+         EX DE,HL
+         LD C,13H
+         JP FILE_MSXDOS
+
+DeleteFileHandleDOS2:
+         LD A,(DE)
+         LD B,A
+         LD C,52H
+         JP FILE_MSXDOS
+
+RenameFile:
+         ; in:    DE = old Drive/path/file ASCIIZ string
+         ;        HL = new filename ASCIIZ string
+         ; out:    A = DOS 2 error code, 0 on success
+         ;             flags are set on A
+         LD A,(DOS2Present)
+         OR A
+         JR NZ,RenameFileDOS2
+
+         PUSH DE
+
+         EX DE,HL                   ; HL = address to old filename
+         LD DE,TEMPFileName         ; address of first half of FCB
+         LD A,' '
+         LD B,A
+         LD C,A                     ; ABC = default extension = '   '
+         CALL ParseName             ; parse filename at HL to FCB at DE
+
+         LD DE,TEMPFileName
+         LD C,11H                   ; DOS 1 search first
+         CALL FILE_MSXDOS
+
+         POP HL                     ; HL = address of new filename
+
+         RET NZ                     ; error, return with 0D7H, File not found
+
+         LD DE,TEMPFileName+16-14   ; Second FileName at FCB+16
+         LD A,' '
+         LD B,A
+         LD C,A                     ; ABC = default extension = '   '
+         CALL ParseName             ; parse filename at HL to FCB at DE
+
+         LD DE,TEMPFileName
+         LD C,17H                   ; DOS 1 rename file
+         JP FILE_MSXDOS
+
+RenameFileDOS2:
+         PUSH DE
+
+         EX DE,HL                   ; DE = drive/path/file string address
+         LD BC,5BH                  ; B = 0 (no volume name), C = function
+         CALL FILE_MSXDOS           ; Parse PathName, NewName
+
+         ; HL = pointer to last item, start of ASCIIZ filename string
+
+         POP DE
+
+         RET NZ                     ; quit if error occurred during Parsing
+
+         LD C,4EH                   ; DOS 2 rename file
+         JP FILE_MSXDOS
+
+GetCurrentDirectory:
+         ; in:     B = drive number, 0 = default, 1 = A: etc.
+         ;        DE = address where to put drive/path string
+         ;             without a trailing backslash
+         ; out:    A = DOS 2 error code, 0 on succes
+         ;             flags are set on A
+
+         LD A,B
+         CALL CheckDrive
+         JR C,GetCurrentDirectory_IDRV
+
+         ; A = drive number, default already converted
+         LD B,A
+
+         ADD A,'A'-1
+         LD (DE),A
+         INC DE
+         LD A,':'
+         LD (DE),A
+         INC DE
+
+         LD A,(DOS2Present)
+         OR A
+         RET Z                      ; return with no error if DOS 1
+
+         LD A,'\'
+         LD (DE),A
+         INC DE
+
+         LD C,59H                   ; DOS 2 get current directory
+         JP FILE_MSXDOS
+
+
+GetCurrentDirectory_IDRV:
+         LD A,0DBH
+         OR A
+         RET
+
+L15B7:   DW 0
+L15B9:   DW 0
+
+L15BB:   CALL L15CD
+         CALL ReadFile              ; 33e, 14B2
+         JP L15DC
+
+L15C4:   CALL L15CD
+         CALL WriteFile             ; 33e, 14DE
+         JP L15DC
+
+L15CD:   PUSH DE
+         PUSH HL
+         CALL FilePos               ; 33e, 1446
+         LD (L15B7),HL
+         LD (L15B9),DE
+         POP HL
+         POP DE
+         RET
+
+L15DC:   PUSH AF
+         PUSH DE
+         PUSH HL
+         LD HL,(L15B7)
+         LD DE,(L15B9)
+         CALL FileSeek              ; 33e, 141D
+         POP HL
+         POP DE
+         POP AF
+         RET
+
+;M       END
+;!       END
+

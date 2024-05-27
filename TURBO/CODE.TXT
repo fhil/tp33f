@@ -1,0 +1,58 @@
+   CALL L6160
+   Prev. (reg D)  Current (reg B)   Generated Code
+   REAL           REAL              EXX            ; HLDEBC' = current
+                                    POP HL
+                                    POP DE
+                                    POP BC         ; HLDEBC = previous
+
+   REAL           INTEGER           CALL _L1008    ; convert HL to float HLDEBC
+                                    EXX            ; HLDEBC' = current
+                                    POP HL
+                                    POP DE
+                                    POP BC         ; HLDEBC = previous
+
+   REAL           LONGINT           CALL _L        ; convert DE:HL to REAL
+                                    EXX            ; HLDEBC' = current
+                                    POP HL
+                                    POP DE
+                                    POP BC         ; HLDEBC = previous
+
+   INTEGER        REAL              EXX            ; HLDEBC' = current value
+                                    POP HL         ; HL = value of previous
+                                    CALL _L1008    ; convert HL to float HLDEBC
+
+   LONGINT        REAL              EXX            ; HLDEBC' = current value
+                                    POP HL         ; DE:HL = value of previous
+                                    POP DE
+                                    CALL _L        ; convert DE:HL to REAL
+
+   INTEGER        INTEGER                          ; HL = current value
+                                    POP DE         ; DE = previous value
+
+   LONGINT        LONGINT                          ; previous value pushed
+                                                   ; DE:HL = current value
+
+   LONGINT        INTEGER                          ; previous value pushed
+                                    CALL _L        ; convert HL to LONGINT
+
+   INTEGER        LONGINT           CALL _L        ; convert pushed INTEGER
+                                                   ; to LONGINT
+
+   STRING         STRING            -              ; previous pushed first
+                                                   ; current pushed second
+
+   STRING         CHAR                             ; previous pushed on stack
+                                    LD H,L         ; convert CHAR to STRING
+                                    LD L,1
+                                    PUSH HL
+
+   CHAR           STRING            CALL _L09A2    ; convert previous to STRING
+
+   CHAR           CHAR                             ; HL = current character
+                                    POP DE         ; DE = previous character
+
+   POINTER        POINTER                          ; HL = current pointer
+                                    POP DE         ; DE = previous pointer
+
+   BOOLEAN        BOOLEAN                          ; HL = current boolean
+                                    POP DE         ; DE = previous boolean

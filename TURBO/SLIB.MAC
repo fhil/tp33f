@@ -1,0 +1,2063 @@
+;         .Z80
+
+IFNDEF MAKEPC
+MSX:
+ENDIF
+
+IFDEF MSX
+MSXDOS   EQU 5
+ENDIF
+
+FASTWRITE:
+         DB 0
+
+         INCLUDE stdio.inc
+
+         INCLUDE libdefs.inc
+
+         INCLUDE libconst.inc
+
+         ; defined in compiler.mac
+         EXTRN L5271,L5287,L5639,L58C5,L5960,L59E9,L5A0C,L5A17,L5CAD
+         EXTRN L5D76,L5E8E,L5E97,L5EA2,L5EBB,L5EBE,L5ED0,L5EDD,L5EE8
+
+         EXTRN L6148,L6201,L620F,L6540,L65D5,L65DE,L65E7,L65EF,L65F7,L677F
+         EXTRN PARSE_O_IL_C
+         EXTRN ParseLONG
+         EXTRN L678B,L6A5C
+         EXTRN L6B5E                ; output length (C) and data at L7A57
+         EXTRN L6CC2,L6D24,L6D43,L6E54
+         EXTRN L6F0B,L6F13,L6F1B,L6F5E,L6F66,L6F6E,L6F7E
+         EXTRN L72D4,L72DA
+         EXTRN L7B5E,L7B6F,L7B8B,L7B9E,L7BA3,L7BA7
+
+;         PUBLIC L5ABE
+         PUBLIC L7638,L77B1
+
+L59FA:   DW _L1811                  ; LIB, reset typed file
+         DW _L13FF                  ; LIB, reset text file
+         DW _L1A70                  ; LIB, reset untyped file
+
+L5A00:   DW _L1810                  ; LIB, rewrite typed file
+         DW _L13FE                  ; LIB, rewrite text file
+         DW _L1A6F                  ; LIB, rewrite untyped file
+
+L5A06:   DW _L187A                  ; LIB, close typed file
+         DW _L1469                  ; LIB, close text file
+         DW _L1AB0                  ; LIB, close untyped file
+
+L5943:	; PROCEDURE Assign(VAR F: FILE; Name: STRING);
+         CALL L5A0C                 ; parse '(' and file parameter
+         LD HL,_L1370               ; LIB, assume file type = untyped or typed
+	CP 6
+	JR NZ,L5955		; jump if not text file
+
+	LD HL,_L136F		; LIB, file type = text
+	CALL L5955
+         JP L5ABE                   ; add call for I/O checking, if on
+
+L5955:	PUSH HL
+	CALL O_PSHHL		; push for first parameter, FIB address
+         CALL L6F5E                 ; match(',')
+         CALL L5ED0                 ; parse string expression
+	POP HL
+         JP L5960                   ; match(')', CALL HL
+
+L5966:   ; PROCEDURE Rename(VAR F: FILE; Name: STRING);
+         CALL L5A0C                 ; parse '(' and file parameter
+	LD HL,_L1BA5		; LIB, rename
+	CALL L5955
+         JP L5ABE                   ; add call for I/O checking, if on
+
+P_RenameFile:
+         ; PROCEDURE RenameFile(OldName: STRING; NewName: STRING);
+         CALL L6F66                 ; match('(')
+         CALL L5ED0                 ; parse string expression
+         CALL L6F5E                 ; match(',')
+         CALL L5ED0                 ; parse string expression
+         LD HL,_RenameFile_LIB
+         JP L5960                   ; match(')'), CALL HL
+
+L5971:	; PROCEDURE Erase(VAR F: FILE);
+         CALL L5A0C                 ; parse '(' and file parameter
+	LD HL,_L1B93		; LIB
+         JP L5960                   ; match(')'), CALL HL
+
+L5979:	; PROCEDURE Chain(VAR F: FILE);
+         LD HL,_L1BEB               ; LIB
+         JR L5981
+
+L597E:	; PROCEDURE Execute(VAR F: FILE);
+         LD HL,_L1BEA               ; LIB
+L5981:	PUSH HL
+         CALL L5A0C                 ; parse '(' and file parameter
+
+L5985:   POP HL
+L5986:   CALL L5960                 ; match(')'), CALL HL
+
+         JP L5ABE                   ; add call for I/O checking, if on
+
+L598C:	; PROCEDURE Seek(VAR F: FILE OF TYPE; Pos: INTEGER);
+         ; PROCEDURE Seek(VAR F: FILE; Pos: INTEGER);
+         CALL L5A0C                 ; parse '(' and file parameter
+	CP 6
+
+	CALL L72D4		; Zero --> error
+         DB 3FH                     ; error 63: Textfiles are not allowed here
+
+         LD HL,_L19D5               ; LIB, seek typed
+	CP 5
+         JR Z,L599F                 ; jump if typed
+
+         LD HL,_L1B6F               ; LIB, seek untyped
+L599F:	PUSH HL
+	CALL O_PSHHL
+         CALL L6F5E                 ; match(',')
+;         CALL L5E97                 ; parse integer expression
+         CALL ParseLONG             ; parse integer/long expression
+	JR L5985
+
+L59AB:   ; PROCEDURE Flush(VAR F: FILE OF TYPE);
+         CALL L5A0C                 ; parse '(' and file parameter
+	CP 5
+
+	CALL L72DA		; NonZero --> error
+	DB 40H			; error 64: Textfiles and untyped files
+				;	    are not allowed here
+
+         LD HL,_L19A5               ; LIB, flush typed file
+	JR L5986
+
+L59B9:	; PROCEDURE Reset(VAR F: FILE);
+         LD HL,L59FA
+	JR L59C1
+
+L59BE:	; PROCEDURE Rewrite(VAR F: FILE);
+	LD HL,L5A00
+L59C1:	PUSH HL
+         CALL L5A0C                 ; parse '(' and file parameter
+         LD A,(L7B5C)               ; 33e, 54C8
+         CP 7
+         JR Z,L78CD
+         CP 5                       ; jump if not a typed file
+         JR NZ,L59D8
+
+         ; typed file
+         LD HL,(L7B5E)
+	CALL L5271
+
+	LD HL,(L7B6F)
+	CALL O_LDDE
+
+L59D8:	POP HL
+	JR L59E1
+
+; 33e
+L78CD:
+         CALL O_PSHHL               ; L427D
+         CALL L6F13                 ; match(','), if present
+         JR NZ,L78E3                ; jump if no size given
+
+         LD A,(L7B5C)
+         PUSH AF
+         CALL L5E97                 ; parse integer expression
+         POP AF
+         LD (L7B5C),A
+         POP HL
+         JR L59E1
+
+L78E3:
+         LD HL,0080H                ; default block size
+         CALL O_LDHL
+         POP HL
+         JR L59E1
+; 33e
+
+L59DB:	; PROCEDURE Close(VAR F: FILE);
+         CALL L5A0C                 ; parse '(' and file parameter
+
+         LD HL,L5A06                ; HL = address of table for closing types
+L59E1:   CALL L6F6E                 ; match(')')
+
+         CALL L59E9                 ; generate call for file I/O
+         JP L5ABE                   ; add call for I/O checking, if on
+
+
+L5A32:   ; PROCEDURE Readln(VAR F: TEXT);
+	LD A,0AFH		; NZ = 'LN' after read
+         JR L5A34
+
+L5A33:	; PROCEDURE Read(VAR F: FILE OF TYPE; VAR F: TYPE);
+	; PROCEDURE Read(VAR F: TEXT; VAR I: INTEGER);
+         ; PROCEDURE Read(VAR F: TEXT; VAR L: LONGINT);
+	; PROCEDURE Read(VAR F: TEXT; VAR R: REAL);
+	; PROCEDURE Read(VAR F: TEXT; VAR C: CHAR);
+	; PROCEDURE Read(VAR F: TEXT; VAR S: STRING);
+	XOR A
+L5A34:   LD (L7BA3),A               ; 0 = no 'LN' after read
+	CALL L6F1B		; match('('), if present
+	JR Z,L5A41		; jump if '(' matched
+
+	; PROCEDURE Read;
+	CALL L5ACA
+	JR L5AB4
+
+L5A41:   CALL L5A17                 ; parse file parameter
+	JR C,L5A63
+	JR NZ,L5A5B
+
+         CP 5                       ; typed file ?
+	JP Z,L5BD8		; jump if typed file
+
+         CP 6                       ; no typed file and no text file ?
+
+	CALL L72DA		; NonZero --> error
+	DB 41H			; error 65: Untyped files are not allowed here
+
+	; read from text file
+	LD HL,_L14A9		; LIB
+	CALL O_CALHL
+	JR L5AAC
+
+L5A5B:	CALL L678B
+	CALL L5ACA
+	JR L5A69
+
+L5A63:	CALL L5ACA
+L5A66:   CALL L677F                 ; parse var parameter
+
+L5A69:	LD A,(L7B5C)
+	CP 8
+         JR C,L5A78                 ; no STRING, REAL, INTEGER, BOOLEAN,
+                                    ; CHAR or LONGINT
+
+         CP 0BH                     ; type = BOOLEAN ?
+         JR Z,L5A78                 ; jump for error 66
+
+         CP 0EH+1
+	JR C,L5A7C
+
+L5A78:	CALL L72E1		; no condition
+	DB 42H			; error 66: I/O are not allowed
+
+L5A7C:	CP 8
+	JR NZ,L5A8F
+
+         ; printed type = STRING
+         LD A,(L7B62)
+	DEC A
+	LD H,A
+	LD L,6
+	CALL O_HL
+
+         LD A,8
+         JR L5A90
+
+L5A8F:
+         CP 0AH
+         JR NZ,L5A90                ; jump if not INTEGER
+
+         LD A,(L7B62)
+         DEC A
+
+         LD A,0AH                   ; assume INTEGER
+         JR NZ,L5A90
+
+         LD A,0DH                   ; no, BYTE type
+
+L5A90:
+         LD HL,ReadTypesTable - 8*2
+         CALL TableIndex2
+
+         CALL O_CALHL
+
+L5AAC:   CALL L6F13                 ; match(','), if present
+	JR Z,L5A66		; jump if ',' matched
+
+	CALL L6F6E		; match(')')
+
+L5AB4:   LD HL,_L16AB               ; LIB, 'LN' after Read
+
+L5AB7:   LD A,(L7BA3)               ; 0 = no 'LN' after read/write
+	OR A
+	CALL NZ,O_CALHL		; call if LN is needed
+
+L5ABE:   LD A,(L7B9E)               ; compiler directives
+	BIT 0,A			; 1 = I/O Error Handling on
+	RET Z			; return if off
+	LD HL,_L201B		; LIB, I/O Error function
+	JP O_CALHL
+
+ReadTypesTable:
+         DW _L168E                  ; 08, read STRING
+         DW _L1672                  ; 09, read REAL
+         DW _L164E                  ; 0A, read INTEGER
+         DW 0                       ; 0B
+         DW _L1644                  ; 0C, read CHAR
+         DW _L164D                  ; 0D, read BYTE
+         DW _L1671                  ; 0E, read LONGINT
+
+L5ACA:   LD HL,_L149B               ; LIB, assume normal output
+	LD A,(L7B9E)		; compiler directives
+	BIT 6,A			; 1 = I/O Mode selection on
+	JR Z,L5AE4		; jump if off
+
+         LD HL,_L14CC               ; LIB, read from console
+
+         LD A,(L7BA3)
+	OR A
+	JR Z,L5AE4
+
+         LD HL,_L14CB               ; LIB, readln from console
+	XOR A
+	LD (L7BA3),A
+L5AE4:	JP O_CALHL
+
+L5AE7:   ; FastWriteln
+         LD A,1
+         JR L5AE72
+
+L5AE71:  ; normal Writeln
+         XOR A
+
+L5AE72:  LD (FASTWRITE),A
+
+         ; PROCEDURE Writeln(VAR F: TEXT);
+         LD A,0AFH                  ; NZ = 'LN' after write
+	JR L5AE9
+
+L5AE8:   ; FastWrite
+         LD A,1
+         JR L5AE82
+
+L5AE81:  ; normal Write
+         XOR A
+
+L5AE82:  LD (FASTWRITE),A
+         ; PROCEDURE Write(VAR F: FILE OF TYPE; VAR V: TYPE);
+	; PROCEDURE Write(VAR F: TEXT; I: INTEGER);
+         ; PROCEDURE Write(VAR F: TEXT; L: LONGINT);
+         ; PROCEDURE Write(VAR F: TEXT; R: REAL);
+	; PROCEDURE Write(VAR F: TEXT; B: BOOLEAN);
+	; PROCEDURE Write(VAR F: TEXT; C: CHAR);
+	; PROCEDURE Write(VAR F: TEXT; S: STRING);
+	XOR A
+
+L5AE9:   LD (L7BA3),A               ; 0 = no 'LN' after write
+
+         CALL L6F1B                 ; match('('), if present
+         JR Z,L5AFA                 ; jump if '(' matched
+
+	LD HL,_L149B		; LIB
+         CALL O_CALHL               ; set FIB address at standard output
+
+         JP L5BD2                   ; output CALL for CR, LF codes
+
+L5AFA:   ; '(' parsed
+         CALL L5A17                 ; parse file parameter
+         JR C,L5B20                 ; jump if no file variable present
+                                    ; output CALL for standard output
+         JR NZ,L5B15
+
+         CP 5                       ; typed file ?
+         JP Z,L5BDD                 ; jump if typed file
+
+         CP 6                       ; text file
+
+	CALL L72DA		; NonZero --> error
+	DB 41H			; error 65: Untyped files are not allowed here
+
+	LD HL,_L14BA		; LIB
+	CALL O_CALHL
+
+	JP L5BC9
+
+L5B15:   CALL L620F
+
+         LD HL,_L149B               ; LIB
+         CALL O_CALHL               ; set FIB address at standard output
+	JR L5B4F
+
+L5B20:   LD HL,_L149B               ; LIB
+         CALL O_CALHL               ; set FIB address at standard output
+
+L5B26:   LD A,0FFH
+         LD (DEF_TYPE),A            ; default type = SMART
+         LD E,0                     ; no sign
+         CALL L6A5C                 ; parse unsigned-constant
+         JR NZ,L5B4C                ; jump if no constant parsed
+
+         LD A,B
+	CP 8
+	JR NZ,L5B47
+	LD A,(IX+0)
+         CP ','
+	JR Z,L5B3B
+         CP ')'
+	JR NZ,L5B47
+
+L5B3B:	LD HL,_L17BA		; LIB
+	CALL O_CALHL
+         CALL L6B5E                 ; output length (C) and data at L7A57
+	JP L5BC9
+
+L5B47:   CALL L6201
+	JR L5B4F
+
+L5B4C:
+         LD A,0FFH                  ; default type = smart
+         CALL L5EE8                 ; parse expression
+
+L5B4F:   LD A,B
+;         CP 0EH                     ; type = LONGINT ?
+;         JR Z,L5B5C
+
+         CP 8
+	JR C,L5B58
+
+         CP 0EH+1
+	JR C,L5B5C
+
+L5B58:	CALL L72E1		; no condition
+	DB 42H			; error 66: I/O are not allowed
+
+L5B5C:   CP 0CH                     ; type = CHAR ?
+         JR NZ,L5B6A                ; jump if not
+
+         ; type = CHAR
+         CALL L6F0B                 ; match(':'), if present
+	JR NZ,L5BA6		; jump if ':' not matched
+
+         CALL L5EDD                 ; code to push CHAR as STRING
+	JR L5B72
+
+L5B6A:   CALL L6148                 ; generate code to push REAL, INTEGER,
+                                    ; BOOLEAN, CHAR, POINTER or LONGINT
+                                    ; on the stack
+	CALL L6F0B		; match(':'), if present
+	JR NZ,L5B8B		; jump if ':' not matched
+
+L5B72:   ; ':' parsed, size number expected
+         PUSH BC                    ; save type of expression before ':'
+
+         CALL L5E97                 ; parse integer expression
+
+         POP BC
+	LD A,B
+         CP 9                       ; type REAL ?
+         JR NZ,L5BA6                ; jump if not
+
+         ; type = REAL
+         ; second ':', number of digits after '.'
+         CALL L6F0B                 ; match(':'), if present
+	JR NZ,L5B9D		; jump if ':' not matched
+
+         ; second ':' parsed
+         PUSH BC
+         CALL O_PSHHL               ; code: push size on stack
+
+         CALL L5E97                 ; parse integer expression
+
+         POP BC
+	JR L5BA6
+
+L5B8B:   ; <expression>
+         LD HL,0000
+	LD A,B
+	CP 9
+	JR NZ,L5B95
+
+         ; type = REAL
+         LD L,12H                   ; default for first ':'
+
+L5B95:   CALL O_LDHL
+	LD A,B
+	CP 9
+	JR NZ,L5BA6
+
+L5B9D:   ; type = REAL
+         CALL O_PSHHL
+	LD HL,-1
+	CALL O_LDHL
+
+L5BA6:	LD A,B
+         LD HL,WriteTypesTable - 8*2
+         CALL TableIndex2
+
+         CALL O_CALHL
+
+L5BC9:   CALL L6F13                 ; match(','), if present
+	JP Z,L5B26		; jump if ',' matched
+	CALL L6F6E		; match(')')
+
+L5BD2:   LD HL,_L17CD               ; LIB, print CR LF codes
+         JP L5AB7
+
+WriteTypesTable:
+         DW _L17AA                  ; 08, write STRING
+         DW _L1779                  ; 09, write REAL
+         DW _L1726                  ; 0A, write INTEGER
+         DW _L178B                  ; 0B, write BOOLEAN
+         DW _L1722                  ; 0C, write CHAR
+         DW 0                       ; 0D, write .., reserved for BYTE
+         DW _PRT_LONG               ; 0E, write LONGINT
+
+L5BD8:   LD HL,_L18B6               ; LIB, read from typed file
+	JR L5BE0
+
+L5BDD:   LD HL,_L18DC               ; LIB, write to typed file
+
+L5BE0:   LD (L7BA7),HL
+	LD A,(L7BA3)
+	OR A
+
+	CALL L72DA		; NonZero --> error
+	DB 23H			; error 35: Textfile expected
+
+         LD HL,_L18A4               ; LIB, save FIB address and check
+                                    ; if the file is open
+	CALL O_CALHL
+
+         LD HL,(L7B5E)
+	CALL L5271
+
+L5BF7:	CALL L6F13		; match(','), if present
+	JR NZ,L5C10		; jump if ',' not matched
+
+	CALL L6D24		; push 13, L7B64
+         CALL L677F                 ; parse var parameter
+	CALL L6D43		; pop 13, L7B64
+
+         CALL L58C5                 ; perform type checking
+	LD HL,(L7BA7)
+	CALL O_CALHL
+	JR L5BF7
+
+L5C10:	CALL L6F6E		; match(')')
+	JP L5ABE
+
+L5C16:   ; PROCEDURE BlockRead(VAR F: FILE; VAR Dest: Type;
+         ;                     Num: INTEGER [; VAR Result: INTEGER]);
+         LD HL,_L1AF1               ; LIB, with result
+         LD DE,_L1ABE               ; LIB, without result
+	JR L5C24
+
+L5C1E:   ; PROCEDURE BlockWrite(VAR F: FILE; VAR Dest: Type;
+         ;                      Num: INTEGER [; VAR Result: INTEGER]);
+         LD HL,_L1AED               ; LIB, with result
+         LD DE,_L1ABA               ; LIB, without result
+
+L5C24:	PUSH HL
+	PUSH DE
+         CALL L5A0C                 ; parse '(' and file parameter
+	CP 7			; untyped file ?
+
+	CALL L72DA		; NonZero --> error
+	DB 25H			; error 37: Untyped file expected
+
+         CALL O_PSHHL               ; push address FIB
+         CALL L6F5E                 ; match(',')
+
+         CALL L677F                 ; parse VAR parameter
+         CALL O_PSHHL               ; push address of untyped variable
+         CALL L6F5E                 ; match(',')
+
+         CALL L5E97                 ; parse integer expression
+	CALL L6F13		; match(','), if present
+
+	POP DE
+	POP HL
+         JR Z,L5C4B                 ; jump if ',' matched = 'result' parameter
+
+         PUSH DE                    ; address LIB routine without result
+	JR L5C63
+
+L5C4B:   PUSH HL                    ; address LIB routine with result
+
+         CALL O_PSHHL               ; push Num parameter on stack
+
+;         CALL ParseIntVar           ; parse VAR integer parameter
+         CALL L677F                 ; parse VAR parameter
+
+         LD A,(L7B5C)
+         CP 0AH                     ; type = integer ?
+         JR NZ,L5C5F                ; jump if not integer
+
+         LD A,(L7B62)               ; A = sizeof var parameter (BYTE/INTEGER)
+         DEC A
+         JR NZ,L5C63                ; jump if size = 2 --> real INTEGER
+
+L5C5F:   CALL L72E1                 ; no condition
+         DB 18H                     ; error 24: Integer variable expected
+
+L5C63:
+         JP L5985
+
+L5C66:   ; PROCEDURE Delete(VAR S: STRING; Pos, Len: INTEGER);
+	CALL L6F66		; match('(')
+         CALL L5CAD                 ; parse VAR string variable
+	CALL O_PSHHL
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+	CALL O_PSHHL
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+	LD HL,_L08F3		; LIB
+L5C81:   CALL L6F6E                 ; match(')')
+	JP O_CALHL
+
+L5C87:	; PROCEDURE Insert(S: STRING; VAR D: STRING; Pos: INTEGER);
+	CALL L6F66		; match('(')
+         CALL L5ED0                 ; parse string expression
+         CALL L6F5E                 ; match(',')
+         CALL L5CAD                 ; parse VAR string variable
+	CALL O_PSHHL
+	LD A,(L7B62)
+	DEC A
+	LD H,A
+	LD L,6
+	PUSH HL
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+	POP HL
+	CALL O_HL
+	LD HL,_L0920		; LIB
+	JR L5C81
+
+L5CBA:   ; PROCEDURE Str(I: INTEGER; VAR S: STRING);
+         ; PROCEDURE Str(L: LONGINT; VAR S: STRING);
+         ; PROCEDURE Str(R: REAL; VAR S: STRING);
+         ; (INTEGER [: INTEGER],
+         ; (LONGINT [: INTEGER],
+         ; (REAL [: INTEGER [: INTEGER] ],
+	CALL L6F66		; match('(')
+         LD A,0FFH                  ; A = default type = smart
+         CALL L5EA2                 ; parse integer, longint or real expression
+         CALL L6148                 ; generate code to push REAL, INTEGER,
+                                    ; BOOLEAN, CHAR or POINTER on the stack
+	CALL L6F0B		; match(':'), if present
+	JR NZ,L5CE4		; jump if ':' not matched
+
+         PUSH BC                    ; save type of expression
+
+         CALL L5E97                 ; parse integer expression
+	CALL O_PSHHL
+
+         POP BC                     ; B = type of expression
+
+         LD A,B
+	CP 00AH
+         JR Z,L5D02                 ; INTEGER has no second ':'
+         CP 00EH
+         JR Z,L5D02                 ; LONGINT has no second ':'
+
+	CALL L6F0B		; match(':'), if present
+	JR NZ,L5CF9		; jump if ':' not matched
+
+	PUSH BC
+         CALL L5E97                 ; parse integer expression
+	CALL O_PSHHL
+	POP BC
+	JR L5D02
+
+L5CE4:   ; (INTEGER
+         ; (LONGINT
+         ; (REAL
+         LD HL,0                    ; assume ': 0' for an integer or longint
+	LD A,B
+         CP 00AH                    ; integer ?
+	JR Z,L5CEE
+         CP 00EH
+         JR Z,L5CEE                 ; longint ?
+
+         LD L,012H                  ; default ': 18' for a real
+
+L5CEE:   CALL O_LDHL
+	CALL O_PSHHL
+	LD A,B
+         CP 00AH                    ; integer ?
+         JR Z,L5D02                 ; an integer does not have a second ': x'
+         CP 00EH                    ; longint ?
+         JR Z,L5D02                 ; a longint does not have a second ': x'
+
+L5CF9:   LD HL,-1                   ; default second ': -1' for real
+	CALL O_LDHL
+	CALL O_PSHHL
+
+L5D02:   CALL L6F5E                 ; match(',')
+
+         PUSH BC
+
+         CALL L5CAD                 ; parse VAR string variable
+	LD A,(L7B62)
+	DEC A
+	LD H,A
+	LD L,6
+         CALL O_HL                  ; output: LD B,length of string variable
+
+         POP BC                     ; B = type of first expression
+
+         LD HL,_L1EBE               ; LIB, print INTEGER
+	LD A,B
+	CP 00AH
+	JR Z,L5D1F
+
+         LD HL,_L1EBC               ; LIB, print LONGINT
+         CP 00EH
+         JR Z,L5D1F
+
+         LD HL,_L1EBD               ; LIB, print REAL
+L5D1F:	JP L5C81
+
+L5D22:   ; PROCEDURE Val(S: STRING; VAR R: REAL; VAR P: INTEGER);
+         ; PROCEDURE Val(S: STRING; VAR L: LONGINT; P: INTEGER);
+	; PROCEDURE Val(S: STRING; VAR I,P: INTEGER);
+	CALL L6F66		; match('(')
+         CALL L5ED0                 ; parse string expression
+         CALL L6F5E                 ; match(',')
+         CALL L677F                 ; parse VAR parameter
+	LD A,(L7B5C)
+
+         CP 9                       ; type = REAL ?
+         JR Z,L5D45                 ; jump if type = REAL
+
+         CP 00EH                    ; type = LONGINT ?
+         JR Z,L5D45                 ; jump if type = LONGINT
+
+         CP 00AH                    ; type = INTEGER ?
+         JR NZ,L5D41                ; jump if not
+
+         LD A,(L7B62)
+	DEC A
+	LD A,00AH
+	JR NZ,L5D45
+
+L5D41:   CALL L72E1                 ; no condition
+         DB 1BH                     ; error 27: Integer, longint or
+                                    ; real variable expected
+
+L5D45:   PUSH AF
+	CALL O_PSHHL
+         CALL L6F5E                 ; match(',')
+         CALL L677F                 ; parse VAR parameter
+	LD A,(L7B5C)
+         CP 00AH                    ; type = integer ?
+	JR NZ,L5D5C		; jump if type <> integer
+
+	LD A,(L7B62)
+	DEC A
+	JR NZ,L5D60
+
+L5D5C:   CALL L72E1                 ; no condition
+	DB 18H			; error 24: Integer variable expected
+
+L5D60:   POP AF                     ; A = type
+	LD HL,_L1EF4		; LIB, val(string,integer,integer)
+         CP 00AH                    ; type = INTEGER ?
+	JR Z,L5D1F
+
+         LD HL,_L1EF2               ; LIB, val(string,longint,integer)
+         CP 00EH                    ; type = LONGINT ?
+         JR Z,L5D1F
+
+         LD HL,_L1EF3               ; LIB, val(string,real,integer)
+	JR L5D1F
+
+L5D6D:   ; PROCEDURE GotoXY(X, Y: INTEGER);
+	CALL L6F66		; match('(')
+         CALL L5E97                 ; parse integer expression
+	LD HL,_L1FDB		; LIB
+         JP L5D76
+
+L5D83:   ; PROCEDURE Randomize;
+	LD HL,_L1F48		; LIB
+	JP O_CALHL
+
+L5D89:   ; PROCEDURE Delay(mS: INTEGER);
+	CALL L6F66		; match('(')
+         CALL L5E97                 ; parse integer expression
+	LD HL,_L021D		; LIB
+         JP L5960                   ; match(')'), CALL HL
+
+L5E05:   ; PROCEDURE Move(VAR Source,Dest: TYPE; Length: INTEGER);
+	CALL L6F66		; match('(')
+         CALL L677F                 ; parse VAR parameter
+	CALL O_PSHHL
+         CALL L6F5E                 ; match(',')
+         CALL L677F                 ; parse VAR parameter
+	LD HL,_L1F64		; LIB, clear
+	JP L5D76
+
+L5E1A:   ; PROCEDURE FillChar(var Dest; Length: INTEGER; Data: CHAR);
+	; PROCEDURE FillChar(var Dest; Length: INTEGER; Data: BYTE);
+	CALL L6F66		; match('(')
+         CALL L677F                 ; parse VAR parameter
+	CALL O_PSHHL
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+	CALL O_PSHHL
+         CALL L6F5E                 ; match(',')
+         LD A,0AH                   ; A = default type = INTEGER
+         CALL L5EBB                 ; parse simple expression
+	LD HL,_L1F4E		; LIB, clear
+         JP L5960                   ; match(')'), CALL HL
+
+L5D94:   ; PROCEDURE GetMem(VAR P: POINTER; I: INTEGER);
+         CALL L5DE3                 ; parse '(', VAR pointer and O_PSHHL
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+	JR L5DAE
+
+L5D9F:	; PROCEDURE New(VAR P: POINTER);
+         CALL L5DE3                 ; parse '(', VAR pointer and O_PSHHL
+	LD HL,(L7B5E)
+	CALL L5271
+	LD HL,(L7B6F)
+	CALL O_LDHL
+
+L5DAE:	LD HL,_L1CE5		; LIB, clear
+         JP L5960                   ; match(')'), CALL HL
+
+L5DB4:	; PROCEDURE FreeMem(VAR P: POINTER; I: INTEGER);
+         CALL L5DE3                 ; parse '(', VAR pointer and O_PSHHL
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+	JR L5DCE
+
+L5DBF:	; PROCEDURE Dispose(VAR P: POINTER);
+         CALL L5DE3                 ; parse '(', VAR pointer and O_PSHHL
+	LD HL,(L7B5E)
+	CALL L5271
+	LD HL,(L7B6F)
+	CALL O_LDHL
+
+L5DCE:	LD HL,_L1D7A		; LIB, clear
+         JP L5960                   ; match(')'), CALL HL
+
+L5DD4:	; PROCEDURE Mark(VAR P: POINTER);
+	LD HL,_L1EA3		; LIB, clear
+	JR L5DDC
+
+L5DD9:	; PROCEDURE Release(VAR P: POINTER);
+	LD HL,_L1EAB		; LIB, clear
+
+L5DDC:   PUSH HL
+         CALL L5DE9                 ; parse '(' and VAR pointer
+	POP HL
+         JP L5960                   ; match(')'), CALL HL
+
+L5DE3:   ; parses a '(', VAR pointer and O_PSHHL
+         CALL L5DE9                 ; parse '(' and VAR pointer
+
+	JP O_PSHHL
+
+L5DE9:   ; parses a '(' and VAR pointer
+         CALL L6F66                 ; match('(')
+         CALL L677F                 ; parse VAR parameter
+	LD A,(L7B5C)
+         CP 4                       ; pointer variable parsed ?
+         RET Z                      ; return if yes
+
+	CALL L72E1		; no condition
+	DB 1CH			; error 28: Pointer variable expected
+
+L5DF9:   ; PROCEDURE OvrDrive(Drive: INTEGER);
+	CALL L6F66		; match('(')
+         CALL L5E97                 ; parse integer expression
+	LD HL,_L1CDB		; LIB, clear
+         JP L5960                   ; match(')'), CALL HL
+
+L5E38:   ; PROCEDURE CrtInit;
+	LD HL,_L030A		; LIB, done
+         JR L5E45                   ; CALL HL
+
+L5E3D:	; PROCEDURE CrtExit;
+	LD HL,_L0310		; LIB, done
+         JR L5E45                   ; CALL HL
+
+L5E42:	; PROCEDURE ClrScr;
+	LD HL,_L023E		; LIB, done
+
+L5E45:   JP O_CALHL
+
+L5E48:	; PROCEDURE ClrEol;
+	LD HL,_L0299		; LIB, done
+         JR L5E45                   ; CALL HL
+
+L5E4D:	; PROCEDURE NormVideo;
+	; PROCEDURE HighVideo;
+	LD HL,_L0284		; LIB, done
+         JR L5E45                   ; CALL HL
+
+L5E52:	; PROCEDURE LowVideo;
+	LD HL,_L026B		; LIB, done
+         JR L5E45                   ; CALL HL
+
+L5E57:	; PROCEDURE InsLine;
+	LD HL,_L0262		; LIB, done
+         JR L5E45                   ; CALL HL
+
+L5E5C:	; PROCEDURE DelLine;
+         LD HL,_L0259               ; LIB, done
+         JR L5E45                   ; CALL HL
+
+P_ErrorExit:
+         ; PROCEDURE ErrorExit;
+
+         CALL L6F1B                 ; match('('), if present
+         JR NZ,P_ErrorExit1         ; jump if '(' not matched
+
+         CALL L5EA2                 ; parse integer, longint or real expression
+
+         CALL L6F6E                 ; match(')')
+
+P_ErrorExit1:
+         LD HL,_ErrorExit
+         JP O_CALHL
+
+L5E61:   ; PROCEDURE Exit;
+         LD DE,0000                 ;
+         JP L5639
+
+L5E67:	; PROCEDURE Halt;
+	LD HL,_L20D4		; LIB, done
+	JP O_JPHL
+
+L5E6D:   ; PROCEDURE Port(Port: INTEGER);
+         CALL L5E8E                 ; parse array index, ':=', integer expr.
+
+	CALL O_CODE
+	DB 3
+	DB 0C1H			; POP BC
+	DB 0EDH,69H		; OUT (C),L
+
+	RET
+
+L5E78:   ; StackPtr:= INTEGER;
+	CALL L6F7E		; match(':=')
+         CALL L5E97                 ; parse integer expression
+
+	CALL O_CODE
+	DB 1
+	DB 0F9H			; LD SP,HL
+
+	RET
+
+L6360:   ; FUNCTION Sqr(I: INTEGER): INTEGER;
+         ; FUNCTION Sqr(L: LONGINT): LONGINT;
+	; FUNCTION Sqr(R: REAL): REAL;
+         CALL L65E7                 ; parse integer, longint or real expression
+
+	LD HL,_L06F3		; LIB, Sqr(I: INTEGER): INTEGER;
+	LD A,B
+         CP 00AH                    ; type = INTEGER ?
+         JR Z,L636E                 ; jump if type = INTEGER
+
+         LD HL,_L_SQR
+         CP 00EH                    ; type = LONGINT ?
+         JR Z,L636E                 ; jump if type = LONGINT
+
+	LD HL,_L09F7		; LIB, Sqr(R: REAL): REAL;
+
+L636E:	JP O_CALHL
+
+L6371:   ; FUNCTION Abs(I: INTEGER): INTEGER;
+	; FUNCTION Abs(R: REAL): REAL;
+         ; FUNCTION Abs(L: LONGINT): LONGINT;
+         CALL L65E7                 ; parse integer, longint or real expression
+	LD A,B
+         CP 00AH                    ; type = INTEGER ?
+	JR Z,L6380
+
+         CP 00EH                    ; type = LONGINT ?
+         JR Z,L63801
+
+         ; code for REAL
+	CALL O_CODE
+	DB 2
+	DB 0CBH,0B8H		; RES 7,B
+
+	RET
+
+L6380:	; FUNCTION Abs(I: INTEGER): INTEGER;
+	LD HL,_L0780		; LIB, absolute HL, done
+	JR L63CF
+
+L63801:  ; FUNCTION Abs(L: LONGINT): LONGINT;
+         LD HL,_L_ABS
+         LD B,0EH                   ; return type = LONGINT
+         JP O_CALHL
+
+L6385:   ; FUNCTION Sqrt(R: REAL): REAL;
+	LD HL,_L0C46		; LIB, clear
+         JR L63AB
+
+L638A:   ; FUNCTION Sin(R: REAL): REAL;
+	LD HL,_L0C87		; LIB, clear
+	JR L63AB
+
+L638F:   ; FUNCTION Cos(R: REAL): REAL;
+	LD HL,_L0C7F		; LIB, clear
+	JR L63AB
+
+L6394:   ; FUNCTION ArcTan(R: REAL): REAL;
+	LD HL,_L0E46		; LIB, clear
+	JR L63AB
+
+L6399:   ; FUNCTION Ln(R: REAL): REAL;
+	LD HL,_L0D2B		; LIB, clear
+	JR L63AB
+
+L639E:   ; FUNCTION Exp(R: REAL): REAL;
+	LD HL,_L0DB6		; LIB, clear
+	JR L63AB
+
+L63A3:   ; FUNCTION Int(R: REAL): REAL;
+	LD HL,_L0BFD		; LIB, clear
+	JR L63AB
+
+L63A8:   ; FUNCTION Frac(R: REAL): REAL;
+	LD HL,_L0C34		; LIB, clear
+
+L63AB:	PUSH HL
+         CALL L65E7                 ; parse integer, longint or real expression
+
+	LD A,B
+         CP 009H                    ; type = REAL ?
+         JR Z,L63AD                 ; jump if type = REAL
+
+	LD HL,_L1008		; LIB, convert integer HL to float HLDEBC
+         CP 00AH                    ; type = INTEGER ?
+         JR Z,L63AC                 ; jump if type = INTEGER
+
+         LD HL,_L_R                 ; LONGINT to REAL conversion
+
+L63AC:   CALL O_CALHL
+
+L63AD:
+	POP HL
+	LD B,9
+	JP O_CALHL
+
+L63BE:   ; FUNCTION Trunc(R: REAL): INTEGER;
+	LD HL,_L0FDE		; LIB, float HLDEBC to int HL, clear
+	JR L63C6
+
+L63C3:   ; FUNCTION Round(R: REAL): INTEGER;
+	LD HL,_L0FD0		; LIB, clear
+
+L63C6:   PUSH HL
+         CALL L65E7                 ; parse integer, longint or real expression
+	POP HL
+	LD A,B
+	CP 00AH			; integer ?
+         RET Z                      ; yes, return
+
+         CP 00EH                    ; longint ?
+         RET Z                      ; yes, return
+
+L63CF:	LD B,00AH
+	JP O_CALHL
+
+L63D4:   ; FUNCTION Succ(X: SCALAR): SCALAR;
+         LD A,0FFH                  ; type = smart
+         CALL L65EF                 ; match('('), simple expression, match(')')
+
+         LD A,B
+         CP 0EH                     ; type = LONGINT ?
+         JR NZ,L63D5                ; jump if not
+
+         LD HL,_L_SUCC
+         JP O_CALHL
+
+L63D5:
+         LD A,023H                  ; opcode: INC HL
+         JP O_BYTE
+
+L63D7:   ; FUNCTION Pred(X: SCALAR) : SCALAR;
+         LD A,0FFH                  ; type = smart
+         CALL L65EF                 ; match('('), simple expression, match(')')
+
+         LD A,B
+         CP 0EH                     ; type = LONGINT ?
+         JR NZ,L63D8                ; jump if not
+
+         LD HL,_L_PRED
+         JP O_CALHL
+
+L63D8:
+         LD A,2BH                   ; opcode: DEC HL
+	JP O_BYTE
+
+L63E1:   ; FUNCTION Low(I: INTEGER): INTEGER;
+         ; FUNCTION Low(L: LONGINT): INTEGER;
+         LD A,0FFH                  ; type = smart
+         CALL PARSE_O_IL_C
+;         CALL L65DE                 ; parse '(', integer expression and ')'
+
+         LD A,B
+         CP 0EH                     ; type = LONGINT ?
+
+         JR NZ,L63E2                ; jump if not LONGINT
+
+         LD B,0AH                   ; no code generation
+                                    ; return type = INTEGER
+         RET
+
+L63E2:
+         CALL O_CODE
+	DB 2
+	DB 26H,00H		; LD H,0
+
+         ; return same type
+         RET
+
+L63EB:	; FUNCTION Hi(I: INTEGER): INTEGER;
+         ; FUNCTION Hi(L: LONGINT): INTEGER;
+         LD A,0FFH                  ; type = smart
+         CALL PARSE_O_IL_C
+;         CALL L65DE                 ; parse '(', integer expression and ')'
+
+         LD A,B
+         CP 0EH                     ; type = LONGINT ?
+
+         JR NZ,L63EC                ; jump if not LONGINT
+
+         LD B,0AH                   ; return type = INTEGER
+         LD A,0EBH                  ; opcode: EX DE,HL
+         JP O_BYTE
+
+L63EC:
+	CALL O_CODE
+	DB 3
+	DB 6CH			; LD L,H
+	DB 26H,00H		; LD H,0
+
+         ; return same type
+	RET
+
+L63F6:	; FUNCTION Swap(I: INTEGER): INTEGER;
+         LD A,0FFH                  ; type = smart
+         CALL PARSE_O_IL_C
+
+         LD A,B
+         CP 0EH                     ; type = LONGINT ?
+
+         JR NZ,L63F7                ; jump if not LONGINT
+
+         LD A,0EBH                  ; opcode: EX DE,HL
+         JP O_BYTE                  ; output code and return same type
+
+L63F7:
+	CALL O_CODE
+	DB 3
+	DB 7DH			; LD A,L
+	DB 6CH			; LD L,H
+	DB 67H			; LD H,A
+
+	RET
+
+L6401:   ; FUNCTION Odd(I: INTEGER): BOOLEAN;
+         LD A,0FFH                  ; type = smart
+         CALL PARSE_O_IL_C
+;         CALL L65DE                 ; parse '(', integer expression and ')'
+
+         LD HL,_L078B               ; LIB, make integer HL a boolean, clear
+
+L6407:   LD B,00BH
+         JP O_CALHL
+
+L640C:   ; FUNCTION KeyPressed: BOOLEAN;
+         LD HL,_CONSTPTR            ; LIB
+	JR L6407
+
+L6411:   ; Function Ord(X: SCALAR): INTEGER;
+	CALL L6F66		; match('(')
+         LD A,0AH                   ; A = default type = INTEGER
+         CALL L5EE8                 ; parse expression
+	CALL L6F6E		; match(')')
+	LD A,B
+         CP 4                       ; POINTER type ?
+         JR Z,L6422                 ; jump if POINTER type
+
+         CALL L5EBE                 ; check for a simple type expression
+
+L6422:   LD B,00AH
+	RET
+
+L6425:   ; FUNCTION Chr(I: INTEGER): CHAR;
+         ; FUNCTION Chr(L: LONGINT): CHAR;
+         LD A,0FFH                  ; type = smart
+         CALL PARSE_O_IL_C
+;         CALL L65DE                 ; parse '(', integer expression and ')'
+
+	LD B,00CH
+	RET
+
+L642B:   ; Function Ptr(I: INTEGER): POINTER;
+         CALL PARSE_O_IL_C
+;         CALL L65DE                 ; parse '(', integer expression and ')'
+
+         LD HL,0000
+	LD (L7B8B),HL
+         LD B,4                     ; return POINTER type
+	RET
+
+L6437:   ; FUNCTION UpCase(Ch: CHAR): CHAR;
+         LD A,0CH                   ; A = default expression = CHARC
+	CALL L65EF
+	LD B,00CH
+	LD HL,_L1FE4		; LIB, clear
+         JP O_CALHL
+
+L6441:   ; FUNCTION Length(S: STRING): INTEGER;
+	CALL L6F66		; match('(')
+	LD HL,_L08A3		; LIB, clear
+
+L6447:   PUSH HL
+         CALL L5ED0                 ; parse string expression
+	CALL L6F6E		; match(')')
+	POP HL
+	JP L63CF
+
+L6452:   ; FUNCTION Pos(Pattern, Source: STRING): INTEGER;
+	CALL L6F66		; match('(')
+         CALL L5ED0                 ; parse string expression
+         CALL L6F5E                 ; match(',')
+	LD HL,_L08B2		; LIB, clear
+	JR L6447
+
+L6460:   ; FUNCTION Copy(S: STRING; Pos, Len: INTEGER): STRING;
+	CALL L6F66		; match('(')
+         CALL L5ED0                 ; parse string expression
+         CALL L6F5E                 ; match(',')
+         CALL L5E97                 ; parse integer expression
+         CALL L6F5E                 ; match(',')
+	CALL O_PSHHL
+         CALL L5E97                 ; parse integer expression
+	CALL L6F6E		; match(')')
+	LD HL,_L086B		; LIB, clear
+	CALL O_CALHL
+
+L647E:	LD B,8
+	RET
+
+L6481:   ; FUNCTION Concat(S1,S2,...,Sn: STRING);
+	CALL L6F66		; match('(')
+         CALL L5ED0                 ; parse string expression
+L6487:	CALL L6F13		; match(','), if present
+	JR NZ,L6497		; jump if ',' not matched
+         CALL L5ED0                 ; parse string expression
+	LD HL,_L083D		; LIB, clear
+	CALL O_CALHL
+	JR L6487
+
+L6497:	CALL L6F6E		; match(')')
+	JR L647E
+
+L649C:   ; FUNCTION ParamCount: INTEGER;
+	LD HL,_L1F9B		; LIB, clear
+	JR L64BF
+
+L64A1:   ; FUNCTION ParamStr(N: INTEGER): STRING;
+         CALL L65DE                 ; parse '(', integer expression and ')'
+
+	LD HL,_L1F7D		; LIB, clear
+	LD B,8
+	JP O_CALHL
+
+L64AC:   ; FUNCTION Random(Range: INTEGER): INTEGER;
+	; FUNCTION Random: REAL;
+	CALL L6F1B		; match('('), if present
+	LD HL,_L0FB4		; LIB, clear
+	LD B,9			; assume REAL type
+	JR NZ,L64C1		; jump if '(' not matched
+
+         CALL L5E97                 ; parse integer expression
+	CALL L6F6E		; match(')')
+	LD HL,_L073B		; LIB, clear
+
+L64BF:	LD B,00AH		; INTEGER type
+
+L64C1:	JP O_CALHL
+
+L64C4:   ; FUNCTION IOresult: BYTE (BOOLEAN in manual ?)
+	LD HL,_L1FF1		; LIB, clear
+	JR L64BF
+
+L64C9:   ; FUNCTION Eof(VAR F: FILE): BOOLEAN;
+	CALL L65F7
+
+	LD HL,L6615		; table of three file types
+	CALL L59E9		; generate call for file IO
+L64D2:   LD B,00BH                  ; returns BOOLEAN type
+	RET
+
+L6615:   DW _L1A49                  ; LIB, Eof, typed file,   type 5
+         DW _L17E6                  ; LIB, Eof, text,         type 6
+	DW _L1A49		; LIB, Eof, untyped file, type 7
+
+L64D5:   ; FUNCTION SeekEof(VAR F: TEXT): BOOLEAN;
+	LD HL,_L17E1		; LIB, clear
+	JR L64E2
+
+L64DA:   ; FUNCTION SeekEoln(VAR F: TEXT): BOOLEAN;
+	LD HL,_L17D7		; LIB, clear
+	JR L64E2
+
+L64DF:   ; FUNCTION Eoln(VAR F: TEXT): BOOLEAN;
+	LD HL,_L17DC		; LIB, clear
+
+L64E2:	PUSH HL
+	CALL L65F7
+
+	CP 6			; text file ?
+
+	CALL L72DA		; NonZero --> error
+	DB 23H			; error 35: Textfile expected
+
+	POP HL
+	CALL O_CALHL
+	JR L64D2
+
+L64F2:   ; FUNCTION FilePos(VAR F: FILE OF TYPE): INTEGER;
+	; FUNCTION FilePos(VAR F: FILE): INTEGER;
+	LD HL,_L1A55		; LIB, clear
+	LD DE,_L1A55		; LIB, clear
+         JR L6500
+
+L64FA:   ; FUNCTION FileSize(VAR F: FILE OF TYPE): INTEGER;
+	; FUNCTION FileSize(var F: FILE): INTEGER;
+	LD HL,_L1A5D		; LIB, clear
+	LD DE,_L1A5D		; LIB, clear
+
+L6500:	PUSH HL
+	PUSH DE
+         CALL L65F7
+	POP DE
+	POP HL
+	CP 6			; text file ?
+
+	CALL L72D4		; Zero --> error
+	DB 3FH			; error 63: Textfiles are not allowed here
+
+	CP 5			; typed file ?
+         JR Z,L7FA9 ; 33e,L 64BF                 ; jump if typed file
+	EX DE,HL
+         JR L7FA9 ; 33e, L64BF
+
+; 33e
+L7FA9:
+         LD B,0EH                   ; LONGINT type
+         JP O_CALHL
+; 33e
+
+L6514:   ; FUNCTION MemAvail: INTEGER;
+	LD HL,_L1E3D		; LIB, clear
+	JR L64BF
+
+L6519:   ; FUNCTION MaxAvail: INTEGER;
+	LD HL,_L1E44		; LIB, clear
+	JR L64BF
+
+L651E:   ; PROCEDURE Bios(Func,Param: INTEGER);
+	LD A,0AFH		; LD A,XOR A
+	JR L6520
+
+L651F:	; FUNCTION Bios(Func,Param: INTEGER): BYTE;
+	XOR A
+L6520:	PUSH AF			; save flag for FUNCTION/PROCEDURE
+	CALL L6F66		; match('(')
+         CALL L5E97                 ; parse integer expression
+
+	CALL O_PSHHL		; push Func
+
+	CALL L6F13		; match(','), if present
+         JR NZ,L6538                ; jump if ',' not matched
+
+         CALL L5E97                 ; parse integer expression
+
+	; BC = Param
+	CALL O_CODE
+	DB 2
+	DB 44H			; LD B,H
+	DB 4DH			; LD C,L
+
+L6538:	CALL O_CODE
+	DB 1
+	DB 0D1H			; POP DE, E = Func
+
+	LD HL,_L1FEA		; LIB, clear
+         JP L6540
+
+L6553:   ; PROCEDURE Bdos(Func,Param: INTEGER);
+	LD A,0AFH		; LD A,XOR A
+	JR L6555
+
+L6554:	; FUNCTION Bdos(Func,Param: INTEGER): BYTE;
+	XOR A
+L6555:	PUSH AF			; save flag for FUNCTION/PROCEDURE
+	CALL L6F66		; match('(')
+         CALL L5E97                 ; parse integer expression
+
+	CALL O_PSHHL		; push function number in L
+
+	CALL L6F13		; match(','), if present
+	JR NZ,L656C		; jump if ',' not matched
+         CALL L5E97                 ; parse integer expression
+
+	CALL O_CODE
+	DB 1
+	DB 0EBH			; EX DE,HL
+
+L656C:	CALL O_CODE
+	DB 1
+	DB 0C1H			; POP BC, restore function number in C
+
+	LD HL,0005H
+         JP L6540                   ; output: CALL 0005H
+
+L6576:   ; FUNCTION ADDR(VAR Variable): INTEGER;
+	CALL L6F66		; match('(')
+	LD BC,500H
+	CALL L6E54		; check if current in id list
+	JR Z,L6589
+	LD BC,600H
+	CALL L6E54		; check if current in id list
+	JR NZ,L6594
+
+L6589:   DEC HL
+	DEC HL
+	LD D,(HL)
+	DEC HL
+	LD E,(HL)
+	EX DE,HL
+
+L658F:   CALL O_LDHL
+	JR L6597
+
+L6594:   CALL L677F                 ; parse var parameter
+L6597:	CALL L6F6E		; match(')')
+	LD B,00AH
+	RET
+
+L659D:	; FUNCTION SizeOf(VAR Variable): INTEGER;
+	CALL L6F66		; match('(')
+	LD BC,300H
+	CALL L6E54		; check if current in id list, types
+	JR NZ,L65B1
+	LD D,(HL)
+	DEC HL
+	LD E,(HL)
+	EX DE,HL
+	CALL L5287		; 8 bytes from HL (down) to 7B5C (up)
+	JR L65BA
+
+L65B1:   PUSH IY
+         CALL L677F                 ; parse var parameter
+	POP HL
+	CALL L6CC2
+
+L65BA:   LD HL,(L7B62)              ; HL = size of variable
+	JR L658F
+
+L65BF:   ; FUNCTION Port(N: INTEGER): BYTE;
+         CALL L65D5                 ; parse an array index
+
+	CALL O_CODE
+	DB 3
+	DB 4DH			; LD C,L
+	DB 0EDH,68H		; IN L,(C)
+
+	RET
+
+L65CA:	; FUNCTION StackPtr: INTEGER
+	; returns stackptr value
+
+	CALL O_CODE
+	DB 4
+	DB 21H,00H,00H		; LD HL,0000
+	DB 39H			; ADD HL,SP
+
+	LD B,00AH		; result = integer
+	RET
+
+P_DOSErrorHandlerOn:
+         LD HL,_DOSErrorHandlerOn
+         JP O_CALHL
+
+P_DOSErrorHandlerOff:
+         LD HL,_DOSErrorHandlerOff
+         JP O_CALHL
+
+L7638:   ; Procedure's
+         DC 'FWRITELN'
+         DW L5AE7                   ; Fast WRITELN
+
+         DC 'WRITELN'               ; 1x list
+         DW L5AE71
+
+         DC 'FWRITE'
+         DW L5AE8                   ; Fast WRITE
+
+         DC 'WRITE'
+         DW L5AE81
+
+	DC 'READLN'
+         DW L5A32
+
+	DC 'READ'
+         DW L5A33
+
+	DC 'DELETE'
+         DW L5C66                   ; OK
+
+	DC 'INSERT'
+         DW L5C87
+
+	DC 'ASSIGN'                ; OK
+         DW L5943
+
+	DC 'RESET'
+         DW L59B9                   ; OK
+
+	DC 'REWRITE'
+         DW L59BE                   ; OK
+
+	DC 'CLOSE'
+         DW L59DB                   ; OK
+
+	DC 'ERASE'
+         DW L5971                   ; OK
+
+	DC 'RENAME'
+         DW L5966                   ; OK
+
+         DC 'RENAMEFILE'            ; OK
+         DW P_RENAMEFILE
+
+	DC 'SEEK'
+         DW L598C                   ; OK
+
+         DC 'GETMEM'
+         DW L5D94                   ; OK
+
+	DC 'NEW'
+         DW L5D9F                   ; OK
+
+	DC 'FREEMEM'
+         DW L5DB4                   ; OK
+
+         DC 'DISPOSE'
+         DW L5DBF                   ; OK
+
+         DC 'MARK'
+         DW L5DD4                   ; OK
+
+         DC 'RELEASE'
+         DW L5DD9                   ; OK
+
+	DC 'OVRDRIVE'
+         DW L5DF9                   ; OK
+
+	DC 'CRTINIT'
+         DW L5E38                   ; OK
+
+	DC 'CRTEXIT'
+         DW L5E3D                   ; OK
+
+	DC 'GOTOXY'
+         DW L5D6D                   ; OK
+
+	DC 'CLRSCR'
+         DW L5E42                   ; OK
+
+	DC 'CLREOL'
+         DW L5E48                   ; OK
+
+	DC 'NORMVIDEO'
+         DW L5E4D                   ; OK
+
+	DC 'HIGHVIDEO'
+         DW L5E4D                   ; OK
+
+	DC 'LOWVIDEO'
+         DW L5E52                   ; OK
+
+	DC 'INSLINE'
+         DW L5E57                   ; OK
+
+	DC 'DELLINE'
+         DW L5E5C                   ; OK
+
+	DC 'DELAY'
+         DW L5D89                   ; OK
+
+	DC 'BLOCKREAD'
+         DW L5C16                   ; OK
+
+	DC 'BLOCKWRITE'
+         DW L5C1E                   ; OK
+
+	DC 'RANDOMIZE'
+         DW L5D83                   ; OK
+
+	DC 'MOVE'
+         DW L5E05                   ; OK
+
+	DC 'FILLCHAR'
+         DW L5E1A                   ; OK
+
+         DC 'ERROREXIT'
+         DW P_ErrorExit             ; ??
+
+	DC 'EXIT'
+         DW L5E61                   ; OK
+
+	DC 'HALT'
+         DW L5E67                   ; OK
+
+         DC 'PORT'
+         DW L5E6D                   ; OK
+
+	DC 'STACKPTR'              ; stackptr assignment
+         DW L5E78                   ; OK
+
+	DC 'FLUSH'
+         DW L59AB                   ; OK
+
+	DC 'EXECUTE'
+         DW L597E                   ; OK
+
+	DC 'CHAIN'
+         DW L5979                   ; OK
+
+	DC 'STR'
+         DW L5CBA                   ; OK
+
+	DC 'VAL'
+         DW L5D22                   ; OK
+
+	DC 'BDOS'
+         DW L6553                   ; OK
+
+	DC 'BIOS'
+         DW L651E                   ; OK
+
+         DC 'DOSERRORHANDLERON'
+         DW P_DOSErrorHandlerOn
+
+         DC 'DOSERRORHANDLEROFF'
+         DW P_DOSErrorHandlerOff
+
+         ; GIOS Procedures
+         DC 'DELETEFILE'
+         DW P_DELETEFILE
+
+         DC 'DEFINEPICTURE'
+         DW P_DEFINEPICTURE
+
+         DC 'PFILLSHAPE'
+         DW P_PFILLSHAPE
+
+         DC 'PPAINT'
+         DW P_PPAINT
+
+         DC 'MEMEXPAND'
+         DW P_MEMEXPAND
+
+         DC 'MEMTOVRAM'
+         DW P_MEMTOVRAM
+
+         DC 'MEMLOADPICTURE'
+         DW P_MEMLOADPICTURE
+
+;         DC 'MEMUNCRUNCH'
+;         DW P_MEMUNCRUNCH
+
+         DC 'MEMSAVEPICTURE'
+         DW P_MEMSAVEPICTURE
+
+         DC 'SETCLIPPING'
+         DW P_SETCLIPPING
+
+         DC 'SETVIEWPORT'
+         DW P_SETVIEWPORT
+
+         DC 'GETVIEWPORT'
+         DW P_GETVIEWPORT
+
+         DC 'MEMCOPY'
+         DW P_MEMCOPY
+
+         DC 'BLOAD'
+         DW P_BLOAD
+
+         DC 'BSAVE'
+         DW P_BSAVE
+
+         DC 'CHANGECOLOR'
+         DW P_CHANGECOLOR
+
+         DC 'CHANGESCREEN'
+         DW P_CHANGESCREEN
+
+         DC 'CIRCLE'
+         DW P_CIRCLE
+
+         DC 'CLEARMEM'
+         DW P_CLEARMEM
+
+         DC 'DATE'
+         DW P_DATE
+
+         DC 'DISPLAYPAGE'
+         DW P_DISPLAYPAGE
+
+         DC 'ELLIPSE'                ; name not completely English !
+         DW P_ELLIPSE
+
+         DC 'EXPAND'
+         DW P_EXPAND
+
+         DC 'FASTBOX'
+         DW P_FASTBOX
+
+         DC 'FASTCOPY'
+         DW P_FASTCOPY
+
+         DC 'FILLBOX'
+         DW P_FILLBOX
+
+         DC 'FILLSHAPE'
+         DW P_FILLSHAPE
+
+         DC 'FILLSPRITE'
+         DW P_FILLSPRITE
+
+         DC 'GCOPY'
+         DW P_GCOPY
+
+         DC 'GETDOSVERSION'
+         DW P_GETDOSVERSION
+
+         DC 'LINE'
+         DW P_LINE
+
+         DC 'LOADPICTURE'
+         DW P_LOADPICTURE
+
+         DC 'LOADVRAM'
+         DW P_LOADVRAM
+
+         DC 'MEMREADFILE'
+         DW P_MEMREADFILE
+
+         DC 'MEMWRITEFILE'
+         DW P_MEMWRITEFILE
+
+         DC 'MEMAPPENDFILE'
+         DW P_MEMAPPENDFILE
+
+         DC 'MOVEVRAM'
+         DW P_MOVEVRAM
+
+         DC 'PAINT'
+         DW P_PAINT
+
+         DC 'PSET'
+         DW P_PSET
+
+         DC 'PUTSPRITE'
+         DW P_PUTSPRITE
+
+         DC 'READMEM'
+         DW P_READMEM
+
+         DC 'READSECTOR'
+         DW P_READSECTOR
+
+         DC 'SAVEPICTURE'
+         DW P_SAVEPICTURE
+
+;         DC 'SAVEVRAM'
+;         DW P_SAVEVRAM
+
+         DC 'SCREEN'
+         DW P_SCREEN
+
+         DC 'SCREENOFF'
+         DW P_SCREENOFF
+
+         DC 'SCREENON'
+         DW P_SCREENON
+
+         DC 'SETCHANNEL'
+         DW P_SETCHANNEL
+
+         DC 'SOUND'
+         DW P_SOUND
+
+         DC 'SPRITEATTRIBUTEADDRESS'
+         DW P_SPRITEATTRIBUTEADDRESS
+
+         DC 'SPRITECOLOR'
+         DW P_SPRITECOLOR
+
+         DC 'SPRITEPATTERN'
+         DW P_SPRITEPATTERN
+
+         DC 'SPRITEPATTERNADDRESS'
+         DW P_SPRITEPATTERNADDRESS
+
+         DC 'SPRITESIZE'
+         DW P_SPRITESIZE
+
+         DC 'SPRITESOFF'
+         DW P_SPRITESOFF
+
+         DC 'SPRITESON'
+         DW P_SPRITESON
+
+         DC 'TIME'
+         DW P_TIME
+
+;         DC 'UNCRUNCH'
+;         DW P_UNCRUNCH
+
+         DC 'VPOKE'
+         DW P_VPOKE
+
+         DC 'WAITVDP'
+         DW P_WAITVDP
+
+         DC 'WRITEMEM'
+         DW P_WRITEMEM
+
+         DC 'WRITESECTOR'
+         DW P_WRITESECTOR
+
+         DC 'WRITEVDP'
+         DW P_WRITEVDP
+
+         DB 0                       ; end of this table
+
+
+L77B1:   ; Functions
+         DC 'CHR'                   ; 1x list
+         DW L6425                   ; OK
+
+	DC 'ORD'
+         DW L6411                   ; OK
+
+	DC 'COPY'
+         DW L6460                   ; OK
+
+	DC 'LENGTH'
+         DW L6441                   ; OK
+
+	DC 'POS'
+         DW L6452                   ; OK
+
+	DC 'CONCAT'
+         DW L6481                   ; OK
+
+	DC 'SUCC'
+         DW L63D4                   ; OK
+
+	DC 'PRED'
+         DW L63D7                   ; OK
+
+	DC 'UPCASE'
+         DW L6437                   ; OK
+
+	DC 'TRUNC'
+         DW L63BE                   ; OK
+
+	DC 'ROUND'
+         DW L63C3                   ; OK
+
+	DC 'ODD'
+         DW L6401                   ; OK
+
+         DC 'ABS'
+         DW L6371                   ; OK
+
+	DC 'SQR'
+         DW L6360                   ; OK
+
+	DC 'SQRT'
+         DW L6385                   ; OK
+
+	DC 'SIN'
+         DW L638A                   ; OK
+
+	DC 'COS'
+         DW L638F                   ; OK
+
+	DC 'ARCTAN'
+         DW L6394                   ; OK
+
+	DC 'LN'
+         DW L6399                   ; OK
+
+	DC 'EXP'
+         DW L639E                   ; OK
+
+         DC 'INT'
+         DW L63A3                   ; OK
+
+         DC 'FRAC'
+         DW L63A8                   ; OK
+
+	DC 'RANDOM'
+         DW L64AC                   ; OK
+
+	DC 'PARAMCOUNT'
+         DW L649C                   ; OK
+
+	DC 'PARAMSTR'
+         DW L64A1                   ; OK
+
+	DC 'LO'
+         DW L63E1                   ; OK
+
+	DC 'HI'
+         DW L63EB                   ; OK
+
+         DC 'SWAP'
+         DW L63F6                   ; OK
+
+	DC 'PTR'
+         DW L642B                   ; OK
+
+	DC 'IORESULT'
+         DW L64C4                   ; OK
+
+	DC 'EOF'
+         DW L64C9                   ; OK
+
+	DC 'EOLN'
+         DW L64DF                   ; OK
+
+	DC 'SEEKEOF'
+         DW L64D5                   ; OK
+
+	DC 'SEEKEOLN'
+         DW L64DA                   ; OK
+
+	DC 'FILESIZE'
+         DW L64FA                   ; OK
+
+	DC 'FILEPOS'
+         DW L64F2                   ; OK
+
+	DC 'KEYPRESSED'
+         DW L640C                   ; OK
+
+	DC 'MEMAVAIL'
+         DW L6514                   ; OK
+
+	DC 'MAXAVAIL'
+         DW L6519                   ; OK
+
+	DC 'PORT'
+         DW L65BF                   ; OK
+
+	DC 'STACKPTR'              ; stackptr value
+         DW L65CA                   ; OK
+
+	DC 'ADDR'
+         DW L6576                   ; OK
+
+	DC 'SIZEOF'                ; OK
+         DW L659D
+
+	DC 'BDOSHL'
+         DW L6553                   ; OK
+
+	DC 'BDOS'
+         DW L6554                   ; OK
+
+	DC 'BIOSHL'
+         DW L651E                   ; OK
+
+	DC 'BIOS'
+         DW L651F                   ; OK
+
+         ; GIOS Functions
+         DC 'TSRPRESENT'
+         DW F_TSRPRESENT            ; OK
+
+         DC 'GETCLIPPING'
+         DW F_GETCLIPPING
+
+         DC 'SIMULATEDDISK'
+         DW F_SIMULATEDDISK
+
+         DC 'FINDFIRST'
+         DW F_FINDFIRST             ; OK
+
+         DC 'FINDNEXT'
+         DW F_FINDNEXT              ; OK
+
+         DC 'GETDRIVE'
+         DW F_GETDRIVE              ; OK
+
+         DC 'TESTDRIVE'
+         DW F_TESTDRIVE             ; OK
+
+         DC 'GETERROR'
+         DW F_GETERROR              ; OK
+
+         DC 'GETFKEY'
+         DW F_GETFKEY               ; OK
+
+         DC 'GETPAD'
+         DW F_GETPAD                ; OK
+
+         DC 'GETPDL'
+         DW F_GETPDL                ; OK
+
+         DC 'GETCHANNEL'
+         DW F_GETCHANNEL            ; OK
+
+         DC 'GETPAGEID'
+         DW F_GETPAGEID             ; OK
+
+         DC 'POINT'
+         DW F_POINT                 ; OK
+
+         DC 'READPSG'
+         DW F_READPSG               ; OK
+
+         DC 'READSTATUS'
+         DW F_READSTATUS            ; OK
+
+         DC 'READVDP'
+         DW F_READVDP               ; OK
+
+         DC 'SEARCH'
+         DW F_SEARCH
+
+         DC 'SETDATE'
+         DW F_SETDATE
+
+         DC 'SETMEM'
+         DW F_SETMEM                ; OK
+
+         DC 'SETTIME'
+         DW F_SETTIME
+
+         DC 'STICK'
+         DW F_STICK                 ; OK
+
+         DC 'STRIG'
+         DW F_STRIG                 ; OK
+
+         DC 'VPEEK'
+         DW F_VPEEK
+
+         DB 0                       ; end of this table
+
+         END
